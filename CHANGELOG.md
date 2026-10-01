@@ -3,6 +3,13 @@
 All notable changes to Windows Manager (called Windows Software Manager in 2.0, and Windows Package Manager before
 1.0). The version is `$AppVersion` in `src\00-Startup.ps1`, which Build-Exe.ps1 also stamps on the exe.
 
+## 2.2.0.2 - 2026-10-01
+
+- **Fixed:** after an update, `Windows Manager.exe.old` was left next to the app. The new version tried to delete it
+  while the old one was still closing; it now tries again every 2 seconds for a minute.
+- The first update from 2.2.0.0 to 2.2.0.1 through GitHub worked end to end (download, checksum, version check,
+  swap, restart, History).
+
 ## 2.2.0.1 - 2026-10-01
 
 - **The release download is labeled "Windows Manager.exe".** GitHub doesn't allow spaces in release file names (it

@@ -16,8 +16,23 @@ $script:AppChecked = $null
 $script:AppDownload = $null
 $script:AppProgress = -1
 
-# After an update: the old exe goes, and the update is recorded
-if ($IsCompiled) { $oldExe = "$ExePath.old"; if (Test-Path -LiteralPath $oldExe) { try { Remove-Item -LiteralPath $oldExe -Force -ErrorAction Stop } catch { } } }
+# After an update: the old exe goes, and the update is recorded. The old version may still be closing when this one
+# starts (its file is then in use), so deleting it is tried again every 2 seconds for a minute.
+$OldExe = "$ExePath.old"
+function Remove-OldExe {
+    if (-not (Test-Path -LiteralPath $OldExe)) { return $true }
+    try { Remove-Item -LiteralPath $OldExe -Force -ErrorAction Stop; return $true } catch { return $false }
+}
+if ($IsCompiled -and -not (Remove-OldExe)) {
+    $script:OldExeTries = 0
+    $script:OldExeTimer = New-Object System.Windows.Threading.DispatcherTimer
+    $script:OldExeTimer.Interval = [TimeSpan]::FromSeconds(2)
+    $script:OldExeTimer.Add_Tick({
+            $script:OldExeTries++
+            if ((Remove-OldExe) -or $script:OldExeTries -ge 30) { $script:OldExeTimer.Stop() }
+        })
+    $script:OldExeTimer.Start()
+}
 if (-not $SelfTest -and -not $Auto -and (Test-Path -LiteralPath $AppUpdateMarker)) {
     try {
         $m = Get-Content -LiteralPath $AppUpdateMarker -Raw | ConvertFrom-Json
