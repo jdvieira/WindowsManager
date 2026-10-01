@@ -1,0 +1,62 @@
+# Publishes a release when a version tag is pushed (git tag v2.3.0.0 && git push origin v2.3.0.0): builds the exe
+# from the tagged commit, checks its version matches the tag, and creates the GitHub release with that version's
+# CHANGELOG.md section as the notes and the exe labeled "Windows Manager.exe". Tags with a hyphen (v2.4.0.0-beta1)
+# are marked as pre-releases, which only copies on the beta channel offer. Does nothing if the release already exists
+# (one created by hand with gh release create).
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Already released?
+        id: exists
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view $env:GITHUB_REF_NAME *> $null
+          if ($LASTEXITCODE -eq 0) { "skip=true" >> $env:GITHUB_OUTPUT; "Release $env:GITHUB_REF_NAME already exists" } else { "skip=false" >> $env:GITHUB_OUTPUT }
+          exit 0
+
+      - name: Install ps2exe
+        if: steps.exists.outputs.skip != 'true'
+        shell: powershell
+        run: |
+          Set-PSRepository PSGallery -InstallationPolicy Trusted
+          Install-Module ps2exe -Scope CurrentUser -Force
+
+      - name: Check and build
+        if: steps.exists.outputs.skip != 'true'
+        shell: powershell
+        run: |
+          .\tools\Test-Source.ps1
+          if ($LASTEXITCODE) { exit 1 }
+          $tag = $env:GITHUB_REF_NAME
+          $version = ($tag.TrimStart('v') -split '-')[0]
+          .\Build-Exe.ps1 -Version $version
+          $built = (Get-Item 'dist\Windows Manager.exe').VersionInfo.FileVersion
+          $app = (Select-String -LiteralPath src\00-Startup.ps1 -Pattern "^\`$AppVersion = '([\d.]+)'").Matches[0].Groups[1].Value
+          if ($app -ne $version) { throw "The tag is $tag but `$AppVersion is $app" }
+          "Built $built"
+
+      - name: Create the release
+        if: steps.exists.outputs.skip != 'true'
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $version = ($tag.TrimStart('v') -split '-')[0]
+          .\tools\Get-ReleaseNotes.ps1 $version | Set-Content -Encoding UTF8 notes.md
+          $pre = if ($tag -like '*-*') { '--prerelease' } else { '--latest' }
+          gh release create $tag "dist\Windows Manager.exe#Windows Manager.exe" --title "Windows Manager $($tag.TrimStart('v'))" --notes-file notes.md --verify-tag $pre

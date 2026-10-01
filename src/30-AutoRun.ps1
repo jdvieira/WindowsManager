@@ -242,6 +242,14 @@ function Invoke-AutoRun {
 
     $notify = $DryRun -or $run.Error -or $run.Failed -or ($notifyOnly -and $run.Available) -or ($Settings.NotifyReboot -and $run.Reboot) -or ($Settings.NotifyAlways -and ($run.Updated + $run.Reboot))
     if ($notify) { Show-RunNotification ([pscustomobject]$run) }
+    # then the PC's health: a reading for Device Health's trends, and a notification about any new problem
+    if ($Settings.HealthAlerts -and -not $DryRun) {
+        try {
+            $hev = @(Invoke-WorkerNow 'health' @{}) | Where-Object { $_.T -eq 'health' } | Select-Object -Last 1
+            if ($hev) { Add-HealthSnapshot $hev; Invoke-HealthAlerts $hev }
+        }
+        catch { Write-RunLog "Health check failed: $($_.Exception.Message)" }
+    }
     return [int]([bool]($run.Error -or $run.Failed))
 }
 

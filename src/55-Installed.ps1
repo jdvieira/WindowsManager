@@ -116,6 +116,7 @@ function Complete-Pick {
     $chosen = @($UI.PickList.Children | Where-Object { $_.IsChecked } | ForEach-Object { $_.Tag })
     if ($script:Pick -eq 'export') { Save-AppList $chosen }
     elseif ($script:Pick -eq 'setup') { Save-SetupFile $chosen }
+    elseif ($script:Pick -eq 'leftovers') { Remove-Leftovers $chosen }
 }
 
 # A source's details as winget export writes them (from winget source export, or the defaults)

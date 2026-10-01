@@ -3,8 +3,9 @@
 A single-exe Windows app for keeping a PC's software current. Through winget, Microsoft's command-line package
 manager, it keeps apps updated (on demand or on a schedule), finds and installs new apps, and uninstalls what you no
 longer need. It also turns startup apps on and off, installs Windows' own updates, keeps drivers current (from Windows
-Update, the PC's vendor, NVIDIA and AMD, with a saved copy to roll back to), shows the PC's health, and cleans up
-leftover files. A setup backup puts your apps and options on a new PC.
+Update, the PC's vendor, NVIDIA and AMD, with a saved copy to roll back to), removes built-in apps and turns Windows'
+optional features on and off, shows the PC's health (with trends over time, alerts and a shareable report), and cleans
+up leftover files, including what uninstalled apps leave behind. A setup backup puts your apps and options on a new PC.
 
 ## Screenshots
 
@@ -33,9 +34,10 @@ glance.
 
 Download `Windows Manager.exe` from the [latest release](https://github.com/jdvieira/WindowsManager/releases/latest)
 and run it; there is nothing to install. (To build it yourself, see [Building](#building); it lands in
-`dist\Windows Manager.exe`.) There are eight sections, as tabs under the header (Ctrl+1 to Ctrl+8): Device
+`dist\Windows Manager.exe`.) There are nine sections, as tabs under the header (Ctrl+1 to Ctrl+9): Device
 Health (where the app opens), Software Updates, Discover Software, Installed Software, Startup, Drivers, Windows
-Update and Cleanup.
+Update, Windows Features and Cleanup. One copy of the app runs at a time: opening it again brings the open window to
+the front.
 
 ### Device Health
 
@@ -54,6 +56,16 @@ each card's lines have a green, amber, red or grey dot.
 | Network | Each connected adapter, the network (and Wi-Fi signal), link speed and address, and whether there's internet access |
 | Cleanup | How much the Cleanup tab can free, and the system drive's free space. **Open Cleanup** goes there |
 | Drives | Each drive's free space (amber under 20% free, red under 10%), and each disk's health. Wear and temperature show when the app runs as administrator |
+| Trends | Battery health, free space on the system drive, the stability index, app crashes, memory in use and drive wear over the last 90 days, each as a small line with its latest value and the change since the first reading (hover a point for its date and value). One reading a day is kept, from the tab and from automatic runs, for 400 days in `health-history.jsonl`; the card appears once there are two days |
+
+**Save report** writes the whole page as one HTML file on the desktop and opens it: every card, the drives, waiting
+updates, startup apps and installed software, to keep or send to someone helping with the PC.
+
+Automatic runs also check the PC's health (Options > Automatic runs > **Check the PC's health and tell me about problems**, on by
+default) and send a Windows notification when something needs attention: antivirus or real-time protection off, old
+virus definitions, a firewall off, a drive under 10% free, a disk reporting a problem, a battery under 60% of its
+original capacity, blue screens, or a restart that has been waiting for days. Each problem is mentioned once, and
+again after a week if it's still there.
 
 ### Software Updates
 
@@ -98,6 +110,7 @@ Everything installed on the PC, including apps winget did not install. **winget 
 | Action | How |
 | --- | --- |
 | Uninstall | **Uninstall** on its row. The app asks you to confirm first |
+| Remove what it left behind | After an uninstall, the app looks for what the app left: folders named after it (or its publisher's folder) in AppData, ProgramData and Program Files, its scheduled tasks, and startup entries whose program is gone. If it finds any, it lists them, all ticked: **Remove ticked** sends folders to the Recycle Bin (so a wrong guess can be brought back) and deletes the rest. Folders a running program uses are left out; items outside your profile need one administrator approval |
 | See what takes space | The **Size** column (click it to sort, largest first) and the total in the status bar. Sizes come from what each app reports to Windows; Store apps are measured from their install folders in the background and remembered in `sizes.json`. Apps that report nothing (Office language packs, for example) show no size |
 | Save your app list | **Export list**: choose the apps (all winget and Store apps are ticked), then save. The file is in winget's own export format, so `winget import` reads it too |
 | Keep an app at its version | Right-click > Hide (keep at this version), the same as on Updates; hidden apps are tagged *hidden* here too. Apps with an update waiting carry an *update* tag |
@@ -166,14 +179,16 @@ Vendor tools the tab knows:
 ### Startup
 
 Apps that start when you sign in, as Task Manager lists them: the Run keys (yours, and every user's), the Startup
-folders, and Store apps' startup tasks. Each shows its name, the command it runs, its publisher and where it starts
-from.
+folders, and Store apps' startup tasks; plus scheduled tasks that start at sign-in or at startup (outside Windows' own
+`\Microsoft` folder), which Task Manager doesn't show. Each shows its name, the command it runs, its publisher and
+where it starts from.
 
 | Action | How |
 | --- | --- |
 | Stop an app starting by itself | **Turn off** on its row (or right-click). It still works when you open it; nothing is deleted. Task Manager and Settings > Apps > Startup show the same change, because the app uses their switch (the `StartupApproved` values, or a Store app's startup task state) |
 | Let it start again | **Turn on** |
 | Apps that start for everyone | Marked with a shield; turning them on or off asks for administrator approval |
+| Scheduled tasks | **Turn off** disables the task (Task Scheduler shows it as Disabled); **Turn on** enables it again. Tasks that run as another account need administrator approval |
 | See only what's off | **Turned off only** |
 | Find the program | Right-click > Open file location, or Copy command |
 | Startup impact | **Open Task Manager** (its Startup apps page measures how much each one slows sign-in) |
@@ -193,6 +208,15 @@ many updates are waiting.
 
 On a work PC whose updates are managed (Intune, Group Policy or an update server), a note says so: installing here
 installs straight away, which may be sooner than IT intended. **Restore point first** is shared with the Drivers tab.
+
+### Windows Features
+
+| View | What it does |
+| --- | --- |
+| Built-in apps | The Store apps that came with Windows (or that you added) and that Windows lets you remove: Bing News, Clipchamp, Xbox apps, Solitaire and the like, with their publisher. **Remove** removes one for your account (after asking). Removed apps stay on the list with **Reinstall**, which registers them again from their files; when Windows has cleared those, it opens the app's Microsoft Store page. Parts of Windows itself and frameworks aren't listed |
+| Optional features | Windows' optional features (.NET Framework 3.5, Hyper-V, Windows Sandbox, the Linux subsystem, the TFTP and Telnet clients, and so on), each on or off. **Turn on** / **Turn off** asks for administrator approval and makes a restore point first (with **Restore point first** on); some need a restart, which the row says. History has each change |
+
+Filter by name, and **On only** shows only what's installed or turned on.
 
 ### Cleanup
 
@@ -226,7 +250,8 @@ Click the gear in the header. Packages, Automatic runs and Logs apply when you c
 | --- | --- |
 | Packages | Source (all / winget / Microsoft Store), install scope for new apps, silent installs, include unknown versions, uninstall previous version, check on open, the hidden apps list (IDs added or removed here get their winget pin set or removed on Save), and the apps left to Windows, with **Forget learned apps** |
 | Sources | winget's sources, each with an **In searches** switch (off = only used when a package names it) and **Remove**; **Update sources**, **Reset sources**, and **Add a source** (name, URL, REST or pre-indexed, optionally only when named). Adding, removing and switching need administrator approval |
-| Automatic runs | Retry failures once, restore point first, only with network, only on AC power, random start delay, maximum run time, notification style (a Windows notification or this app's pop-up), auto-close pop-ups |
+| Automatic runs | Retry failures once, restore point first, only with network, only on AC power, random start delay, maximum run time, notification style (a Windows notification or this app's pop-up), auto-close pop-ups, and **Check the PC's health and tell me about problems** |
+| App updates | The version you have and the latest one, **Check now**, **Update now**, **Go back to** the previous version, **Release notes**, and the switches for checking on open, updating without asking, and **Get beta versions** |
 | Logs | Keep logs for N days (default 30), log folder, verbose winget logging, buttons to open the log folders, and **Save diagnostics** |
 | Maintenance | winget version, export or import settings, open the data folder, reset to defaults, and **Back up this PC's setup** / **Set up from a backup** |
 
@@ -299,21 +324,32 @@ is newer, it shows what's new and offers **Update now**:
 
 - It downloads the release's exe, checks it against the SHA-256 checksum GitHub publishes and against its own version
   number, then swaps it in: the running exe is renamed to `Windows Manager.exe.old`, the new one takes its name (so
-  the scheduled task and any shortcuts still point at it), and the new version starts. It deletes the `.old` file and
-  adds the update to History when it opens.
+  the scheduled task and any shortcuts still point at it), and the new version starts. The old copy waits, out of
+  sight, until the new one has opened its window. If the new one closes straight away or doesn't open within 90
+  seconds, everything is put back, the old version carries on, and the failed version isn't offered again on start.
+- Once open, the new version keeps the old exe in `%LOCALAPPDATA%\WindowsManager\Previous` (one version) and adds the
+  update to History. Options > App updates > **Go back to <version>** switches back to it the same way (with the same
+  safety net); the newer version is kept too, so you can come back to it. Versions before 2.3 can't do this, so going
+  back to one of them means updating again from GitHub to return.
 - **Not now** skips that version; it isn't offered again on start, but Options > App updates can still install it.
 - It waits when something is installing, updating or running as administrator, and offers the update next time.
 - A copy run from its source files can't replace itself, so it points to the release page instead (use `git pull`).
 
 Options > **App updates** shows the version you have and the latest one, with **Check now**, **Update now** and
-**Release notes**, and two switches: **Check for a new version when the app opens** (on by default) and **Update
-without asking** (off by default: it then downloads, swaps and restarts by itself).
+**Release notes**, and three switches: **Check for a new version when the app opens** (on by default), **Update
+without asking** (off by default: it then downloads, swaps and restarts by itself), and **Get beta versions** (off by
+default: pre-releases are offered too, as soon as they're published).
 
 Publishing a release the updater picks up: tag it `v<version>` (the same as `$AppVersion`, for example `v2.2.0.0`) and
 attach the built `Windows Manager.exe` with the label "Windows Manager.exe" (`gh release create v<version>
 "dist\Windows Manager.exe#Windows Manager.exe"`): GitHub turns the space in the file name into a dot, and the label is
 what its release page shows. Any `.exe` asset works for the updater. The
-newest release that isn't a draft or pre-release is the one offered.
+newest release that isn't a draft or pre-release is the one offered (with **Get beta versions**, the newest of all).
+
+Pushing the tag does the same on GitHub (`.github\workflows\release.yml`): it builds the exe from the tagged commit,
+checks it's the tag's version, and creates the release with that version's `CHANGELOG.md` section as the notes. A tag
+with a hyphen, such as `v2.4.0.0-beta1`, becomes a pre-release, which only copies on beta versions are offered. It
+does nothing when the release was already created by hand.
 
 ## Setting up a new PC
 
@@ -339,12 +375,16 @@ until you do). It also replaces the old name's notification registration with it
 
 | File | Purpose |
 | --- | --- |
-| `src\*.ps1` | The app's code, in parts that join in name order: `00-Startup` (parameters, version), settings, scheduled task, data classes, the background worker and its 2.0 operations, the window's layout, notifications, automatic runs, then one part per tab or panel (`80-Drivers`, `81-DriverBackup`, `82-Amd`, `83-WindowsUpdate`, `84-Startup`, `86-Health`, `87-HealthCards`, `88-Setup`, `89-Diagnostics`, `92-Cleanup`, ...), wiring, and `95-Main` |
+| `src\*.ps1` | The app's code, in parts that join in name order: `00-Startup` (parameters, version, one copy at a time), settings, scheduled task, data classes, the background worker and its 2.0 operations, health history and alerts (`28-HealthHistory`), the window's layout, notifications, automatic runs, then one part per tab or panel (`78-Leftovers`, `80-Drivers`, `81-DriverBackup`, `82-Amd`, `83-WindowsUpdate`, `84-Startup`, `86-Health`, `87-HealthCards`, `88-Setup`, `89-Diagnostics`, `91-WinFeatures`, `92-Cleanup`, `93-AppUpdate`, ...), wiring, and `95-Main` |
 | `Windows_Manager.ps1` | Runs the app from source: joins `src\*.ps1` into `dist\build\Windows_Manager.dev.ps1` and runs that, with the same arguments, exactly as the exe runs |
 | `Build-Exe.ps1` | Joins the same parts, embeds the assets, and compiles `dist\Windows Manager.exe` with PS2EXE |
+| `tools\Test-Source.ps1` | Checks the source as the build reads it (ASCII only, parses, no test driver left), and with `-SelfTest` runs the self-test |
+| `tools\Get-ReleaseNotes.ps1` | Prints one version's `CHANGELOG.md` section (the release notes) |
+| `tools\New-WingetManifest.ps1` | Writes the winget manifest for a published release |
+| `.github\workflows\` | `ci.yml` checks and builds every pull request (the exe is attached to the run); `release.yml` publishes a release when a version tag is pushed |
 | `CHANGELOG.md` | Every change, by version |
 | `TESTING.md` | What to try on real PCs, for the parts that need administrator approval or particular hardware |
-| `%LOCALAPPDATA%\WindowsManager\` | settings.json, lastrun.json, descriptions.json, sizes.json, history.jsonl, notification.png, Logs\, Drivers\ (administrator runs' scripts and logs), DriverBackups\ |
+| `%LOCALAPPDATA%\WindowsManager\` | settings.json, lastrun.json, descriptions.json, sizes.json, history.jsonl, health-history.jsonl (a reading a day), health-alerts.json (what was mentioned when), removed-apps.json (built-in apps to offer back), notification.png, Logs\, Drivers\ (administrator runs' scripts and logs), DriverBackups\, Previous\ (the version before the last update) |
 | `assets\icon.ico` | App and exe icon (embedded in the exe by the build) |
 | `assets\logo.jpg` | Header logo (embedded in the exe by the build) |
 
@@ -362,6 +402,17 @@ For every change, bump `$AppVersion` in `src\00-Startup.ps1`, add a `CHANGELOG.m
 ASCII-only (the build refuses anything else, since Windows PowerShell 5.1 reads files without a BOM as ANSI). A new part
 goes in `src\` with a number that puts it in the right place; a new tab registers itself in `$Panels` (see
 `40-State.ps1`).
+
+Before a pull request, run `.\tools\Test-Source.ps1 -SelfTest`. GitHub runs the same checks on every pull request and
+attaches the built exe to the run, so it can be tried before merging.
+
+### Publishing to winget
+
+Once a release is on GitHub, `.\tools\New-WingetManifest.ps1 -Version <version>` writes its manifest (package
+`jdvieira.WindowsManager`, a portable app with a `windows-manager` command) under `dist\winget`, with the checksum
+GitHub gives for the release's exe. Check it with `winget validate --manifest <folder>`, try it with
+`winget install --manifest <folder>`, then open a pull request to
+[microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) with the folder (`manifests\j\jdvieira\WindowsManager\<version>`).
 
 ## Testing without the window
 

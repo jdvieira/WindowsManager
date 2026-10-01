@@ -319,6 +319,41 @@ namespace WingetUM {
         public bool CanDelete { get { return state != "ok"; } }
     }
 
+    // Windows Features tab: a built-in app (Store package) or an optional Windows feature, and whether it's there
+    public class FeatureItem : INotifyPropertyChanged {
+        public event PropertyChangedEventHandler PropertyChanged;
+        private void Changed(params string[] names) {
+            PropertyChangedEventHandler h = PropertyChanged;
+            if (h == null) return;
+            foreach (string n in names) h(this, new PropertyChangedEventArgs(n));
+        }
+        private bool on;
+        private string state = "", detail = "";
+        // app | feature
+        public string Kind { get; set; }
+        public string Name { get; set; }
+        public string SubText { get; set; }
+        public string Publisher { get; set; }
+        // the package's full name or the feature's name; the package family and install folder, for reinstalling
+        public string Key { get; set; }
+        public string Family { get; set; }
+        public string Location { get; set; }
+        public bool Available { get; set; }
+        public bool On { get { return on; } set { on = value; Changed("On", "StatusText", "ActionText"); } }
+        public string State { get { return state; } set { state = value ?? ""; Changed("State", "IsBusy", "CanChange", "StatusText"); } }
+        public string Detail { get { return detail; } set { detail = value ?? ""; Changed("Detail", "StatusText"); } }
+        public bool IsBusy { get { return state == "running"; } }
+        public bool CanChange { get { return !IsBusy && (Kind == "app" || Available); } }
+        public string StatusText {
+            get {
+                if (!string.IsNullOrEmpty(state) && !string.IsNullOrEmpty(detail)) return detail;
+                if (Kind == "app") return on ? "Installed" : "Removed";
+                return !Available ? "Not available" : (on ? "On" : "Off");
+            }
+        }
+        public string ActionText { get { return Kind == "app" ? (on ? "Remove" : "Reinstall") : (on ? "Turn off" : "Turn on"); } }
+    }
+
     // One line of the History panel (history.jsonl)
     public class HistoryEntry {
         public System.DateTime Time { get; set; }

@@ -80,6 +80,8 @@ function Set-OptionControls($S) {
     $UI.OptNotifyToast.IsChecked = $S.NotifyStyle -ne 'window'
     $UI.OptAppCheck.IsChecked = $S.AppUpdateCheck
     $UI.OptAppAuto.IsChecked = $S.AppUpdateAuto
+    $UI.OptAppBeta.IsChecked = $S.AppUpdateBeta
+    $UI.OptHealthAlerts.IsChecked = $S.HealthAlerts
     $UI.OptNotifyWindow.IsChecked = $S.NotifyStyle -eq 'window'
     $script:OptLearned = @($S.WindowsUpdated)
     $script:OptToWinget = @($S.WingetUpdates)
@@ -126,6 +128,8 @@ function Read-OptionControls {
     $n.NotifyStyle = if ($UI.OptNotifyWindow.IsChecked) { 'window' } else { 'toast' }
     $n.AppUpdateCheck = [bool]$UI.OptAppCheck.IsChecked
     $n.AppUpdateAuto = [bool]$UI.OptAppAuto.IsChecked
+    $n.AppUpdateBeta = [bool]$UI.OptAppBeta.IsChecked
+    $n.HealthAlerts = [bool]$UI.OptHealthAlerts.IsChecked
     $n.WindowsUpdated = @($script:OptLearned | Where-Object { $_ })
     $n.WingetUpdates = @($script:OptToWinget | Where-Object { $_ })
     $dir = $UI.OptLogDir.Text.Trim()
