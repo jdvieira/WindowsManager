@@ -1,68 +1,102 @@
-# Publishes a release when a version tag is pushed (git tag v2.3.0.0 && git push origin v2.3.0.0): builds the exe
-# from the tagged commit, checks its version matches the tag, and creates the GitHub release with that version's
-# CHANGELOG.md section as the notes and the exe labeled "Windows Manager.exe". Tags with a hyphen (v2.4.0.0-beta1)
-# are marked as pre-releases, which only copies on the beta channel offer. Does nothing if the release already exists
-# (one created by hand with gh release create).
+# Publishes releases. Two ways in:
+# - Merging into main (an approved pull request): when $AppVersion in src\00-Startup.ps1 is newer than every
+#   release, the new version is built and released, tagged v<version> on the merged commit. A merge that doesn't
+#   bump the version releases nothing.
+# - Pushing a version tag (only admins can create v* tags): releases that tag. Tags with a hyphen (v2.5.0.0-beta1)
+#   become pre-releases, which only copies on the beta channel offer.
+# Either way the exe is built from the source here, its version is checked, and the release gets that version's
+# CHANGELOG.md section as its notes and the exe labeled "Windows Manager.exe". Nothing happens if the release exists.
+#
+# The job runs in the "release" environment, which only main and v* tags can use. Its RELEASE_TOKEN secret (a
+# fine-grained token of the repository owner with Contents read and write on this repository) creates the tag and
+# release, so they are the owner's: the v* tag rule lets only admins create them, and no workflow on another branch
+# can reach the token.
 name: Release
 
 on:
   push:
+    branches: [main]
     tags: ['v*']
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release:
     runs-on: windows-latest
+    environment: release
     steps:
       - uses: actions/checkout@v4
 
-      - name: Already released?
-        id: exists
+      # GitHub runs PowerShell steps with $ErrorActionPreference = 'Stop', which turns a native command's stderr
+      # (such as gh's "release not found") into an error; these steps go by exit codes instead
+      - name: What to release
+        id: plan
         shell: powershell
         env:
           GH_TOKEN: ${{ github.token }}
-        # GitHub runs PowerShell steps with $ErrorActionPreference = 'Stop', which turns a native command's stderr
-        # ("release not found") into an error; these steps go by exit codes instead
         run: |
           $ErrorActionPreference = 'Continue'
-          gh release view $env:GITHUB_REF_NAME 2>&1 | Out-Null
-          if ($LASTEXITCODE -eq 0) { "skip=true" >> $env:GITHUB_OUTPUT; "Release $env:GITHUB_REF_NAME already exists" } else { "skip=false" >> $env:GITHUB_OUTPUT }
+          $app = (Select-String -LiteralPath src\00-Startup.ps1 -Pattern "^\`$AppVersion = '([\d.]+)'").Matches[0].Groups[1].Value
+          if ($env:GITHUB_REF_TYPE -eq 'tag') { $tag = $env:GITHUB_REF_NAME } else { $tag = "v$app" }
+          $version = ($tag.TrimStart('v') -split '-')[0]
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "version=$version" >> $env:GITHUB_OUTPUT
+          $skip = ''
+          # betas don't count when comparing: merging 2.5.0.0 after v2.5.0.0-beta1 releases 2.5.0.0
+          gh release view $tag 2>&1 | Out-Null
+          if ($LASTEXITCODE -eq 0) { $skip = "Release $tag already exists" }
+          elseif ($version -ne $app) { "::error::The tag is $tag but `$AppVersion is $app"; exit 1 }
+          elseif ($env:GITHUB_REF_TYPE -ne 'tag') {
+            git ls-remote --exit-code --tags origin "refs/tags/$tag" 2>&1 | Out-Null
+            if ($LASTEXITCODE -eq 0) { $skip = "The tag $tag exists without a release; release it by hand"; "::warning::$skip" }
+            else {
+              $newest = @(gh release list --limit 100 --exclude-pre-releases --json tagName -q '.[].tagName' 2>$null | ForEach-Object { $v = $null; if ([version]::TryParse((($_ -replace '^v', '') -split '-')[0], [ref]$v)) { $v } } | Sort-Object -Descending)[0]
+              if ($newest -and [version]$version -le $newest) { $skip = "$app isn't newer than the newest release ($newest); bump `$AppVersion to release" }
+            }
+          }
+          if ($skip) { "skip=true" >> $env:GITHUB_OUTPUT; "Nothing to release: $skip" } else { "skip=false" >> $env:GITHUB_OUTPUT; "Releasing $tag" }
           exit 0
 
       - name: Install ps2exe
-        if: steps.exists.outputs.skip != 'true'
+        if: steps.plan.outputs.skip == 'false'
         shell: powershell
         run: |
           Set-PSRepository PSGallery -InstallationPolicy Trusted
           Install-Module ps2exe -Scope CurrentUser -Force
 
       - name: Check and build
-        if: steps.exists.outputs.skip != 'true'
+        if: steps.plan.outputs.skip == 'false'
         shell: powershell
         run: |
           $ErrorActionPreference = 'Continue'
           .\tools\Test-Source.ps1
           if ($LASTEXITCODE) { exit 1 }
-          $tag = $env:GITHUB_REF_NAME
-          $version = ($tag.TrimStart('v') -split '-')[0]
-          .\Build-Exe.ps1 -Version $version
+          .\Build-Exe.ps1 -Version ${{ steps.plan.outputs.version }}
+          if (-not (Test-Path 'dist\Windows Manager.exe')) { exit 1 }
           $built = (Get-Item 'dist\Windows Manager.exe').VersionInfo.FileVersion
-          $app = (Select-String -LiteralPath src\00-Startup.ps1 -Pattern "^\`$AppVersion = '([\d.]+)'").Matches[0].Groups[1].Value
-          if ($app -ne $version) { Write-Host "The tag is $tag but `$AppVersion is $app"; exit 1 }
+          if ($built -ne '${{ steps.plan.outputs.version }}') { "::error::The exe says $built"; exit 1 }
+          .\tools\Get-ReleaseNotes.ps1 ${{ steps.plan.outputs.version }} | Set-Content -Encoding UTF8 notes.md
+          if ($LASTEXITCODE -or -not (Get-Content notes.md -Raw)) { "::error::CHANGELOG.md has no section for ${{ steps.plan.outputs.version }}"; exit 1 }
           "Built $built"
 
       - name: Create the release
-        if: steps.exists.outputs.skip != 'true'
+        if: steps.plan.outputs.skip == 'false'
         shell: powershell
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           $ErrorActionPreference = 'Continue'
-          $tag = $env:GITHUB_REF_NAME
-          $version = ($tag.TrimStart('v') -split '-')[0]
-          .\tools\Get-ReleaseNotes.ps1 $version | Set-Content -Encoding UTF8 notes.md
+          if (-not $env:GH_TOKEN) { "::error::The release environment has no RELEASE_TOKEN secret"; exit 1 }
+          $tag = '${{ steps.plan.outputs.tag }}'
           $pre = if ($tag -like '*-*') { '--prerelease' } else { '--latest' }
-          gh release create $tag "dist\Windows Manager.exe#Windows Manager.exe" --title "Windows Manager $($tag.TrimStart('v'))" --notes-file notes.md --verify-tag $pre
+          $where = if ($env:GITHUB_REF_TYPE -eq 'tag') { @('--verify-tag') } else { @('--target', $env:GITHUB_SHA) }
+          gh release create $tag "dist\Windows Manager.exe#Windows Manager.exe" --title $tag --notes-file notes.md $pre @where
           if ($LASTEXITCODE) { exit 1 }
+          $h = [Security.Cryptography.SHA256]::Create().ComputeHash([IO.File]::ReadAllBytes('dist\Windows Manager.exe'))
+          "Released $tag, sha256 " + (-join ($h | ForEach-Object { $_.ToString('x2') }))
