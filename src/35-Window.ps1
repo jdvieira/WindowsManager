@@ -58,7 +58,8 @@ foreach ($name in 'TabStartup', 'TabWindows', 'TabHealth', 'WinBadge', 'WinBadge
 # 2.1: Device Health's new cards and the Cleanup tab
 foreach ($name in 'TabCleanup', 'CleanupPanel', 'ClTitle', 'ClDriveBar', 'ClDriveText', 'ClRefresh', 'ClBigInfo', 'ClBigScan', 'ClBigList', 'ClAppsInfo', 'ClAllApps', 'ClAppList',
     'HlSecTitle', 'HlSecItems', 'HlSecOpen', 'HlPerfTitle', 'HlMemBar', 'HlPerfItems', 'HlPerfOpen', 'HlRelTitle', 'HlRelItems', 'HlRelOpen',
-    'HlUpdTitle', 'HlUpdItems', 'HlUpdOpen', 'HlNetTitle', 'HlNetItems', 'HlNetOpen', 'HlCleanSumTitle', 'HlCleanSumText', 'HlCleanOpen') {
+    'HlUpdTitle', 'HlUpdItems', 'HlUpdOpen', 'HlNetTitle', 'HlNetItems', 'HlNetOpen', 'HlCleanSumTitle', 'HlCleanSumText', 'HlCleanOpen',
+    'PageApp', 'OptAppStatus', 'OptAppCheckNow', 'OptAppInstall', 'OptAppReleases', 'OptAppCheck', 'OptAppAuto') {
     $UI[$name] = $Window.FindName($name)
     if (-not $UI[$name]) { throw "XAML element '$name' not found." }
 }

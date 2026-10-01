@@ -1900,6 +1900,7 @@ $Xaml = @'
                 <ListBoxItem Tag="PageSources"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE774;" FontFamily="Segoe MDL2 Assets" Width="28" VerticalAlignment="Center"/><TextBlock Text="Sources"/></StackPanel></ListBoxItem>
                 <ListBoxItem Tag="PageAuto"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE823;" FontFamily="Segoe MDL2 Assets" Width="28" VerticalAlignment="Center"/><TextBlock Text="Automatic runs"/></StackPanel></ListBoxItem>
                 <ListBoxItem Tag="PageLogs"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE7C3;" FontFamily="Segoe MDL2 Assets" Width="28" VerticalAlignment="Center"/><TextBlock Text="Logs"/></StackPanel></ListBoxItem>
+                <ListBoxItem Tag="PageApp"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE895;" FontFamily="Segoe MDL2 Assets" Width="28" VerticalAlignment="Center"/><TextBlock Text="App updates"/></StackPanel></ListBoxItem>
                 <ListBoxItem Tag="PageMaint"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE90F;" FontFamily="Segoe MDL2 Assets" Width="28" VerticalAlignment="Center"/><TextBlock Text="Maintenance"/></StackPanel></ListBoxItem>
               </ListBox>
             </DockPanel>
@@ -2066,6 +2067,29 @@ $Xaml = @'
                   <Button x:Name="OptDiag" Content="Save diagnostics"/>
                 </StackPanel>
                 <TextBlock Text="Save diagnostics makes a zip file on your desktop with this app's logs, the driver tools' logs, settings and details about this PC, to send to whoever is helping." Style="{StaticResource Hint}" Margin="0,6,0,0"/>
+              </StackPanel>
+            </ScrollViewer>
+
+            <!-- Windows Manager's own updates, from its GitHub releases -->
+            <ScrollViewer x:Name="PageApp" VerticalScrollBarVisibility="Auto" Padding="34,26,30,16" Visibility="Collapsed">
+              <StackPanel>
+                <TextBlock Text="App updates" Style="{StaticResource PageTitle}"/>
+                <TextBlock Text="New versions of Windows Manager are published as releases on GitHub (github.com/jdvieira/WindowsManager)." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,4,0,22"/>
+                <TextBlock Text="THIS VERSION" Style="{StaticResource Label}" Margin="0,0,0,10"/>
+                <Border Background="#1C1C1C" CornerRadius="8" Padding="14,11">
+                  <TextBlock x:Name="OptAppStatus" TextWrapping="Wrap" Foreground="#BDBDBD" FontSize="12.5" LineHeight="19"/>
+                </Border>
+                <StackPanel Orientation="Horizontal" Margin="0,10,0,22">
+                  <Button x:Name="OptAppCheckNow" Content="Check now"/>
+                  <Button x:Name="OptAppInstall" Content="Update now" Style="{StaticResource Primary}" Visibility="Collapsed"/>
+                  <Button x:Name="OptAppReleases" Content="Release notes" Style="{StaticResource Ghost}" ToolTip="Open the releases page on GitHub"/>
+                </StackPanel>
+                <TextBlock Text="AUTOMATIC UPDATES" Style="{StaticResource Label}" Margin="0,0,0,12"/>
+                <CheckBox x:Name="OptAppCheck" Content="Check for a new version when the app opens"/>
+                <TextBlock Text="Looks at the latest release on GitHub in the background and offers to update when it's newer. Not now skips that version until you choose it here." Style="{StaticResource Hint}" Margin="48,3,0,14"/>
+                <CheckBox x:Name="OptAppAuto" Content="Update without asking"/>
+                <TextBlock Text="When a newer version is found, it downloads, swaps itself in and restarts the app straight away (unless something is installing). Settings, history and the schedule stay as they are." Style="{StaticResource Hint}" Margin="48,3,0,14"/>
+                <TextBlock Text="Downloads are checked against the checksum GitHub publishes and the version they say they are, before they replace this app." Style="{StaticResource Hint}" Margin="0,6,0,0"/>
               </StackPanel>
             </ScrollViewer>
 

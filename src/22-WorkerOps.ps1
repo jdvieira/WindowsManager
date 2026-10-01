@@ -103,9 +103,31 @@ if ($Op -eq 'amdlookup') {
     catch { Send @{ T = 'amdlookup'; Error = $_.Exception.Message } }
 }
 
+if ($Op -eq 'appupdate') {
+    # This app's newest release on GitHub: its tag (v<version>), notes, date and the exe to download, with GitHub's
+    # SHA-256 checksum of it
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+        $wc = New-Object Net.WebClient
+        $wc.Headers['User-Agent'] = 'WindowsManager-Updater'
+        $wc.Headers['Accept'] = 'application/vnd.github+json'
+        $j = $wc.DownloadString("https://api.github.com/repos/$($Arg.Repo)/releases/latest") | ConvertFrom-Json
+        $asset = @($j.assets | Where-Object { $_.name -like '*.exe' }) | Select-Object -First 1
+        Send @{ T = 'appupdate'; Manual = [bool]$Arg.Manual; Tag = [string]$j.tag_name; Name = [string]$j.name; Notes = [string]$j.body; Published = [string]$j.published_at
+            Page = [string]$j.html_url; Url = $(if ($asset) { [string]$asset.browser_download_url } else { '' }); Size = $(if ($asset) { [long]$asset.size } else { 0 })
+            Digest = $(if ($asset) { [string]$asset.digest } else { '' }); Error = $null }
+    }
+    catch {
+        $m = $_.Exception.Message
+        if ($m -match '\(404\)') { $m = 'there are no releases on GitHub yet' }
+        Send @{ T = 'appupdate'; Manual = [bool]$Arg.Manual; Error = $m }
+    }
+}
+
 if ($Op -eq 'download') {
     # A download with progress, kept only when it is signed by the expected publisher (Arg.Signer, a regex on the
-    # certificate subject). Some servers (AMD's) need the page the link was on as the referrer.
+    # certificate subject) and, when Arg.Sha256 is given, matches that checksum. Some servers (AMD's) need the page
+    # the link was on as the referrer.
     try {
         [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
         $req = [Net.HttpWebRequest]::Create($Arg.Url)
@@ -127,12 +149,27 @@ if ($Op -eq 'download') {
             finally { $out.Close(); $in.Close() }
         }
         finally { $resp.Close() }
-        $sig = Get-AuthenticodeSignature -LiteralPath $Arg.File
-        if ($sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notmatch $Arg.Signer) {
+        if ($Arg.Total -and (Get-Item -LiteralPath $Arg.File).Length -ne $Arg.Total) {
             Remove-Item -LiteralPath $Arg.File -Force -ErrorAction SilentlyContinue
-            throw "the download isn't signed by $($Arg.SignerName) ($($sig.Status)), so it was deleted"
+            throw 'the download stopped before the end, so it was deleted'
         }
-        Send @{ T = 'download'; Key = $Arg.Key; File = $Arg.File; Signer = ($sig.SignerCertificate.Subject -replace '^CN=("?)([^,"]+)\1.*', '$2'); Error = $null }
+        # .NET's SHA256 (Get-FileHash comes from a script module that the compiled exe's runspaces don't load)
+        $hash = ''
+        if ($Arg.Sha256) { $hs = [IO.File]::OpenRead($Arg.File); try { $hash = -join ([Security.Cryptography.SHA256]::Create().ComputeHash($hs) | ForEach-Object { $_.ToString('X2') }) } finally { $hs.Close() } }
+        if ($Arg.Sha256 -and $hash -ne $Arg.Sha256) {
+            Remove-Item -LiteralPath $Arg.File -Force -ErrorAction SilentlyContinue
+            throw "the download doesn't match the checksum GitHub published for it, so it was deleted"
+        }
+        $signer = ''
+        if ($Arg.Signer) {
+            $sig = Get-AuthenticodeSignature -LiteralPath $Arg.File
+            if ($sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notmatch $Arg.Signer) {
+                Remove-Item -LiteralPath $Arg.File -Force -ErrorAction SilentlyContinue
+                throw "the download isn't signed by $($Arg.SignerName) ($($sig.Status)), so it was deleted"
+            }
+            $signer = $sig.SignerCertificate.Subject -replace '^CN=("?)([^,"]+)\1.*', '$2'
+        }
+        Send @{ T = 'download'; Key = $Arg.Key; File = $Arg.File; Signer = $signer; Error = $null }
     }
     catch { Send @{ T = 'download'; Key = $Arg.Key; Error = $_.Exception.Message } }
 }

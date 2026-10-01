@@ -80,6 +80,8 @@ $EventHandlers = @{}
 $ElevHandlers = @{}
 # Yes in the confirmation panel, by its kind (for kinds that later parts add)
 $ConfirmHandlers = @{}
+# ... and No, for kinds that need to remember it
+$ConfirmDeclined = @{}
 # Background runspaces with something to do when they finish: @{ Bg; Done = { param($Bg) ... } }
 $script:Tracked = New-Object System.Collections.Generic.List[object]
 function Start-Tracked([string]$Op, $Arg, [scriptblock]$Done) {

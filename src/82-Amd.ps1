@@ -69,13 +69,13 @@ function Invoke-DriverAction($u) {
     }
     Update-View
 }
-$EventHandlers.dlprogress = {
+$EventHandlers.dlprogress = $AmdProgressHandler = {
     param($Ev)
     if ($Ev.Key -ne 'amd') { return }
     $row = @($DrvUpdates | Where-Object { $_.Kind -eq 'amd' }) | Select-Object -First 1
     if ($row) { $row.ActionText = "Downloading $($Ev.Value)%" }
 }
-$EventHandlers.download = {
+$EventHandlers.download = $AmdDownloadHandler = {
     param($Ev)
     if ($Ev.Key -ne 'amd') { return }
     $row = @($DrvUpdates | Where-Object { $_.Kind -eq 'amd' }) | Select-Object -First 1

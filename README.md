@@ -268,6 +268,28 @@ Click **Automatic updates** in the header to schedule unattended updates.
 The task points at the exe's current location. If you move the exe, open the panel and **Save** again (the panel
 warns you when the task points somewhere else). Turning **Update apps automatically** off and saving deletes the task.
 
+## Keeping Windows Manager up to date
+
+Each time it opens, the app reads the latest release on GitHub
+([jdvieira/WindowsManager](https://github.com/jdvieira/WindowsManager/releases)) in the background. When that release
+is newer, it shows what's new and offers **Update now**:
+
+- It downloads the release's exe, checks it against the SHA-256 checksum GitHub publishes and against its own version
+  number, then swaps it in: the running exe is renamed to `Windows Manager.exe.old`, the new one takes its name (so
+  the scheduled task and any shortcuts still point at it), and the new version starts. It deletes the `.old` file and
+  adds the update to History when it opens.
+- **Not now** skips that version; it isn't offered again on start, but Options > App updates can still install it.
+- It waits when something is installing, updating or running as administrator, and offers the update next time.
+- A copy run from its source files can't replace itself, so it points to the release page instead (use `git pull`).
+
+Options > **App updates** shows the version you have and the latest one, with **Check now**, **Update now** and
+**Release notes**, and two switches: **Check for a new version when the app opens** (on by default) and **Update
+without asking** (off by default: it then downloads, swaps and restarts by itself).
+
+Publishing a release the updater picks up: tag it `v<version>` (the same as `$AppVersion`, for example `v2.2.0.0`) and
+attach the built `Windows Manager.exe` (GitHub names the download `Windows.Manager.exe`; any `.exe` asset works). The
+newest release that isn't a draft or pre-release is the one offered.
+
 ## Setting up a new PC
 
 Options > Maintenance > **Back up this PC's setup** saves one file with the apps you choose (in winget's export format,

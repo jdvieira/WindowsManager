@@ -26,6 +26,8 @@ Tick each line once it has worked, with the PC and the date.
 | [ ] | Cleanup > Clean up > Windows Update downloads | Windows Update still works afterwards (check the Windows Update tab) |
 | [ ] | Cleanup > Large files > **Delete** on a file you don't need | Asks first; the file goes to the Recycle Bin (and can be restored from there) |
 | [ ] | First start after the rename to Windows Manager | Settings, history and saved drivers are still there; the app offers to move the old scheduled task; **Test notification** shows *Windows Manager* as the sender |
+| [ ] | After the next release is published, open the older exe | The update prompt shows the new version and its notes; **Update now** restarts on the new version and History has the update; the `.old` file is gone |
+| [ ] | Options > App updates > **Update without asking**, then open an older exe | It updates and restarts by itself, without a prompt |
 | [ ] | Automatic updates > **Test notification** | A Windows notification (not the pop-up) with **Open Windows Manager** and **View log** buttons; both work |
 | [ ] | Turn off notifications for Windows Manager in Settings > System > Notifications, then **Test notification** again | The app's own pop-up appears instead |
 | [ ] | Options > Maintenance > **Back up this PC's setup**, then **Set up from a backup** on a second PC | Discover lists the apps with the missing ones ticked; Options opens with the options and schedule filled in |
