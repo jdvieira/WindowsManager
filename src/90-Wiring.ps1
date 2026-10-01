@@ -158,9 +158,9 @@ $Window.Add_KeyDown({
         if ($e.Key -eq 'F5' -and $Panels[$script:Section]) { if ($Panels[$script:Section].Refresh) { & $Panels[$script:Section].Refresh }; $e.Handled = $true }
         elseif ($e.Key -eq 'F5' -and $UI.BtnRefresh.IsEnabled -and $UI.BtnRefresh.Visibility -eq 'Visible') { if ($script:Section -eq 'installed') { Start-InstalledScan } else { Start-Scan }; $e.Handled = $true }
         elseif ($ctrl -and $e.Key -eq 'F') { [void]$UI.Search.Focus(); $UI.Search.SelectAll(); $e.Handled = $true }
-        elseif ($ctrl -and "$($e.Key)" -match '^(D|NumPad)([1-8])$') {
-            # Ctrl+1 to Ctrl+8: the tabs, left to right
-            $tabs = 'TabHealth', 'TabUpdates', 'TabDiscover', 'TabInstalled', 'TabStartup', 'TabDrivers', 'TabWindows', 'TabCleanup'
+        elseif ($ctrl -and "$($e.Key)" -match '^(D|NumPad)([1-9])$') {
+            # Ctrl+1 to Ctrl+9: the tabs, left to right
+            $tabs = 'TabHealth', 'TabUpdates', 'TabDiscover', 'TabInstalled', 'TabStartup', 'TabDrivers', 'TabWindows', 'TabFeatures', 'TabCleanup'
             $UI[$tabs[[int]$Matches[2] - 1]].IsChecked = $true; $e.Handled = $true
         }
         elseif ($e.Key -eq 'Escape' -and $UI.ConfirmOverlay.Visibility -eq 'Visible') { Complete-Confirm $false; $e.Handled = $true }

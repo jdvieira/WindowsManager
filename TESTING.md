@@ -16,29 +16,42 @@ Tick each line once it has worked, with the PC and the date.
 | [ ] | Windows Update tab: install one small update (a Defender definition update is ideal) | One approval; the log shows "Downloading 1 of 1" and "Installing 1 of 1"; the row goes away after the check that follows; History has a *Windows update* line |
 | [ ] | Windows Update tab: **Restart now** when a restart is waiting | Asks first, then Windows restarts after 15 seconds |
 | [ ] | Drivers > Driver Updates: install one Windows Update driver | One approval; a restore point line in the log ("Restore point created."), then "Saved the current driver ..." when the device used a third-party driver; History has the result |
-| [ ] | Drivers > Devices: **Roll back** on that device | Asks first; the device goes back to the saved version (the list shows it after a few seconds); History has *Rolled back driver* |
+| [x] Dell laptop, 2026-10-01 (a saved driver forced back onto its device) | Drivers > Devices: **Roll back** on that device | Asks first; the device goes back to the saved version (the list shows it after a few seconds); History has *Rolled back driver* |
 | [ ] | Drivers > Devices: **Reinstall** on a harmless device (a webcam or card reader) | The device drops out for a moment and comes back with the same driver |
 | [ ] | Drivers > Devices: **Remove** on a third-party driver you can do without | "Saved the current driver" first; the device falls back to another driver; **Roll back** then brings it back |
-| [ ] | Restore point with System Protection turned off | The run continues; its log says System Protection is off |
+| [x] Dell laptop, 2026-10-01 | Restore point with System Protection turned off | The run continues; its log says System Protection is off |
 | [ ] | Startup: turn off an app that starts for you, sign out and in | It doesn't start; Task Manager's Startup apps page shows it as Disabled |
-| [ ] | Startup: turn off an app with a shield (starts for everyone) | One approval; Task Manager shows it as Disabled |
-| [ ] | Cleanup > Clean up with a shield item ticked (Windows temporary files) | One approval; each item shows what it freed; History has a *Cleaned up* line |
+| [x] Dell laptop, 2026-10-01 (registry checked, not Task Manager) | Startup: turn off an app with a shield (starts for everyone) | One approval; Task Manager shows it as Disabled |
+| [x] Dell laptop, 2026-10-01 | Cleanup > Clean up with a shield item ticked (Windows temporary files) | One approval; each item shows what it freed; History has a *Cleaned up* line |
 | [ ] | Cleanup > Clean up > Windows Update downloads | Windows Update still works afterwards (check the Windows Update tab) |
 | [ ] | Cleanup > Large files > **Delete** on a file you don't need | Asks first; the file goes to the Recycle Bin (and can be restored from there) |
 | [ ] | First start after the rename to Windows Manager | Settings, history and saved drivers are still there; the app offers to move the old scheduled task; **Test notification** shows *Windows Manager* as the sender |
-| [ ] | After the next release is published, open the older exe | The update prompt shows the new version and its notes; **Update now** restarts on the new version and History has the update; the `.old` file is gone |
+| [x] 2026-10-01 (2.2.0.0 to 2.2.0.1) | After the next release is published, open the older exe | The update prompt shows the new version and its notes; **Update now** restarts on the new version and History has the update; the `.old` file is gone |
 | [ ] | Options > App updates > **Update without asking**, then open an older exe | It updates and restarts by itself, without a prompt |
 | [ ] | Automatic updates > **Test notification** | A Windows notification (not the pop-up) with **Open Windows Manager** and **View log** buttons; both work |
 | [ ] | Turn off notifications for Windows Manager in Settings > System > Notifications, then **Test notification** again | The app's own pop-up appears instead |
 | [ ] | Options > Maintenance > **Back up this PC's setup**, then **Set up from a backup** on a second PC | Discover lists the apps with the missing ones ticked; Options opens with the options and schedule filled in |
 | [ ] | An app on Updates whose update fails with "install technology is different" | Its row turns *updated by Windows* and Update all skips it from then on |
 | [ ] | **Diagnostics** | A zip on the desktop; Explorer opens with it selected |
+| [x] Dell laptop, 2026-10-01 | Windows Features > Optional features: **Turn on** a harmless one (TFTP Client), then **Turn off** | One approval each; the row says Turned on / Turned off; History has both |
+| [x] Dell laptop, 2026-10-01 (re-registered Calculator) | Windows Features > Built-in apps: **Remove** one you don't use, then **Reinstall** | It disappears from Start, then comes back; History has both |
+| [ ] | Windows Features: an optional feature that needs a restart (Windows Sandbox, Hyper-V) | The row says "Restart to finish" |
+| [x] Dell laptop, 2026-10-01 (a made-up app folder) | Installed Software: uninstall an app that leaves folders behind | The leftovers list opens with its folders ticked; **Remove ticked** moves them to the Recycle Bin |
+| [x] Dell laptop, 2026-10-01 | Startup lists scheduled tasks | Tasks that start at sign-in or startup appear as *Scheduled task* |
+| [ ] | Startup: **Turn off** a scheduled task, then **Turn on** | Task Scheduler shows it Disabled, then Ready |
+| [x] Dell laptop, 2026-10-01 | Device Health > **Save report** | An HTML file on the desktop with every card |
+| [ ] | Device Health on the second day | The Trends card appears |
+| [ ] | An automatic run with a health problem (turn the firewall off for a minute) | A notification about it; the next run doesn't repeat it |
+| [x] Dell laptop, 2026-10-01 | Open the app twice | The second brings the first window to the front and closes |
+| [x] Dell laptop, 2026-10-01 (temp copies) | An update whose new version closes straight away | The old version comes back with a message; History has the failure |
+| [ ] | After an update from 2.3 on, Options > App updates > **Go back to <version>** | The previous version starts; History has *Went back to the previous version* |
+| [ ] | **Get beta versions** with a pre-release published | It's offered, marked as a pre-release |
 
 ## Dell or Alienware
 
 | Done | Test | Expect |
 | --- | --- | --- |
-| [ ] | Drivers: **Check for updates** | One approval; Dell's updates join the list (or "Dell has nothing newer") |
+| [x] Dell laptop, 2026-10-01 | Drivers: **Check for updates** | One approval; Dell's updates join the list (or "Dell has nothing newer") |
 | [ ] | Install one Dell driver update | One approval; Dell's log in the Drivers folder; History has the result |
 | [ ] | **Reinstall all drivers** (only when you mean it) | Dell's driver restore runs; a restart is usually needed |
 | [ ] | A PC without Dell Command \| Update | Offered once when the Drivers tab opens; installs through winget; the check starts by itself afterwards |

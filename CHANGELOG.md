@@ -3,6 +3,49 @@
 All notable changes to Windows Manager (called Windows Software Manager in 2.0, and Windows Package Manager before
 1.0). The version is `$AppVersion` in `src\00-Startup.ps1`, which Build-Exe.ps1 also stamps on the exe.
 
+## 2.3.0.0 - 2026-10-01
+
+- **Windows Features tab** (Ctrl+8; Cleanup moves to Ctrl+9). **Built-in apps**: the Store apps Windows lets you
+  remove, with their publisher; **Remove** removes one for your account, and removed apps stay listed with
+  **Reinstall** (registered again from their files, or their Microsoft Store page when those are gone). **Optional
+  features**: every optional feature, on or off, with **Turn on** / **Turn off** (one administrator approval, a restore
+  point first, and a note when a restart is needed). Filter, and **On only**.
+- **Uninstall leftovers.** After an uninstall from Installed Software, the app looks for folders named after the app
+  (or inside its publisher's folder) in AppData, ProgramData and Program Files, its scheduled tasks, and startup
+  entries whose program is gone, and lists them ticked. **Remove ticked** sends folders to the Recycle Bin; anything
+  outside your profile needs one approval. Folders a running program uses are never listed.
+- **Health trends.** Device Health keeps one reading a day (battery health, free space, stability index, app crashes,
+  memory in use, drive wear) for 400 days, and a **Trends** card draws each over the last 90 days with its latest value
+  and the change since the first reading.
+- **Health alerts in automatic runs.** Automatic runs check the PC's health too and send a notification when
+  something needs attention (antivirus or real-time protection off, old definitions, firewall off, a nearly full drive,
+  a failing disk, a worn battery, blue screens, a restart waiting for days). Each is mentioned once, then weekly while
+  it lasts. Options > Automatic runs > **Check the PC's health and tell me about problems** (on by default).
+- **Health report.** Device Health > **Save report** writes the whole page as an HTML file on the desktop: every card,
+  drives, waiting updates, startup apps and installed software.
+- **Startup lists scheduled tasks** that start at sign-in or at startup (outside Windows' own), which Task Manager
+  doesn't show, with Turn off / Turn on (disabling the task).
+- **A safety net for updates.** After switching to a new version, the old copy waits, out of sight, until the new one
+  has opened; if it closes or doesn't open within 90 seconds, the old exe is put back and carries on, and that version
+  isn't offered again on start. The previous version is kept in `Previous\`, and Options > App updates > **Go back to
+  <version>** switches back to it the same way.
+- **Beta versions.** Options > App updates > **Get beta versions** offers GitHub pre-releases too.
+- **One copy at a time.** Opening the app while it's open brings the open window to the front. Automatic runs,
+  notification buttons and the log link aren't affected. Closing the window frees it straight away, even while
+  background work is finishing.
+- **GitHub Actions.** Every pull request is checked (ASCII only, parses, self-test) and built, with the exe attached
+  to the run; pushing a `v<version>` tag builds and publishes the release with its CHANGELOG notes (a hyphenated tag
+  becomes a pre-release). `tools\Test-Source.ps1` runs the same checks locally.
+- **winget manifest.** `tools\New-WingetManifest.ps1` writes the manifest for a release (package
+  `jdvieira.WindowsManager`, portable, command `windows-manager`) for a pull request to winget-pkgs; it passes
+  `winget validate`.
+- The tabs are a little tighter to fit nine, and the window opens a little wider (1280 x 820).
+- **Fixed:** today's health reading wasn't saved when earlier readings existed.
+- Tested as administrator on real hardware: restore point with System Protection off, saving a driver and forcing it
+  back, an all-users startup app off and on, Windows temporary files cleanup, Dell Command | Update's check, disk wear
+  and temperature, an optional feature on and off, re-registering a built-in app, leftovers, and both outcomes of a
+  version switch.
+
 ## 2.2.0.2 - 2026-10-01
 
 - **Fixed:** after an update, `Windows Manager.exe.old` was left next to the app. The new version tried to delete it

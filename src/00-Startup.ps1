@@ -39,7 +39,7 @@ notification to this PNG file instead of showing it.
 Internal: a windowsmanager: link from a notification's button (open = the window, log = today's log).
 
 .NOTES
-Version:            2.2.0.2 (see CHANGELOG.md)
+Version:            2.3.0.0 (see CHANGELOG.md)
 Created By:         Justin Vieira (jdvieira@icloud.com)
 Source:             src\*.ps1, joined in name order by Windows_Manager.ps1 (to run it) and Build-Exe.ps1 (to
                     compile the exe). This file, 00-Startup.ps1, is the start of the joined script.
@@ -55,7 +55,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$AppVersion = '2.2.0.2'   # also the exe version (Build-Exe.ps1 reads it); record changes in CHANGELOG.md
+$AppVersion = '2.3.0.0'   # also the exe version (Build-Exe.ps1 reads it); record changes in CHANGELOG.md
 $AppName = 'Windows Manager'
 $Dot = [string][char]0x00B7
 $Ellipsis = [string][char]0x2026
@@ -82,6 +82,41 @@ if (-not $SelfTest -and -not $TaskOp -and -not $IsCompiled -and [Threading.Threa
 }
 
 Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
+
+# One window at a time: a second start (a shortcut, a notification's Open button) brings the open window forward and
+# exits. Automatic runs, task changes and tests aren't windows, so they don't take part. A copy that is restarting
+# itself (after an update, or as administrator) lets go first.
+$script:AppMutex = $null
+function Get-AppMutex([int]$WaitSeconds) {
+    $created = $false
+    $m = New-Object Threading.Mutex($true, 'Local\JustinVieira.WindowsManager', [ref]$created)
+    if ($created) { return $m }
+    try { if ($m.WaitOne([TimeSpan]::FromSeconds($WaitSeconds))) { return $m } }
+    catch [Threading.AbandonedMutexException] { return $m }
+    $m.Dispose()
+    return $null
+}
+function Exit-AppMutex {
+    if (-not $script:AppMutex) { return }
+    try { $script:AppMutex.ReleaseMutex() } catch { }
+    $script:AppMutex.Dispose()
+    $script:AppMutex = $null
+}
+if (-not $Auto -and -not $TaskOp -and -not $SelfTest -and $Open -notmatch ':log') {
+    $script:AppMutex = Get-AppMutex 3
+    if (-not $script:AppMutex) {
+        try {
+            Add-Type -Namespace WingetUM -Name Win -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h); [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr h, int cmd); [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h);'
+            $other = @(Get-Process | Where-Object { $_.Id -ne $PID -and $_.MainWindowTitle -eq 'Windows Manager' -and $_.MainWindowHandle -ne [IntPtr]::Zero }) | Select-Object -First 1
+            if ($other) {
+                [void][WingetUM.Win]::ShowWindowAsync($other.MainWindowHandle, $(if ([WingetUM.Win]::IsIconic($other.MainWindowHandle)) { 9 } else { 5 }))
+                [void][WingetUM.Win]::SetForegroundWindow($other.MainWindowHandle)
+            }
+        }
+        catch { }
+        exit 0
+    }
+}
 
 # The window runs without a console, so any unhandled error is written to a log and shown in a message box.
 $StartupLog = Join-Path ([IO.Path]::GetTempPath()) 'Windows_Manager.log'

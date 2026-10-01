@@ -1,0 +1,52 @@
+# Checks every pull request and push to main: the source joins, is ASCII only and parses, the self-test runs, and
+# the exe builds (uploaded as an artifact to try before merging).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ps2exe
+        shell: powershell
+        run: |
+          Set-PSRepository PSGallery -InstallationPolicy Trusted
+          Install-Module ps2exe -Scope CurrentUser -Force
+
+      - name: Check the source
+        shell: powershell
+        run: .\tools\Test-Source.ps1
+
+      - name: Self-test
+        shell: powershell
+        # it needs winget for the update list; runners without it still check the window, the installed list and
+        # Discover, so a failure here is reported but doesn't block
+        continue-on-error: true
+        run: .\tools\Test-Source.ps1 -SelfTest
+
+      - name: Build
+        shell: powershell
+        run: .\Build-Exe.ps1
+
+      - name: Checksum
+        shell: powershell
+        run: |
+          $h = [Security.Cryptography.SHA256]::Create().ComputeHash([IO.File]::ReadAllBytes('dist\Windows Manager.exe'))
+          "sha256: " + (-join ($h | ForEach-Object { $_.ToString('x2') }))
+          "version: " + (Get-Item 'dist\Windows Manager.exe').VersionInfo.FileVersion
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Windows Manager
+          path: dist/Windows Manager.exe
+          if-no-files-found: error

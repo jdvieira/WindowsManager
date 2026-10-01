@@ -76,4 +76,6 @@ if ($SelfTest) {
 
 $Timer.Start()
 [void]$Window.ShowDialog()
+# background work can keep the process alive for a few seconds; opening the app again meanwhile shouldn't find it taken
+Exit-AppMutex
 exit 0

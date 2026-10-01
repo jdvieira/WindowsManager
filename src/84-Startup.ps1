@@ -58,8 +58,14 @@ function Set-StartupItem($s, [bool]$On) {
     if ($s.State -eq 'policy') { $script:LastSummary = "Your organization sets whether $($s.Name) starts with Windows."; Update-View; return }
     $verb = if ($On) { 'on' } else { 'off' }
     if (-not $s.NeedsAdmin -or $IsAdmin) {
+        # a task that turns out to need approval after all goes on to the administrator run below
+        $denied = $false
         try {
-            if ($s.Location -eq 'appx') {
+            if ($s.Location -eq 'task') {
+                $svc = New-Object -ComObject Schedule.Service; $svc.Connect()
+                $svc.GetFolder('\').GetTask($s.Entry).Enabled = $On
+            }
+            elseif ($s.Location -eq 'appx') {
                 $k = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($s.Entry, $true)
                 if (-not $k) { throw "the app's startup task is gone" }
                 try { $k.SetValue('State', $(if ($On) { 2 } else { 1 }), 'DWord') } finally { $k.Close() }
@@ -73,20 +79,31 @@ function Set-StartupItem($s, [bool]$On) {
             Add-History "startup$verb" $s.Name $s.LocationText '' '' 'ok' $(if ($On) { 'Starts with Windows again' } else { "Won't start with Windows" })
             $script:LastSummary = "$($s.Name) $(if ($On) { 'starts with Windows again' } else { "won't start with Windows any more" })"
         }
-        catch { $s.State = 'error'; $s.Detail = "Couldn't change it: $($_.Exception.Message)" }
-        $StartupView.Refresh()
-        Update-View
-        return
+        catch {
+            if ($s.Location -eq 'task' -and -not $IsAdmin -and $_.Exception.Message -match 'denied|0x80070005') { $denied = $true }
+            else { $s.State = 'error'; $s.Detail = "Couldn't change it: $($_.Exception.Message)" }
+        }
+        if (-not $denied) { $StartupView.Refresh(); Update-View; return }
     }
     if ($script:Elev) { $script:LastSummary = "Wait for $($script:ElevTitle) to finish first."; Update-View; return }
-    $bytes = (Get-ApprovedBytes $On) -join ','
-    $sub = "$StartupApprovedKey\$(Get-ApprovedSub $s.Location)" -replace "'", "''"
-    $body = @"
+    if ($s.Location -eq 'task') {
+        # another account's scheduled task: schtasks, as administrator
+        $body = @"
+`$o = & schtasks.exe /Change /TN '$($s.Entry -replace "'", "''")' $(if ($On) { '/ENABLE' } else { '/DISABLE' }) 2>&1; `$c = `$LASTEXITCODE
+`$o | ForEach-Object { Say ([string]`$_) }
+exit `$c
+"@
+    }
+    else {
+        $bytes = (Get-ApprovedBytes $On) -join ','
+        $sub = "$StartupApprovedKey\$(Get-ApprovedSub $s.Location)" -replace "'", "''"
+        $body = @"
 `$k = [Microsoft.Win32.RegistryKey]::OpenBaseKey('LocalMachine', 'Registry64').CreateSubKey('$sub')
 `$k.SetValue('$($s.Entry -replace "'", "''")', [byte[]]@($bytes), 'Binary'); `$k.Close()
 Say 'Turned $verb.'
 exit 0
 "@
+    }
     $s.State = 'running'; $s.Detail = 'Waiting for approval' + $Ellipsis
     Start-Elevated 'startup' "Turning $verb $($s.Name) at startup" $body @() @{ Item = $s; On = $On }
 }
@@ -120,7 +137,7 @@ function Update-StartupView {
     elseif ($script:StartupState -eq 'running') { "Reading the apps that start with Windows$Ellipsis" } else { '' }
     $UI.StRefresh.IsEnabled = -not $script:StartupReader
     $msg = $null
-    if ($script:StartupState -eq 'running' -and -not $StartupItems.Count) { $msg = @{ Bar = $true; Title = 'Reading startup apps'; Text = 'Looking in the registry, the Startup folders and Store apps.' } }
+    if ($script:StartupState -eq 'running' -and -not $StartupItems.Count) { $msg = @{ Bar = $true; Title = 'Reading startup apps'; Text = 'Looking in the registry, the Startup folders, Store apps and scheduled tasks.' } }
     elseif ($script:StartupState -eq 'error' -and -not $StartupItems.Count) { $msg = @{ Title = "Couldn't read the startup apps"; Text = $script:StartupError; Action = 'Try again' } }
     elseif ($script:StartupState -eq 'ready' -and -not $StartupItems.Count) { $msg = @{ Title = 'Nothing starts with Windows'; Text = 'No apps are set to start when you sign in.' } }
     elseif ($StartupItems.Count -and -not @($StartupView).Count) { $msg = @{ Title = $(if ($UI.StOffOnly.IsChecked -and -not $UI.StSearch.Text) { 'Nothing is turned off' } else { 'No apps match' }); Text = '' } }

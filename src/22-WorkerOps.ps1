@@ -111,10 +111,16 @@ if ($Op -eq 'appupdate') {
         $wc = New-Object Net.WebClient
         $wc.Headers['User-Agent'] = 'WindowsManager-Updater'
         $wc.Headers['Accept'] = 'application/vnd.github+json'
-        $j = $wc.DownloadString("https://api.github.com/repos/$($Arg.Repo)/releases/latest") | ConvertFrom-Json
+        if ($Arg.Beta) {
+            # pre-releases too: the highest version among the recent releases that aren't drafts
+            $all = @($wc.DownloadString("https://api.github.com/repos/$($Arg.Repo)/releases?per_page=20") | ConvertFrom-Json | Where-Object { -not $_.draft })
+            $j = $all | Sort-Object { $v = $null; if ([version]::TryParse((([string]$_.tag_name -replace '^[vV]', '') -replace '-.*$', ''), [ref]$v)) { $v } else { [version]'0.0' } } -Descending | Select-Object -First 1
+            if (-not $j) { throw 'there are no releases on GitHub yet' }
+        }
+        else { $j = $wc.DownloadString("https://api.github.com/repos/$($Arg.Repo)/releases/latest") | ConvertFrom-Json }
         $asset = @($j.assets | Where-Object { $_.name -like '*.exe' }) | Select-Object -First 1
         Send @{ T = 'appupdate'; Manual = [bool]$Arg.Manual; Tag = [string]$j.tag_name; Name = [string]$j.name; Notes = [string]$j.body; Published = [string]$j.published_at
-            Page = [string]$j.html_url; Url = $(if ($asset) { [string]$asset.browser_download_url } else { '' }); Size = $(if ($asset) { [long]$asset.size } else { 0 })
+            Page = [string]$j.html_url; Prerelease = [bool]$j.prerelease; Url = $(if ($asset) { [string]$asset.browser_download_url } else { '' }); Size = $(if ($asset) { [long]$asset.size } else { 0 })
             Digest = $(if ($asset) { [string]$asset.digest } else { '' }); Error = $null }
     }
     catch {
@@ -329,6 +335,34 @@ if ($Op -eq 'startup') {
             }
             finally { $root.Close() }
         }
+        # Scheduled tasks that run at sign-in (trigger 9) or at startup (8), outside Windows' own \Microsoft folder.
+        # Tasks that run as you can be changed without approval; others need it.
+        try {
+            $svc = New-Object -ComObject Schedule.Service
+            $svc.Connect()
+            $me = [Security.Principal.WindowsIdentity]::GetCurrent()
+            $folders = New-Object System.Collections.Generic.Stack[object]
+            $folders.Push($svc.GetFolder('\'))
+            while ($folders.Count) {
+                $fo = $folders.Pop()
+                foreach ($sub in @($fo.GetFolders(0))) { if ($sub.Path -notlike '\Microsoft*') { $folders.Push($sub) } }
+                foreach ($t in @($fo.GetTasks(1))) {
+                    $def = $t.Definition
+                    $kinds = @($def.Triggers | ForEach-Object { [int]$_.Type })
+                    if ($kinds -notcontains 9 -and $kinds -notcontains 8) { continue }
+                    $act = @($def.Actions | Where-Object { $_.Type -eq 0 }) | Select-Object -First 1
+                    $path = if ($act) { [Environment]::ExpandEnvironmentVariables([string]$act.Path).Trim('"') } else { '' }
+                    $fi = Get-FileInfo $path
+                    $uid = [string]$def.Principal.UserId
+                    $mine = [bool]$uid -and ($uid -eq $me.Name -or $uid -eq $me.User.Value -or $uid -eq $env:USERNAME)
+                    $items.Add(@{ Name = [string]$t.Name; Command = $(if ($act) { ("`"$path`" " + [string]$act.Arguments).Trim() } else { '(no program)' }); Target = $path
+                            Publisher = $(if ($fi.Company) { $fi.Company } else { [string]$def.RegistrationInfo.Author }); Location = 'task'
+                            LocationText = $(if ($kinds -contains 9) { 'Scheduled task (sign-in)' } else { 'Scheduled task (startup)' }); Entry = [string]$t.Path; File = $path
+                            NeedsAdmin = -not $mine; Enabled = [bool]$t.Enabled })
+                }
+            }
+        }
+        catch { }
         $hku.Close(); $hkm.Close()
     }
     catch { $err = $_.Exception.Message }
@@ -572,5 +606,140 @@ if ($Op -eq 'diag') {
         Send @{ T = 'diag'; Zip = $Arg.Zip; Error = $null }
     }
     catch { Send @{ T = 'diag'; Error = $_.Exception.Message } }
+}
+
+if ($Op -eq 'leftovers') {
+    # What an uninstalled app (Arg.Name, Arg.Id) left behind: folders named after it in AppData, ProgramData and the
+    # Program Files folders (also inside a folder named after its publisher), its scheduled tasks, and startup entries
+    # whose program is gone. Only exact name matches count, and folders a running program uses are left out.
+    $norm = { param($s) (([string]$s).ToLowerInvariant() -replace '\(.*?\)', '' -replace '\b\d+(\.\d+)+\b', '' -replace '[^a-z0-9]', '') }
+    $names = New-Object System.Collections.Generic.HashSet[string]
+    $nm = & $norm $Arg.Name
+    if ($nm.Length -ge 4) { [void]$names.Add($nm) }
+    $idParts = @(([string]$Arg.Id) -split '\.' | Where-Object { $_ })
+    $vendor = ''
+    if ($Arg.Id -notmatch '^(ARP|MSIX)\\' -and $idParts.Count -ge 2) {
+        $vendor = & $norm $idParts[0]
+        $last = & $norm $idParts[-1]
+        if ($last.Length -ge 4) { [void]$names.Add($last) }
+        $joined = & $norm ($idParts[1..($idParts.Count - 1)] -join '')
+        if ($joined.Length -ge 4) { [void]$names.Add($joined) }
+    }
+    $skip = 'microsoft|windows|common files|packages|temp|programs|google|mozilla|nvidia|intel|dell|hp|lenovo|asus|adobe|java|nuget|npm|pip'
+    $running = @(Get-Process -ErrorAction SilentlyContinue | ForEach-Object { try { $_.Path } catch { } } | Where-Object { $_ })
+    $found = New-Object System.Collections.Generic.List[object]
+    $roots = @(
+        @{ Path = $env:LOCALAPPDATA; Admin = $false }, @{ Path = (Join-Path $env:LOCALAPPDATA 'Programs'); Admin = $false }, @{ Path = $env:APPDATA; Admin = $false },
+        @{ Path = $env:ProgramData; Admin = $true }, @{ Path = $env:ProgramFiles; Admin = $true }, @{ Path = ${env:ProgramFiles(x86)}; Admin = $true })
+    $consider = {
+        param($dir, $admin)
+        if ($running | Where-Object { $_.StartsWith($dir.FullName + '\', [StringComparison]::OrdinalIgnoreCase) }) { return }
+        $size = [long]0; try { foreach ($f in $dir.EnumerateFiles('*', 'AllDirectories')) { $size += $f.Length } } catch { }
+        $found.Add(@{ Kind = 'folder'; Path = $dir.FullName; Size = $size; Admin = $admin })
+    }
+    foreach ($r in $roots) {
+        if (-not $r.Path -or -not (Test-Path -LiteralPath $r.Path)) { continue }
+        foreach ($d in @(try { (New-Object IO.DirectoryInfo $r.Path).GetDirectories() } catch { })) {
+            $dn = & $norm $d.Name
+            if ($names.Contains($dn) -and $d.Name -notmatch "^($skip)$") { & $consider $d $r.Admin }
+            elseif ($vendor -and $dn -eq $vendor) {
+                foreach ($s in @(try { $d.GetDirectories() } catch { })) { if ($names.Contains((& $norm $s.Name))) { & $consider $s $r.Admin } }
+            }
+        }
+    }
+    # scheduled tasks named after it (outside Windows' own)
+    try {
+        $svc = New-Object -ComObject Schedule.Service; $svc.Connect()
+        $folders = New-Object System.Collections.Generic.Stack[object]; $folders.Push($svc.GetFolder('\'))
+        while ($folders.Count) {
+            $fo = $folders.Pop()
+            foreach ($sub in @($fo.GetFolders(0))) { if ($sub.Path -notlike '\Microsoft*') { $folders.Push($sub) } }
+            foreach ($t in @($fo.GetTasks(1))) {
+                $tn = & $norm $t.Name
+                if (@($names | Where-Object { $tn.Contains($_) }).Count) { $found.Add(@{ Kind = 'task'; Path = [string]$t.Path; Size = 0; Admin = $true }) }
+            }
+        }
+    }
+    catch { }
+    # startup entries named after it whose program no longer exists
+    foreach ($k in @(@{ Hive = 'CurrentUser'; Admin = $false }, @{ Hive = 'LocalMachine'; Admin = $true })) {
+        try {
+            $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey($k.Hive, 'Registry64')
+            $run = $base.OpenSubKey('Software\Microsoft\Windows\CurrentVersion\Run')
+            if ($run) {
+                foreach ($v in $run.GetValueNames()) {
+                    $cmd = [Environment]::ExpandEnvironmentVariables([string]$run.GetValue($v))
+                    $exe = if ($cmd.StartsWith('"')) { $cmd.Substring(1).Split('"')[0] } elseif ($cmd -match '^(.+?\.exe)') { $Matches[1] } else { '' }
+                    $vn = & $norm $v
+                    if ($exe -and -not (Test-Path -LiteralPath $exe) -and @($names | Where-Object { $vn.Contains($_) -or (& $norm $exe).Contains($_) }).Count) {
+                        $found.Add(@{ Kind = 'run'; Path = "$($k.Hive)\$v"; Hive = $k.Hive; Value = $v; Size = 0; Admin = $k.Admin })
+                    }
+                }
+                $run.Close()
+            }
+            $base.Close()
+        }
+        catch { }
+    }
+    Send @{ T = 'leftovers'; Name = $Arg.Name; Id = $Arg.Id; Items = $found.ToArray() }
+}
+
+if ($Op -eq 'removeleftovers') {
+    # Your own leftovers (Arg.Items): folders to the Recycle Bin, startup entries deleted
+    Add-Type -AssemblyName Microsoft.VisualBasic
+    foreach ($it in @($Arg.Items)) {
+        $ok = $true; $why = ''
+        try {
+            if ($it.Kind -eq 'folder') { [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory($it.Path, 'OnlyErrorDialogs', 'SendToRecycleBin') }
+            elseif ($it.Kind -eq 'run') { $b = [Microsoft.Win32.RegistryKey]::OpenBaseKey($it.Hive, 'Registry64'); $r = $b.OpenSubKey('Software\Microsoft\Windows\CurrentVersion\Run', $true); $r.DeleteValue($it.Value); $r.Close(); $b.Close() }
+        }
+        catch { $ok = $false; $why = $_.Exception.Message }
+        Send @{ T = 'leftoverdone'; Path = $it.Path; Ok = $ok; Error = $why }
+    }
+    Send @{ T = 'leftoversdone' }
+}
+
+if ($Op -eq 'appxlist') {
+    # Built-in apps: your Store packages that Windows lets you remove (not frameworks, not parts of Windows itself),
+    # with the names their manifests give them
+    $items = New-Object Collections.Generic.List[object]
+    $err = $null
+    try {
+        Import-Module Appx -ErrorAction SilentlyContinue
+        foreach ($p in @(Get-AppxPackage -PackageTypeFilter Main -ErrorAction Stop | Where-Object { -not $_.IsFramework -and -not $_.NonRemovable -and $_.SignatureKind -in 'Store', 'System' })) {
+            $display = ''; $pub = ''
+            try { $man = Get-AppxPackageManifest -Package $p.PackageFullName; $display = [string]$man.Package.Properties.DisplayName; $pub = [string]$man.Package.Properties.PublisherDisplayName } catch { }
+            if (-not $display -or $display -like 'ms-resource:*') { $display = ($p.Name -replace '^[^.]+\.', '' -creplace '([a-z])([A-Z])', '$1 $2') }
+            if ($pub -like 'ms-resource:*') { $pub = '' }
+            $items.Add(@{ Name = $display; Package = [string]$p.Name; Full = [string]$p.PackageFullName; Family = [string]$p.PackageFamilyName; Location = [string]$p.InstallLocation; Publisher = $pub; Version = [string]$p.Version })
+        }
+    }
+    catch { $err = $_.Exception.Message }
+    Send @{ T = 'appxlist'; Items = $items.ToArray(); Error = $err }
+}
+
+if ($Op -eq 'appxchange') {
+    # Removes a built-in app for you (Arg.Full), or registers it again from its install folder (Arg.Location)
+    try {
+        Import-Module Appx -ErrorAction SilentlyContinue
+        if ($Arg.Remove) { Remove-AppxPackage -Package $Arg.Full -ErrorAction Stop }
+        else {
+            $man = Join-Path ([string]$Arg.Location) 'AppxManifest.xml'
+            if (-not $Arg.Location -or -not (Test-Path -LiteralPath $man)) { throw 'its files are gone from this PC' }
+            Add-AppxPackage -DisableDevelopmentMode -Register $man -ErrorAction Stop
+        }
+        Send @{ T = 'appxchanged'; Key = $Arg.Key; Remove = [bool]$Arg.Remove; Error = $null }
+    }
+    catch { Send @{ T = 'appxchanged'; Key = $Arg.Key; Remove = [bool]$Arg.Remove; Error = ($_.Exception.Message -split "`n")[0] } }
+}
+
+if ($Op -eq 'features') {
+    # Windows' optional features (Win32_OptionalFeature, which needs no administrator rights to read):
+    # InstallState 1 on, 2 off, 3 not available
+    try {
+        $items = @(Get-CimInstance Win32_OptionalFeature -ErrorAction Stop | ForEach-Object { @{ Name = [string]$_.Name; Caption = [string]$_.Caption; State = [int]$_.InstallState } })
+        Send @{ T = 'features'; Items = $items; Error = $null }
+    }
+    catch { Send @{ T = 'features'; Items = @(); Error = $_.Exception.Message } }
 }
 '@

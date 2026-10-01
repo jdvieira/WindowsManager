@@ -22,6 +22,8 @@ $EventHandlers.health = {
     $script:HealthInfo = $Ev
     $script:HealthRead = Get-Date
     $script:HealthState = if ($Ev.Error -and -not $Ev.Sys) { 'error' } else { 'ready' }
+    if (-not $SelfTest -or $env:WSM_T2) { try { Add-HealthSnapshot $Ev } catch { } }
+    Update-HealthTrends
     Update-View
 }
 

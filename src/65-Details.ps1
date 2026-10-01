@@ -128,6 +128,8 @@ function Invoke-WorkerEvent($Ev) {
                 if ($p.IsDone) {
                     switch ($p.Action) { 'install' { $b.Installed++ } 'uninstall' { $b.Uninstalled++ } default { $b.Updated++ } }
                     Complete-Job $p
+                    # what the app left behind, offered to remove
+                    if ($p.Action -eq 'uninstall') { Start-LeftoverScan $p }
                 }
             }
             Update-View
@@ -231,10 +233,12 @@ function Move-LegacyTask {
 }
 
 function Restart-Elevated {
+    # the elevated copy is a new window, so this one lets go of "one window at a time" first
+    Exit-AppMutex
     try {
         if ($IsCompiled) { Start-Process -FilePath $ExePath -Verb RunAs }
         else { Start-Process -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -Verb RunAs -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-STA', '-WindowStyle', 'Hidden', '-File', "`"$AppScript`"") }
         $Window.Close()
     }
-    catch { $UI.StatusText.Text = 'Administrator approval was declined.' }
+    catch { $script:AppMutex = Get-AppMutex 1; $UI.StatusText.Text = 'Administrator approval was declined.' }
 }

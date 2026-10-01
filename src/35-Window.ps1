@@ -59,7 +59,9 @@ foreach ($name in 'TabStartup', 'TabWindows', 'TabHealth', 'WinBadge', 'WinBadge
 foreach ($name in 'TabCleanup', 'CleanupPanel', 'ClTitle', 'ClDriveBar', 'ClDriveText', 'ClRefresh', 'ClBigInfo', 'ClBigScan', 'ClBigList', 'ClAppsInfo', 'ClAllApps', 'ClAppList',
     'HlSecTitle', 'HlSecItems', 'HlSecOpen', 'HlPerfTitle', 'HlMemBar', 'HlPerfItems', 'HlPerfOpen', 'HlRelTitle', 'HlRelItems', 'HlRelOpen',
     'HlUpdTitle', 'HlUpdItems', 'HlUpdOpen', 'HlNetTitle', 'HlNetItems', 'HlNetOpen', 'HlCleanSumTitle', 'HlCleanSumText', 'HlCleanOpen',
-    'PageApp', 'OptAppStatus', 'OptAppCheckNow', 'OptAppInstall', 'OptAppReleases', 'OptAppCheck', 'OptAppAuto') {
+    'PageApp', 'OptAppStatus', 'OptAppCheckNow', 'OptAppInstall', 'OptAppReleases', 'OptAppCheck', 'OptAppAuto', 'OptAppBack', 'OptAppBeta', 'OptHealthAlerts', 'HlReport', 'HlTrends', 'HlTrendsNote', 'HlTrendsLabel',
+    'TabFeatures', 'FeaturesPanel', 'FtTitle', 'FtText', 'FtViewApps', 'FtViewAppsText', 'FtViewFeatures', 'FtViewFeaturesText', 'FtSearch', 'FtOnOnly', 'FtRefresh',
+    'FtHeader', 'FtHeadName', 'FtHeadPub', 'FtList', 'FtMsgPanel', 'FtMsgBar', 'FtMsgTitle', 'FtMsgText') {
     $UI[$name] = $Window.FindName($name)
     if (-not $UI[$name]) { throw "XAML element '$name' not found." }
 }

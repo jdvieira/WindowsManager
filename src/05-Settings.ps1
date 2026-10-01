@@ -23,7 +23,8 @@ $DefaultLogDir = Join-Path $DataDir 'Logs'
 #                   learned from failed updates), WingetUpdates (IDs on the built-in list that winget may update anyway)
 #   Drivers:        DriverRestorePoint (a restore point before driver and Windows Update changes)
 #   App updates:    AppUpdateCheck (look for a newer GitHub release on start), AppUpdateAuto (install it without asking),
-#                   AppUpdateSkip (a version the user said Not now to)
+#                   AppUpdateSkip (a version the user said Not now to), AppUpdateBeta (also offer pre-releases)
+#   Health:         HealthAlerts (automatic runs check the PC's health and notify about problems)
 function New-DefaultSettings {
     return @{
         Source = ''; InstallScope = ''; Silent = $true; IncludeUnknown = $false; UninstallPrevious = $false; ScanOnOpen = $true; Excluded = @(); Hidden = @()
@@ -31,7 +32,7 @@ function New-DefaultSettings {
         RequireNetwork = $true; RequireAC = $false; RandomDelayMin = 0; MaxRunHours = 4; AutoDismissMin = 0
         LogRetentionDays = 30; LogDir = ''; VerboseLogs = $false
         NotifyStyle = 'toast'; WindowsUpdated = @(); WingetUpdates = @(); DriverRestorePoint = $true
-        AppUpdateCheck = $true; AppUpdateAuto = $false; AppUpdateSkip = ''
+        AppUpdateCheck = $true; AppUpdateAuto = $false; AppUpdateSkip = ''; AppUpdateBeta = $false; HealthAlerts = $true
     }
 }
 function ConvertTo-Setting($Default, $Value) {

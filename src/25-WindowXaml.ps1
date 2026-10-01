@@ -3,7 +3,7 @@
 $Xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Windows Manager" Width="1240" Height="800" MinWidth="1100" MinHeight="580"
+        Title="Windows Manager" Width="1280" Height="820" MinWidth="1180" MinHeight="600"
         WindowStartupLocation="CenterScreen" Background="#1E1E1E"
         FontFamily="Segoe UI" FontSize="13.5" Foreground="#F2F2F2" UseLayoutRounding="True"
         TextOptions.TextFormattingMode="Display">
@@ -251,9 +251,9 @@ $Xaml = @'
     <!-- Section tabs (Updates / Discover / Installed) -->
     <Style x:Key="Tab" TargetType="RadioButton">
       <Setter Property="Foreground" Value="#9A9A9A"/>
-      <Setter Property="FontSize" Value="14.5"/>
+      <Setter Property="FontSize" Value="14"/>
       <Setter Property="Cursor" Value="Hand"/>
-      <Setter Property="Margin" Value="0,0,24,0"/>
+      <Setter Property="Margin" Value="0,0,20,0"/>
       <Setter Property="Focusable" Value="False"/>
       <Setter Property="Template">
         <Setter.Value>
@@ -756,7 +756,8 @@ $Xaml = @'
             </Border>
           </StackPanel>
         </RadioButton>
-        <RadioButton x:Name="TabCleanup" GroupName="Section" Style="{StaticResource Tab}" Content="Cleanup" ToolTip="Free up space: leftover files, large files and the biggest apps (Ctrl+8)"/>
+        <RadioButton x:Name="TabFeatures" GroupName="Section" Style="{StaticResource Tab}" Content="Windows Features" ToolTip="Built-in apps to remove or reinstall, and Windows' optional features (Ctrl+8)"/>
+        <RadioButton x:Name="TabCleanup" GroupName="Section" Style="{StaticResource Tab}" Content="Cleanup" ToolTip="Free up space: leftover files, large files and the biggest apps (Ctrl+9)"/>
       </StackPanel>
     </Border>
     <Grid x:Name="SectionToolbar" Margin="32,16,32,14">
@@ -1446,6 +1447,12 @@ $Xaml = @'
       <StackPanel>
         <DockPanel Margin="0,0,0,12">
           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+          <Button x:Name="HlReport" ToolTip="Save Device Health, installed software, startup apps and waiting updates as a web page, to keep or send to someone helping">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="&#xE74E;" FontFamily="Segoe MDL2 Assets" FontSize="13" Margin="0,1,8,0" VerticalAlignment="Center"/>
+              <TextBlock Text="Save report"/>
+            </StackPanel>
+          </Button>
           <Button x:Name="HlRefresh" ToolTip="Read the PC's health again (F5)">
             <StackPanel Orientation="Horizontal">
               <TextBlock Text="&#xE72C;" FontFamily="Segoe MDL2 Assets" FontSize="13" Margin="0,1,8,0" VerticalAlignment="Center"/>
@@ -1570,8 +1577,130 @@ $Xaml = @'
               </ItemsControl>
             </StackPanel>
           </Border>
+          <Border Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16" Margin="0,12,0,0">
+            <StackPanel>
+              <TextBlock x:Name="HlTrendsLabel" Text="TRENDS" Style="{StaticResource Label}"/>
+              <TextBlock x:Name="HlTrendsNote" Foreground="{StaticResource Muted}" FontSize="12.5" Margin="0,6,0,0" TextWrapping="Wrap"/>
+              <StackPanel x:Name="HlTrends" Margin="0,6,0,0"/>
+            </StackPanel>
+          </Border>
       </StackPanel>
     </ScrollViewer>
+
+    <!-- Windows Features: built-in apps to remove or reinstall, and Windows' optional features -->
+    <Grid x:Name="FeaturesPanel" Grid.Row="2" Margin="32,16,32,18" Visibility="Collapsed">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="*"/>
+      </Grid.RowDefinitions>
+      <Border Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16">
+        <DockPanel>
+          <Border Width="44" Height="44" CornerRadius="10" Background="#17414C" Margin="0,0,14,0" VerticalAlignment="Center">
+            <TextBlock Text="&#xE71D;" FontFamily="Segoe MDL2 Assets" FontSize="20" Foreground="{StaticResource Highlight}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <StackPanel VerticalAlignment="Center">
+            <TextBlock x:Name="FtTitle" FontSize="16" FontWeight="SemiBold" Foreground="White" Text="Windows Features"/>
+            <TextBlock x:Name="FtText" Foreground="#BDBDBD" FontSize="12.5" Margin="0,4,0,0" TextWrapping="Wrap"/>
+          </StackPanel>
+        </DockPanel>
+      </Border>
+      <Grid Grid.Row="1" Margin="0,14,0,12">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto"/>
+          <ColumnDefinition Width="260"/>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+          <RadioButton x:Name="FtViewApps" GroupName="FtView" Style="{StaticResource Chip}" Margin="0,0,8,0" IsChecked="True">
+            <TextBlock x:Name="FtViewAppsText" Text="Built-in apps"/>
+          </RadioButton>
+          <RadioButton x:Name="FtViewFeatures" GroupName="FtView" Style="{StaticResource Chip}" Margin="0,0,16,0">
+            <TextBlock x:Name="FtViewFeaturesText" Text="Optional features"/>
+          </RadioButton>
+        </StackPanel>
+        <Grid Grid.Column="1">
+          <TextBox x:Name="FtSearch" Padding="34,7,10,7"/>
+          <TextBlock Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="13" Foreground="#8A8A8A" Margin="12,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"/>
+          <TextBlock Text="Filter" Foreground="#7A7A7A" Margin="36,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False">
+            <TextBlock.Style>
+              <Style TargetType="TextBlock">
+                <Setter Property="Visibility" Value="Collapsed"/>
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding Text, ElementName=FtSearch}" Value=""><Setter Property="Visibility" Value="Visible"/></DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </TextBlock.Style>
+          </TextBlock>
+        </Grid>
+        <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+          <ToggleButton x:Name="FtOnOnly" Content="On only" Style="{StaticResource Chip}" Margin="0,0,8,0" ToolTip="Only the features that are turned on (or the apps that are installed)"/>
+          <Button x:Name="FtRefresh" ToolTip="Read them again (F5)">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="&#xE72C;" FontFamily="Segoe MDL2 Assets" FontSize="13" Margin="0,1,8,0" VerticalAlignment="Center"/>
+              <TextBlock Text="Refresh"/>
+            </StackPanel>
+          </Button>
+        </StackPanel>
+      </Grid>
+      <Border Grid.Row="2" Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+          </Grid.RowDefinitions>
+          <Border x:Name="FtHeader" BorderBrush="#2E2E2E" BorderThickness="0,0,0,1">
+            <Grid Height="40" Margin="20,0,26,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="220"/>
+                <ColumnDefinition Width="120"/>
+                <ColumnDefinition Width="110"/>
+              </Grid.ColumnDefinitions>
+              <TextBlock x:Name="FtHeadName" Text="APP" Style="{StaticResource Label}" VerticalAlignment="Center"/>
+              <TextBlock x:Name="FtHeadPub" Grid.Column="1" Text="PUBLISHER" Style="{StaticResource Label}" VerticalAlignment="Center"/>
+              <TextBlock Grid.Column="2" Text="STATUS" Style="{StaticResource Label}" VerticalAlignment="Center"/>
+            </Grid>
+          </Border>
+          <ListBox x:Name="FtList" Grid.Row="1" Background="Transparent" BorderThickness="0" ItemContainerStyle="{StaticResource Row}" ScrollViewer.HorizontalScrollBarVisibility="Disabled" VirtualizingPanel.ScrollUnit="Pixel" Focusable="False">
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <Grid x:Name="FtRow" Height="56" Margin="20,0,16,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="220"/>
+                    <ColumnDefinition Width="120"/>
+                    <ColumnDefinition Width="110"/>
+                  </Grid.ColumnDefinitions>
+                  <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
+                    <TextBlock Text="{Binding Name}" Foreground="#F2F2F2" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
+                    <TextBlock Text="{Binding SubText}" Foreground="#8A8A8A" FontSize="12" FontFamily="Consolas" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" ToolTip="{Binding SubText}"/>
+                  </StackPanel>
+                  <TextBlock Grid.Column="1" Text="{Binding Publisher}" Foreground="#9A9A9A" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,10,0"/>
+                  <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                    <TextBlock x:Name="FtStatus" Text="{Binding StatusText}" Foreground="{StaticResource Good}" FontSize="12.5" TextTrimming="CharacterEllipsis" ToolTip="{Binding StatusText}"/>
+                    <ProgressBar x:Name="FtBar" Style="{StaticResource Bar}" IsIndeterminate="True" Margin="0,6,10,0" Visibility="Collapsed"/>
+                  </StackPanel>
+                  <Button Grid.Column="3" Content="{Binding ActionText}" Tag="ftaction" Style="{StaticResource RowButton}" IsEnabled="{Binding CanChange}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+                <DataTemplate.Triggers>
+                  <DataTrigger Binding="{Binding On}" Value="False"><Setter TargetName="FtStatus" Property="Foreground" Value="#8A8A8A"/></DataTrigger>
+                  <DataTrigger Binding="{Binding State}" Value="running"><Setter TargetName="FtBar" Property="Visibility" Value="Visible"/><Setter TargetName="FtStatus" Property="Foreground" Value="White"/></DataTrigger>
+                  <DataTrigger Binding="{Binding State}" Value="error"><Setter TargetName="FtStatus" Property="Foreground" Value="{StaticResource Bad}"/></DataTrigger>
+                  <DataTrigger Binding="{Binding State}" Value="reboot"><Setter TargetName="FtStatus" Property="Foreground" Value="{StaticResource Warn}"/></DataTrigger>
+                </DataTemplate.Triggers>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <StackPanel x:Name="FtMsgPanel" Grid.RowSpan="2" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="560" Visibility="Collapsed">
+            <ProgressBar x:Name="FtMsgBar" Style="{StaticResource Bar}" Width="240" IsIndeterminate="True" Margin="0,0,0,20"/>
+            <TextBlock x:Name="FtMsgTitle" FontSize="17" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"/>
+            <TextBlock x:Name="FtMsgText" Foreground="{StaticResource Muted}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,6,0,0"/>
+          </StackPanel>
+        </Grid>
+      </Border>
+    </Grid>
 
     <!-- Cleanup: free up space -->
     <ScrollViewer x:Name="CleanupPanel" Grid.Row="2" Margin="32,16,20,18" Padding="0,0,12,0" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
@@ -2008,6 +2137,8 @@ $Xaml = @'
                 <TextBlock Text="DURING A RUN" Style="{StaticResource Label}" Margin="0,0,0,12"/>
                 <CheckBox x:Name="OptRetry" Content="Retry failed updates once"/>
                 <TextBlock Text="Tries again 30 seconds after the first pass. Helps when an app was open or a download dropped." Style="{StaticResource Hint}" Margin="48,3,0,14"/>
+                <CheckBox x:Name="OptHealthAlerts" Content="Check the PC's health and tell me about problems"/>
+                <TextBlock Text="After each run: antivirus or firewall off, old virus definitions, a nearly full drive, a disk that isn't healthy, a worn battery, blue screens, or a restart waiting for days. Each problem is mentioned once (and again after a week if it's still there). Every run also saves a reading for Device Health's trends." Style="{StaticResource Hint}" Margin="48,3,0,14"/>
                 <CheckBox x:Name="OptRestorePoint" Content="Create a restore point before installing"/>
                 <TextBlock Text="Needs the task to run elevated and System Protection turned on. Windows creates at most one restore point every 24 hours; the updates go ahead either way." Style="{StaticResource Hint}" Margin="48,3,0,20"/>
                 <TextBlock Text="WHEN TO RUN" Style="{StaticResource Label}" Margin="0,0,0,12"/>
@@ -2082,6 +2213,7 @@ $Xaml = @'
                 <StackPanel Orientation="Horizontal" Margin="0,10,0,22">
                   <Button x:Name="OptAppCheckNow" Content="Check now"/>
                   <Button x:Name="OptAppInstall" Content="Update now" Style="{StaticResource Primary}" Visibility="Collapsed"/>
+                  <Button x:Name="OptAppBack" Content="Go back" Visibility="Collapsed" ToolTip="Go back to the version this one replaced (it is kept for that)"/>
                   <Button x:Name="OptAppReleases" Content="Release notes" Style="{StaticResource Ghost}" ToolTip="Open the releases page on GitHub"/>
                 </StackPanel>
                 <TextBlock Text="AUTOMATIC UPDATES" Style="{StaticResource Label}" Margin="0,0,0,12"/>
@@ -2089,7 +2221,9 @@ $Xaml = @'
                 <TextBlock Text="Looks at the latest release on GitHub in the background and offers to update when it's newer. Not now skips that version until you choose it here." Style="{StaticResource Hint}" Margin="48,3,0,14"/>
                 <CheckBox x:Name="OptAppAuto" Content="Update without asking"/>
                 <TextBlock Text="When a newer version is found, it downloads, swaps itself in and restarts the app straight away (unless something is installing). Settings, history and the schedule stay as they are." Style="{StaticResource Hint}" Margin="48,3,0,14"/>
-                <TextBlock Text="Downloads are checked against the checksum GitHub publishes and the version they say they are, before they replace this app." Style="{StaticResource Hint}" Margin="0,6,0,0"/>
+                <CheckBox x:Name="OptAppBeta" Content="Get beta versions"/>
+                <TextBlock Text="Also offer pre-releases: versions published for testing before everyone gets them. They may have rough edges; Go back returns to the version before." Style="{StaticResource Hint}" Margin="48,3,0,14"/>
+                <TextBlock Text="Downloads are checked against the checksum GitHub publishes and the version they say they are, before they replace this app. If a new version doesn't open, the one you had comes back by itself." Style="{StaticResource Hint}" Margin="0,6,0,0"/>
               </StackPanel>
             </ScrollViewer>
 
