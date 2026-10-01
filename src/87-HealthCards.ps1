@@ -9,6 +9,35 @@ function New-Check([string]$Label, [string]$Value, [string]$Level = 'ok', [strin
     return $c
 }
 function Format-Days([int]$Days) { if ($Days -le 0) { 'today' } elseif ($Days -eq 1) { 'yesterday' } else { "$Days days ago" } }
+function Format-Ms($Ms) { if ($Ms -lt 1) { 'under 1 ms' } else { '{0:0} ms' -f $Ms } }
+
+# The Network card's connection quality lines, from the worker's round trips (h.Quality): the router, the internet
+# (time, lost replies, how much the times vary) and DNS. A line is amber or red when it would make the connection
+# feel slow: calls and games stutter past about 100 ms or 30 ms of jitter, pages hang when replies go missing.
+function Get-NetQualityChecks($q, [bool]$Internet) {
+    $list = New-Object System.Collections.Generic.List[object]
+    if (-not $q) { return , $list.ToArray() }
+    $g = $q.Gateway
+    if ($g) {
+        if ($null -eq $g.Ms) { $list.Add((New-Check 'Router' "No reply from $($g.Target)" 'info' "The router ($($g.Target)) didn't answer ping. Many don't, so this alone isn't a problem")) }
+        else { $list.Add((New-Check 'Router' "$(Format-Ms $g.Ms)$(if ($g.Loss) { ", $($g.Loss)% lost" })" $(if ($g.Ms -ge 100 -or $g.Loss -gt 25) { 'bad' } elseif ($g.Ms -ge 20 -or $g.Loss) { 'warn' } else { 'ok' }) "Round trip to your router ($($g.Target)). Slow or lost replies here point at Wi-Fi signal or the cable, not your internet provider")) }
+    }
+    $i = $q.Internet
+    if ($i -and $null -ne $i.Ms) {
+        $how = if ($i.Method -eq 'tcp') { ' (ping is blocked, so timed by connecting)' } else { '' }
+        $list.Add((New-Check 'Latency' (Format-Ms $i.Ms) $(if ($i.Ms -gt 200) { 'bad' } elseif ($i.Ms -gt 100) { 'warn' } else { 'ok' }) "Average round trip to the internet ($($i.Target))$how. Under 100 ms is good; over 200 ms makes calls and games lag"))
+        if ($null -ne $i.Loss) { $list.Add((New-Check 'Packet loss' "$($i.Loss)%" $(if ($i.Loss -gt 20) { 'bad' } elseif ($i.Loss) { 'warn' } else { 'ok' }) 'Replies from the internet that never came back. Any loss makes pages hang and calls break up')) }
+        if ($null -ne $i.Jitter) { $list.Add((New-Check 'Jitter' (Format-Ms $i.Jitter) $(if ($i.Jitter -gt 30) { 'warn' } else { 'ok' }) 'How much the round trip varies from one reply to the next. Over 30 ms makes calls and video stutter')) }
+    }
+    elseif ($i -and $Internet) { $list.Add((New-Check 'Latency' "No reply from $($i.Target)" 'bad' "Windows says there's internet access, but $($i.Target) didn't answer ping or a connection")) }
+    $d = $q.Dns
+    if ($d) {
+        $from = if ($d.Server) { " from $($d.Server)" } else { '' }
+        if ($null -eq $d.Ms) { $list.Add((New-Check 'DNS lookup' 'Failed' $(if ($Internet) { 'bad' } else { 'warn' }) "Looking up web addresses$from didn't work, so websites won't open by name")) }
+        else { $list.Add((New-Check 'DNS lookup' "$(Format-Ms $d.Ms)$(if ($d.Failed) { ", $($d.Failed) of 2 failed" })" $(if ($d.Ms -gt 500) { 'bad' } elseif ($d.Ms -gt 150 -or $d.Failed) { 'warn' } else { 'ok' }) "How long looking up a web address takes$from. Slow lookups make every new website slow to start")) }
+    }
+    return , $list.ToArray()
+}
 
 function Update-HealthCards($h) {
     $issues = 0
@@ -117,6 +146,12 @@ function Update-HealthCards($h) {
             if ($a.Ip) { $net.Add((New-Check 'Address' $a.Ip 'info')) }
         }
         if (-not $main.Internet) { $issues++ }
+        $quality = Get-NetQualityChecks $h.Quality ([bool]$main.Internet)
+        foreach ($c in $quality) { $net.Add($c) }
+        $issues += @($quality | Where-Object { $_.Level -in 'warn', 'bad' }).Count
+        if ($main.Internet -and $quality.Count) {
+            $UI.HlNetTitle.Text = if (@($quality | Where-Object { $_.Level -eq 'bad' }).Count) { 'Poor connection' } elseif (@($quality | Where-Object { $_.Level -eq 'warn' }).Count) { 'Fair connection' } else { 'Good connection' }
+        }
     }
     elseif ($h.ContainsKey('Network')) { $UI.HlNetTitle.Text = 'Not connected'; $net.Add((New-Check 'Network' 'No connected adapter' 'bad')); $issues++ }
     else { $UI.HlNetTitle.Text = $Ellipsis }
@@ -152,6 +187,7 @@ $TrendMetrics = @(
     @{ Key = 'Crashes7'; Label = 'App crashes (7 days)'; Unit = ''; Format = '{0:0}'; Good = 'down' }
     @{ Key = 'MemUsedPct'; Label = 'Memory in use'; Unit = '%'; Format = '{0:0}%'; Good = 'down' }
     @{ Key = 'DiskWear'; Label = 'Drive wear'; Unit = '%'; Format = '{0:0}%'; Good = 'down' }
+    @{ Key = 'LatencyMs'; Label = 'Internet latency'; Unit = 'ms'; Format = '{0:0} ms'; Good = 'down' }
 )
 
 function New-Sparkline($Points, [double]$Width = 320, [double]$Height = 34) {

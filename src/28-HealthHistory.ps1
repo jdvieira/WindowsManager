@@ -25,6 +25,7 @@ function Add-HealthSnapshot($h) {
         Shutdowns30 = $(if ($r) { $r.Shutdowns } else { $null })
         BlueScreens30 = $(if ($r) { $r.BlueScreens } else { $null })
         DiskWear    = $(@($h.Disks | Where-Object { $null -ne $_.Wear } | ForEach-Object { [int]$_.Wear }) | Measure-Object -Maximum).Maximum
+        LatencyMs   = $(if ($h.Quality -and $h.Quality.Internet -and $null -ne $h.Quality.Internet.Ms) { [Math]::Round($h.Quality.Internet.Ms) } else { $null })
     }
     try {
         $keep = @(Read-HealthHistory | Where-Object { $_.Date -ne $snap.Date -and [datetime]$_.Date -ge (Get-Date).AddDays(-400) } | ForEach-Object { $_ | ConvertTo-Json -Compress })
