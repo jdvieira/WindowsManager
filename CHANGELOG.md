@@ -3,6 +3,13 @@
 All notable changes to Windows Manager (called Windows Software Manager in 2.0, and Windows Package Manager before
 1.0). The version is `$AppVersion` in `src\00-Startup.ps1`, which Build-Exe.ps1 also stamps on the exe.
 
+## 2.4.0.0 - 2026-10-01
+
+- **Network health.** Device Health's Network card measures the connection: the round trip to the router, latency,
+  packet loss and jitter to the internet, and how long a DNS lookup takes, each green, amber or red, and its title
+  says Good, Fair or Poor connection. Internet latency is kept in the daily reading and gets a line on **Trends**.
+- Brandon Bolding is credited as a contributor (README and About).
+
 ## 2.3.0.0 - 2026-10-01
 
 - **Windows Features tab** (Ctrl+8; Cleanup moves to Ctrl+9). **Built-in apps**: the Store apps Windows lets you

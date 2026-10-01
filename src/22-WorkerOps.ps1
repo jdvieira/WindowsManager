@@ -496,6 +496,52 @@ if ($Op -eq 'health') {
         $h.Network = $nets.ToArray()
     }
     catch { $h.Network = @() }
+    # Connection quality: round trips to the router and to the internet (how long, how many are lost, how much they
+    # vary) and how long a DNS lookup takes. A network that blocks ping is timed with a connection to port 443 instead.
+    if (@($h.Network).Count) {
+        $q = @{}
+        $pinger = New-Object System.Net.NetworkInformation.Ping
+        $probe = {
+            param([string]$Target, [int]$Count)
+            $times = New-Object Collections.Generic.List[double]; $lost = 0
+            for ($i = 0; $i -lt $Count; $i++) {
+                try { $r = $pinger.Send($Target, 1000); if ($r.Status -eq 'Success') { $times.Add([double]$r.RoundtripTime) } else { $lost++ } } catch { $lost++ }
+            }
+            $jit = $null
+            if ($times.Count -ge 2) { $d = 0.0; for ($i = 1; $i -lt $times.Count; $i++) { $d += [Math]::Abs($times[$i] - $times[$i - 1]) }; $jit = [Math]::Round($d / ($times.Count - 1), 1) }
+            @{ Target = $Target; Ms = $(if ($times.Count) { [Math]::Round(($times | Measure-Object -Average).Average, 1) } else { $null }); Jitter = $jit; Loss = [int][Math]::Round(100.0 * $lost / $Count); Method = 'ping' }
+        }
+        $route = $null
+        try { $route = @(Get-NetRoute -DestinationPrefix '0.0.0.0/0' -ErrorAction Stop | Where-Object { $_.NextHop -and $_.NextHop -ne '0.0.0.0' } | Sort-Object { [int]$_.RouteMetric + [int]$_.InterfaceMetric }) | Select-Object -First 1 } catch { }
+        if ($route) { try { $q.Gateway = & $probe ([string]$route.NextHop) 4 } catch { } }
+        try {
+            $q.Internet = & $probe '1.1.1.1' 6
+            if ($null -eq $q.Internet.Ms) {
+                $times = @(foreach ($i in 1..3) {
+                        $tcp = New-Object System.Net.Sockets.TcpClient
+                        try { $sw = [Diagnostics.Stopwatch]::StartNew(); if ($tcp.ConnectAsync('1.1.1.1', 443).Wait(2000)) { $sw.Elapsed.TotalMilliseconds } } catch { } finally { $tcp.Close() }
+                    })
+                if ($times.Count) { $q.Internet = @{ Target = '1.1.1.1'; Ms = [Math]::Round(($times | Measure-Object -Average).Average, 1); Jitter = $null; Loss = $null; Method = 'tcp' } }
+            }
+        }
+        catch { }
+        try {
+            $dns = $null
+            if ($route) { try { $dns = @((Get-DnsClientServerAddress -InterfaceIndex $route.ifIndex -AddressFamily IPv4 -ErrorAction Stop).ServerAddresses) | Select-Object -First 1 } catch { } }
+            $times = @(foreach ($n in 'www.microsoft.com', 'www.cloudflare.com') {
+                    $sw = [Diagnostics.Stopwatch]::StartNew()
+                    try {
+                        # asking the server itself skips Windows' DNS cache
+                        if ($dns) { $null = Resolve-DnsName $n -Type A -DnsOnly -QuickTimeout -Server $dns -ErrorAction Stop } else { $null = Resolve-DnsName $n -Type A -DnsOnly -QuickTimeout -ErrorAction Stop }
+                        $sw.Elapsed.TotalMilliseconds
+                    }
+                    catch { }
+                })
+            $q.Dns = @{ Server = [string]$dns; Ms = $(if ($times.Count) { [Math]::Round(($times | Measure-Object -Average).Average, 1) } else { $null }); Failed = 2 - $times.Count }
+        }
+        catch { }
+        $h.Quality = $q
+    }
     Send $h
 }
 

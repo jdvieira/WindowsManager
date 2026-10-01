@@ -1997,6 +1997,8 @@ $Xaml = @'
             <StackPanel>
               <TextBlock Text="MADE BY" Style="{StaticResource Label}"/>
               <TextBlock Text="Justin Vieira" FontSize="15" Foreground="White" Margin="0,4,0,10"/>
+              <TextBlock Text="CONTRIBUTORS" Style="{StaticResource Label}"/>
+              <TextBlock Text="Brandon Bolding" FontSize="15" Foreground="White" Margin="0,4,0,10"/>
               <TextBlock Text="CONTACT" Style="{StaticResource Label}"/>
               <TextBlock Margin="0,4,0,0" FontSize="14">
                 <Hyperlink x:Name="AboutMail" NavigateUri="mailto:jdvieira@icloud.com" Foreground="{StaticResource Highlight}">jdvieira@icloud.com</Hyperlink>

@@ -53,7 +53,7 @@ each card's lines have a green, amber, red or grey dot.
 | Performance | Memory in use (with a bar), how busy the processor is right now, the three apps using the most memory, how many programs are running and how many start with Windows. **Task Manager** opens it |
 | Reliability | Windows' stability index, unexpected shutdowns and blue screens in the last 30 days, app crashes in the last 7 (and which apps), and devices with a problem. **Reliability history** opens Windows' Reliability Monitor |
 | Updates | What's waiting from winget (Software Updates), Windows Update and the drivers check, and a waiting restart. **See updates** opens the tab with them |
-| Network | Each connected adapter, the network (and Wi-Fi signal), link speed and address, and whether there's internet access |
+| Network | Each connected adapter, the network (and Wi-Fi signal), link speed and address, and whether there's internet access. Connection quality: the round trip to the router, latency, packet loss and jitter to the internet (1.1.1.1; timed with a connection to port 443 where ping is blocked), and how long a DNS lookup takes. The title says Good, Fair or Poor connection (amber over 100 ms latency, 30 ms jitter, 150 ms DNS or any loss; red over 200 ms, 20% loss or 500 ms DNS) |
 | Cleanup | How much the Cleanup tab can free, and the system drive's free space. **Open Cleanup** goes there |
 | Drives | Each drive's free space (amber under 20% free, red under 10%), and each disk's health. Wear and temperature show when the app runs as administrator |
 | Trends | Battery health, free space on the system drive, the stability index, app crashes, memory in use and drive wear over the last 90 days, each as a small line with its latest value and the change since the first reading (hover a point for its date and value). One reading a day is kept, from the tab and from automatic runs, for 400 days in `health-history.jsonl`; the card appears once there are two days |
@@ -438,3 +438,7 @@ Line numbers in errors refer to `dist\build\Windows_Manager.dev.ps1`, where each
 ## Author
 
 Justin Vieira, [jdvieira@icloud.com](mailto:jdvieira@icloud.com)
+
+## Contributors
+
+- Brandon Bolding
