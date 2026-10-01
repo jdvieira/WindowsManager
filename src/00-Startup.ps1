@@ -39,7 +39,7 @@ notification to this PNG file instead of showing it.
 Internal: a windowsmanager: link from a notification's button (open = the window, log = today's log).
 
 .NOTES
-Version:            2.2.0.0 (see CHANGELOG.md)
+Version:            2.2.0.1 (see CHANGELOG.md)
 Created By:         Justin Vieira (jdvieira@icloud.com)
 Source:             src\*.ps1, joined in name order by Windows_Manager.ps1 (to run it) and Build-Exe.ps1 (to
                     compile the exe). This file, 00-Startup.ps1, is the start of the joined script.
@@ -55,7 +55,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$AppVersion = '2.2.0.0'   # also the exe version (Build-Exe.ps1 reads it); record changes in CHANGELOG.md
+$AppVersion = '2.2.0.1'   # also the exe version (Build-Exe.ps1 reads it); record changes in CHANGELOG.md
 $AppName = 'Windows Manager'
 $Dot = [string][char]0x00B7
 $Ellipsis = [string][char]0x2026

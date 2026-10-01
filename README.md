@@ -287,7 +287,9 @@ Options > **App updates** shows the version you have and the latest one, with **
 without asking** (off by default: it then downloads, swaps and restarts by itself).
 
 Publishing a release the updater picks up: tag it `v<version>` (the same as `$AppVersion`, for example `v2.2.0.0`) and
-attach the built `Windows Manager.exe` (GitHub names the download `Windows.Manager.exe`; any `.exe` asset works). The
+attach the built `Windows Manager.exe` with the label "Windows Manager.exe" (`gh release create v<version>
+"dist\Windows Manager.exe#Windows Manager.exe"`): GitHub turns the space in the file name into a dot, and the label is
+what its release page shows. Any `.exe` asset works for the updater. The
 newest release that isn't a draft or pre-release is the one offered.
 
 ## Setting up a new PC
