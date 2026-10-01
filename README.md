@@ -6,6 +6,29 @@ longer need. It also turns startup apps on and off, installs Windows' own update
 Update, the PC's vendor, NVIDIA and AMD, with a saved copy to roll back to), shows the PC's health, and cleans up
 leftover files. A setup backup puts your apps and options on a new PC.
 
+## Screenshots
+
+**Device Health**, where the app opens: security, performance, reliability, updates, network, battery and drives at a
+glance.
+
+![Device Health](docs/screenshots/01-device-health.png)
+
+**Installed Software**, sorted by size, with uninstall on every row.
+
+![Installed Software](docs/screenshots/02-installed-software.png)
+
+**Drivers**: the PC's vendor tool, and driver updates from Windows Update, the vendor, NVIDIA and AMD.
+
+![Drivers](docs/screenshots/03-drivers.png)
+
+**Startup**: apps that start when you sign in, turned on or off the way Task Manager does it.
+
+![Startup](docs/screenshots/04-startup.png)
+
+**Cleanup**: leftover files measured and cleaned, plus large files and the biggest apps.
+
+![Cleanup](docs/screenshots/05-cleanup.png)
+
 ## Using it
 
 Download `Windows Manager.exe` from the [latest release](https://github.com/jdvieira/WindowsManager/releases/latest)

@@ -7,6 +7,8 @@ All notable changes to Windows Manager (called Windows Software Manager in 2.0, 
 
 - **Fixed:** after an update, `Windows Manager.exe.old` was left next to the app. The new version tried to delete it
   while the old one was still closing; it now tries again every 2 seconds for a minute.
+- The README has screenshots of Device Health, Installed Software, Drivers, Startup and Cleanup (in `docs/screenshots`;
+  the PC's name, serial number and network details are replaced).
 - The first update from 2.2.0.0 to 2.2.0.1 through GitHub worked end to end (download, checksum, version check,
   swap, restart, History).
 
