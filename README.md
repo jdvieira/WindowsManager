@@ -340,16 +340,22 @@ Options > **App updates** shows the version you have and the latest one, with **
 without asking** (off by default: it then downloads, swaps and restarts by itself), and **Get beta versions** (off by
 default: pre-releases are offered too, as soon as they're published).
 
-Publishing a release the updater picks up: tag it `v<version>` (the same as `$AppVersion`, for example `v2.2.0.0`) and
-attach the built `Windows Manager.exe` with the label "Windows Manager.exe" (`gh release create v<version>
-"dist\Windows Manager.exe#Windows Manager.exe"`): GitHub turns the space in the file name into a dot, and the label is
-what its release page shows. Any `.exe` asset works for the updater. The
-newest release that isn't a draft or pre-release is the one offered (with **Get beta versions**, the newest of all).
+**Publishing a release:** merge a pull request that bumps `$AppVersion` (with its `CHANGELOG.md` entry). Once it's on
+`main`, `.github\workflows\release.yml` builds the exe from the merged source, checks its version, and publishes
+release `v<version>` with that version's `CHANGELOG.md` section as the notes and the exe labeled "Windows Manager.exe"
+(GitHub turns the space in the file name into a dot; the label is what its release page shows). Approving the pull
+request is approving the release. A merge that doesn't bump the version, or bumps it to one that isn't newer than the
+latest release, releases nothing.
 
-Pushing the tag does the same on GitHub (`.github\workflows\release.yml`): it builds the exe from the tagged commit,
-checks it's the tag's version, and creates the release with that version's `CHANGELOG.md` section as the notes. A tag
-with a hyphen, such as `v2.4.0.0-beta1`, becomes a pre-release, which only copies on beta versions are offered. It
-does nothing when the release was already created by hand.
+A beta goes out by pushing a tag with a hyphen, such as `v2.5.0.0-beta1`, on a commit whose `$AppVersion` is
+2.5.0.0: it becomes a pre-release, which only copies with **Get beta versions** are offered. Only the repository's
+admins can create `v*` tags. The newest release that isn't a draft or pre-release is the one offered (with **Get beta
+versions**, the newest of all).
+
+The workflow runs in the repository's `release` environment, which only `main` and `v*` tags can use. Its
+`RELEASE_TOKEN` secret, a fine-grained token of the owner's with *Contents: read and write* on this repository, creates
+the tag and release, so no workflow on another branch can publish one. Releases are immutable once published. To
+publish by hand instead: `gh release create v<version> "dist\Windows Manager.exe#Windows Manager.exe" --target main`.
 
 ## Setting up a new PC
 
