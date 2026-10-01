@@ -72,6 +72,7 @@ function Show-Confirm([string]$Kind, $Payload, [string]$Title, [string]$Text, [s
     $UI.ConfirmTitle.Text = $Title
     $UI.ConfirmText.Text = $Text
     $UI.ConfirmYes.Content = $OkText
+    $UI.ConfirmNo.Content = 'Cancel'
     $UI.ConfirmYes.Style = $Window.FindResource($(if ($Danger) { 'Danger' } else { 'Primary' }))
     $UI.ConfirmYes.Margin = '0'
     $UI.ConfirmOverlay.Visibility = 'Visible'
@@ -81,7 +82,8 @@ function Complete-Confirm([bool]$Yes) {
     $c = $script:Confirm
     $script:Confirm = $null
     $UI.ConfirmOverlay.Visibility = 'Collapsed'
-    if (-not $Yes -or -not $c) { return }
+    if (-not $c) { return }
+    if (-not $Yes) { $h = $ConfirmDeclined[[string]$c.Kind]; if ($h) { & $h $c.Payload }; return }
     switch ($c.Kind) {
         'uninstall' { Add-Job @($c.Payload.Item) -Interactive:$c.Payload.Interactive }
         'migrate' { Move-LegacyTask }

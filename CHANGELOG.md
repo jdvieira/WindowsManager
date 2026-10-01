@@ -3,6 +3,17 @@
 All notable changes to Windows Manager (called Windows Software Manager in 2.0, and Windows Package Manager before
 1.0). The version is `$AppVersion` in `src\00-Startup.ps1`, which Build-Exe.ps1 also stamps on the exe.
 
+## 2.2.0.0 - 2026-10-01
+
+- **Updates itself from GitHub.** On start the app reads the latest release on GitHub; when it's newer, it shows what's
+  new and offers to update. Updating downloads the release's exe, checks GitHub's SHA-256 checksum and the file's
+  version, swaps it in for the running exe (which becomes `.old` and is deleted on the next start) and restarts on the
+  new version, with settings, history and the schedule unchanged. **Not now** skips that version. It waits while
+  something is installing.
+- **Options > App updates:** the version you have and the latest one, Check now, Update now, Release notes, and the
+  switches *Check for a new version when the app opens* (on) and *Update without asking* (off).
+- The update's steps go into the daily log as well as the log panel.
+
 ## 2.1.0.0 - 2026-10-01
 
 - **Renamed to Windows Manager**, since it does much more than manage software: the exe is `Windows Manager.exe`, the

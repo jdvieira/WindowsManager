@@ -8,7 +8,7 @@ $script:MaintNext = $null
 $script:WingetVersion = $null
 
 function Show-OptionsPage([string]$Name) {
-    foreach ($p in 'PageUpdates', 'PageSources', 'PageAuto', 'PageLogs', 'PageMaint') { $UI[$p].Visibility = if ($p -eq $Name) { 'Visible' } else { 'Collapsed' } }
+    foreach ($p in 'PageUpdates', 'PageSources', 'PageAuto', 'PageLogs', 'PageApp', 'PageMaint') { $UI[$p].Visibility = if ($p -eq $Name) { 'Visible' } else { 'Collapsed' } }
 }
 
 function Set-OptionMessage([string]$Text, [switch]$IsError) {
@@ -78,6 +78,8 @@ function Set-OptionControls($S) {
     $UI.OptLogDir.Text = $S.LogDir
     $UI.OptVerbose.IsChecked = $S.VerboseLogs
     $UI.OptNotifyToast.IsChecked = $S.NotifyStyle -ne 'window'
+    $UI.OptAppCheck.IsChecked = $S.AppUpdateCheck
+    $UI.OptAppAuto.IsChecked = $S.AppUpdateAuto
     $UI.OptNotifyWindow.IsChecked = $S.NotifyStyle -eq 'window'
     $script:OptLearned = @($S.WindowsUpdated)
     $script:OptToWinget = @($S.WingetUpdates)
@@ -122,6 +124,8 @@ function Read-OptionControls {
     $n.LogRetentionDays = Read-OptionInt $UI.OptRetention 1 365 'Keep logs for'
     $n.VerboseLogs = [bool]$UI.OptVerbose.IsChecked
     $n.NotifyStyle = if ($UI.OptNotifyWindow.IsChecked) { 'window' } else { 'toast' }
+    $n.AppUpdateCheck = [bool]$UI.OptAppCheck.IsChecked
+    $n.AppUpdateAuto = [bool]$UI.OptAppAuto.IsChecked
     $n.WindowsUpdated = @($script:OptLearned | Where-Object { $_ })
     $n.WingetUpdates = @($script:OptToWinget | Where-Object { $_ })
     $dir = $UI.OptLogDir.Text.Trim()
@@ -184,6 +188,7 @@ function Open-Options {
     $UI.OptMaintStatus.Visibility = 'Collapsed'
     if ($UI.OptNav.SelectedIndex -lt 0) { $UI.OptNav.SelectedIndex = 0 }
     Update-OptionInfo
+    Update-AppUpdateStatus
     Update-SourceList
     Start-SourceList
     $UI.OptionsOverlay.Visibility = 'Visible'
