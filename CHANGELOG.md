@@ -3,6 +3,14 @@
 All notable changes to Windows Manager (called Windows Software Manager in 2.0, and Windows Package Manager before
 1.0). The version is `$AppVersion` in `src\00-Startup.ps1`, which Build-Exe.ps1 also stamps on the exe.
 
+## 2.2.0.1 - 2026-10-01
+
+- **The release download is labeled "Windows Manager.exe".** GitHub doesn't allow spaces in release file names (it
+  turns them into dots, so the file still downloads as `Windows.Manager.exe`), but each file can have a label, which
+  is what the release page shows. Releases are now uploaded with that label. The in-app updater is unaffected: it
+  always installs under the app's own name.
+- First release published to test the updater end to end: copies on 2.2.0.0 find it and update themselves.
+
 ## 2.2.0.0 - 2026-10-01
 
 - **Updates itself from GitHub.** On start the app reads the latest release on GitHub; when it's newer, it shows what's
