@@ -55,7 +55,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$AppVersion = '2.4.0.0'   # also the exe version (Build-Exe.ps1 reads it); record changes in CHANGELOG.md
+$AppVersion = '2.4.1.0'   # also the exe version (Build-Exe.ps1 reads it); record changes in CHANGELOG.md
 $AppName = 'Windows Manager'
 $Dot = [string][char]0x00B7
 $Ellipsis = [string][char]0x2026

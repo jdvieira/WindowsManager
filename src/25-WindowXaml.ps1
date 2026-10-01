@@ -1666,15 +1666,16 @@ $Xaml = @'
           <ListBox x:Name="FtList" Grid.Row="1" Background="Transparent" BorderThickness="0" ItemContainerStyle="{StaticResource Row}" ScrollViewer.HorizontalScrollBarVisibility="Disabled" VirtualizingPanel.ScrollUnit="Pixel" Focusable="False">
             <ListBox.ItemTemplate>
               <DataTemplate>
-                <Grid x:Name="FtRow" Height="56" Margin="20,0,16,0">
+                <Grid x:Name="FtRow" MinHeight="56" Margin="20,0,16,0">
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="220"/>
                     <ColumnDefinition Width="120"/>
                     <ColumnDefinition Width="110"/>
                   </Grid.ColumnDefinitions>
-                  <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
+                  <StackPanel VerticalAlignment="Center" Margin="0,9,14,9">
                     <TextBlock Text="{Binding Name}" Foreground="#F2F2F2" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
+                    <TextBlock x:Name="FtDesc" Text="{Binding Description}" Foreground="#A8A8A8" FontSize="12.5" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" ToolTip="{Binding Description}"/>
                     <TextBlock Text="{Binding SubText}" Foreground="#8A8A8A" FontSize="12" FontFamily="Consolas" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" ToolTip="{Binding SubText}"/>
                   </StackPanel>
                   <TextBlock Grid.Column="1" Text="{Binding Publisher}" Foreground="#9A9A9A" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,10,0"/>
@@ -1686,6 +1687,7 @@ $Xaml = @'
                 </Grid>
                 <DataTemplate.Triggers>
                   <DataTrigger Binding="{Binding On}" Value="False"><Setter TargetName="FtStatus" Property="Foreground" Value="#8A8A8A"/></DataTrigger>
+                  <DataTrigger Binding="{Binding HasDescription}" Value="False"><Setter TargetName="FtDesc" Property="Visibility" Value="Collapsed"/></DataTrigger>
                   <DataTrigger Binding="{Binding State}" Value="running"><Setter TargetName="FtBar" Property="Visibility" Value="Visible"/><Setter TargetName="FtStatus" Property="Foreground" Value="White"/></DataTrigger>
                   <DataTrigger Binding="{Binding State}" Value="error"><Setter TargetName="FtStatus" Property="Foreground" Value="{StaticResource Bad}"/></DataTrigger>
                   <DataTrigger Binding="{Binding State}" Value="reboot"><Setter TargetName="FtStatus" Property="Foreground" Value="{StaticResource Warn}"/></DataTrigger>

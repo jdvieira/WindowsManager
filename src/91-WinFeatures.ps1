@@ -12,10 +12,12 @@ $FeatureView.Filter = [Predicate[object]] {
     if ($f.Kind -ne $(if ($UI.FtViewFeatures.IsChecked) { 'feature' } else { 'app' })) { return $false }
     if ($UI.FtOnOnly.IsChecked -and -not $f.On) { return $false }
     $q = $UI.FtSearch.Text.Trim()
-    return (-not $q) -or ("$($f.Name) $($f.SubText) $($f.Publisher)".IndexOf($q, [StringComparison]::OrdinalIgnoreCase) -ge 0)
+    return (-not $q) -or ("$($f.Name) $($f.SubText) $($f.Publisher) $($f.Description)".IndexOf($q, [StringComparison]::OrdinalIgnoreCase) -ge 0)
 }
 $UI.FtList.ItemsSource = $FeatureView
 $RemovedAppsPath = Join-Path $DataDir 'removed-apps.json'
+$FeatureDescPath = Join-Path $DataDir 'feature-descriptions.json'
+$script:FeatDescReader = $null
 $script:AppxState = 'none'; $script:AppxError = ''; $script:AppxReader = $null
 $script:FeatState = 'none'; $script:FeatError = ''; $script:FeatReader = $null
 
@@ -24,6 +26,30 @@ function Read-RemovedApps {
     return , @()
 }
 function Save-RemovedApps($List) { try { ConvertTo-Json -InputObject @($List) -Depth 3 | Set-Content -LiteralPath $RemovedAppsPath -Encoding UTF8 } catch { } }
+
+# A description worth showing: not empty, and not just the name again (".NET Framework 4.8 Advanced Services" under
+# that name, or "SupportAssist" under "Dell SupportAssist for PCs")
+function Get-UsefulDescription([string]$Name, [string]$Text) {
+    if (-not $Text) { return '' }
+    $n = $Name.ToLowerInvariant() -replace '[^a-z0-9]', ''
+    $d = $Text.ToLowerInvariant() -replace '[^a-z0-9]', ''
+    if (-not $d -or $d -eq $n -or (($n.Contains($d) -or $d.Contains($n)) -and $d.Length -lt $n.Length + 15)) { return '' }
+    return $Text
+}
+
+# An optional feature's description: Windows' own text (16-FeatureText.ps1), or one read from Windows earlier
+# (feature-descriptions.json; '' where Windows has none)
+$script:FeatureDescCache = $null
+function Read-FeatureDescCache {
+    if ($null -ne $script:FeatureDescCache) { return }
+    $script:FeatureDescCache = @{}
+    try { if (Test-Path -LiteralPath $FeatureDescPath) { foreach ($p in (Get-Content -LiteralPath $FeatureDescPath -Raw | ConvertFrom-Json).PSObject.Properties) { $script:FeatureDescCache[$p.Name] = [string]$p.Value } } } catch { }
+}
+function Get-FeatureDescription([string]$Name) {
+    if ($FeatureText.ContainsKey($Name)) { return $FeatureText[$Name] }
+    Read-FeatureDescCache
+    return [string]$script:FeatureDescCache[$Name]
+}
 
 function Start-FeatureScan {
     if (-not $script:AppxReader) { $script:AppxState = 'running'; $script:AppxReader = Start-Tracked 'appxlist' @{} { $script:AppxReader = $null; if ($script:AppxState -eq 'running') { $script:AppxState = 'error' } } }
@@ -37,14 +63,14 @@ $EventHandlers.appxlist = {
     $have = @{}
     foreach ($a in @($Ev.Items)) {
         $f = New-Object WingetUM.FeatureItem
-        $f.Kind = 'app'; $f.Name = $a.Name; $f.SubText = $a.Package; $f.Publisher = $a.Publisher; $f.Key = $a.Full; $f.Family = $a.Family; $f.Location = $a.Location; $f.On = $true
+        $f.Kind = 'app'; $f.Name = $a.Name; $f.SubText = $a.Package; $f.Publisher = $a.Publisher; $f.Description = Get-UsefulDescription $a.Name $a.Description; $f.Key = $a.Full; $f.Family = $a.Family; $f.Location = $a.Location; $f.On = $true
         $FeatureItems.Add($f); $have[$a.Family] = $true
     }
     # removed earlier, and still gone: offered back
     $removed = @(Read-RemovedApps | Where-Object { $_.Family -and -not $have.ContainsKey([string]$_.Family) })
     foreach ($r in $removed) {
         $f = New-Object WingetUM.FeatureItem
-        $f.Kind = 'app'; $f.Name = [string]$r.Name; $f.SubText = [string]$r.Package; $f.Publisher = [string]$r.Publisher; $f.Key = [string]$r.Full; $f.Family = [string]$r.Family; $f.Location = [string]$r.Location; $f.On = $false
+        $f.Kind = 'app'; $f.Name = [string]$r.Name; $f.SubText = [string]$r.Package; $f.Publisher = [string]$r.Publisher; $f.Description = Get-UsefulDescription ([string]$r.Name) ([string]$r.Description); $f.Key = [string]$r.Full; $f.Family = [string]$r.Family; $f.Location = [string]$r.Location; $f.On = $false
         $FeatureItems.Add($f)
     }
     Save-RemovedApps $removed
@@ -57,11 +83,25 @@ $EventHandlers.features = {
     foreach ($o in @($Ev.Items)) {
         $f = New-Object WingetUM.FeatureItem
         $f.Kind = 'feature'; $f.Name = $(if ($o.Caption) { $o.Caption } else { $o.Name }); $f.SubText = $o.Name; $f.Key = $o.Name; $f.Publisher = ''
+        $f.Description = Get-UsefulDescription $f.Name (Get-FeatureDescription $o.Name)
         $f.Available = $o.State -ne 3; $f.On = $o.State -eq 1
         $FeatureItems.Add($f)
     }
     if ($Ev.Error) { $script:FeatState = 'error'; $script:FeatError = $Ev.Error } else { $script:FeatState = 'ready' }
+    # features this app has no words for (newer Windows builds): Windows can say, but only to an administrator
+    Read-FeatureDescCache
+    $missing = @($FeatureItems | Where-Object { $_.Kind -eq 'feature' -and -not $FeatureText.ContainsKey($_.Key) -and -not $script:FeatureDescCache.ContainsKey($_.Key) } | ForEach-Object { $_.Key })
+    if ($missing.Count -and $IsAdmin -and -not $script:FeatDescReader) { $script:FeatDescReader = Start-Tracked 'featuredesc' @{ Names = $missing } { $script:FeatDescReader = $null } }
     Update-View
+}
+$EventHandlers.featuredesc = {
+    param($Ev)
+    $found = $Ev.Items
+    if (-not $found -or -not $found.Count) { return }
+    foreach ($f in @($FeatureItems | Where-Object { $_.Kind -eq 'feature' -and $found.ContainsKey($_.Key) })) { $f.Description = Get-UsefulDescription $f.Name $found[$f.Key] }
+    Read-FeatureDescCache
+    foreach ($k in $found.Keys) { $script:FeatureDescCache[$k] = $found[$k] }
+    try { [pscustomobject]$script:FeatureDescCache | ConvertTo-Json | Set-Content -LiteralPath $FeatureDescPath -Encoding UTF8 } catch { }
 }
 
 function Request-FeatureChange($f) {
@@ -83,7 +123,7 @@ function Start-FeatureChange($f) {
         $f.State = 'running'; $f.Detail = $(if ($f.On) { 'Removing' } else { 'Reinstalling' }) + $Ellipsis
         if ($f.On) {
             # remember it first, so it can be offered back
-            $list = @(Read-RemovedApps | Where-Object { $_.Family -ne $f.Family }) + @([pscustomobject]@{ Name = $f.Name; Package = $f.SubText; Full = $f.Key; Family = $f.Family; Location = $f.Location; Publisher = $f.Publisher; Removed = (Get-Date).ToString('o') })
+            $list = @(Read-RemovedApps | Where-Object { $_.Family -ne $f.Family }) + @([pscustomobject]@{ Name = $f.Name; Package = $f.SubText; Full = $f.Key; Family = $f.Family; Location = $f.Location; Publisher = $f.Publisher; Description = $f.Description; Removed = (Get-Date).ToString('o') })
             Save-RemovedApps $list
         }
         $script:Showers.Add((Start-Background 'appxchange' @{ Key = $f.Key; Full = $f.Key; Location = $f.Location; Remove = [bool]$f.On }))

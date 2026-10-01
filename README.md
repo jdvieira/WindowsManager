@@ -213,10 +213,12 @@ installs straight away, which may be sooner than IT intended. **Restore point fi
 
 | View | What it does |
 | --- | --- |
-| Built-in apps | The Store apps that came with Windows (or that you added) and that Windows lets you remove: Bing News, Clipchamp, Xbox apps, Solitaire and the like, with their publisher. **Remove** removes one for your account (after asking). Removed apps stay on the list with **Reinstall**, which registers them again from their files; when Windows has cleared those, it opens the app's Microsoft Store page. Parts of Windows itself and frameworks aren't listed |
-| Optional features | Windows' optional features (.NET Framework 3.5, Hyper-V, Windows Sandbox, the Linux subsystem, the TFTP and Telnet clients, and so on), each on or off. **Turn on** / **Turn off** asks for administrator approval and makes a restore point first (with **Restore point first** on); some need a restart, which the row says. History has each change |
+| Built-in apps | The Store apps that came with Windows (or that you added) and that Windows lets you remove: Microsoft News, Clipchamp, Xbox apps, Solitaire and the like, with their publisher and, when the package has one, a description. **Remove** removes one for your account (after asking). Removed apps stay on the list with **Reinstall**, which registers them again from their files; when Windows has cleared those, it opens the app's Microsoft Store page. Parts of Windows itself and frameworks aren't listed |
+| Optional features | Windows' optional features (.NET Framework 3.5, Hyper-V, Windows Sandbox, the Linux subsystem, the TFTP and Telnet clients, and so on), each on or off, with Windows' own description of what it is. **Turn on** / **Turn off** asks for administrator approval and makes a restore point first (with **Restore point first** on); some need a restart, which the row says. History has each change |
 
-Filter by name, and **On only** shows only what's installed or turned on.
+Filter by name or description, and **On only** shows only what's installed or turned on. Feature descriptions come
+with the app (`16-FeatureText`); ones it doesn't know, from newer Windows builds, are read from Windows when the app
+runs as administrator and kept in `feature-descriptions.json`.
 
 ### Cleanup
 
@@ -384,13 +386,14 @@ until you do). It also replaces the old name's notification registration with it
 | `src\*.ps1` | The app's code, in parts that join in name order: `00-Startup` (parameters, version, one copy at a time), settings, scheduled task, data classes, the background worker and its 2.0 operations, health history and alerts (`28-HealthHistory`), the window's layout, notifications, automatic runs, then one part per tab or panel (`78-Leftovers`, `80-Drivers`, `81-DriverBackup`, `82-Amd`, `83-WindowsUpdate`, `84-Startup`, `86-Health`, `87-HealthCards`, `88-Setup`, `89-Diagnostics`, `91-WinFeatures`, `92-Cleanup`, `93-AppUpdate`, ...), wiring, and `95-Main` |
 | `Windows_Manager.ps1` | Runs the app from source: joins `src\*.ps1` into `dist\build\Windows_Manager.dev.ps1` and runs that, with the same arguments, exactly as the exe runs |
 | `Build-Exe.ps1` | Joins the same parts, embeds the assets, and compiles `dist\Windows Manager.exe` with PS2EXE |
+| `CLAUDE.md` | How to contribute, step by step (Claude Code reads it automatically) |
 | `tools\Test-Source.ps1` | Checks the source as the build reads it (ASCII only, parses, no test driver left), and with `-SelfTest` runs the self-test |
 | `tools\Get-ReleaseNotes.ps1` | Prints one version's `CHANGELOG.md` section (the release notes) |
 | `tools\New-WingetManifest.ps1` | Writes the winget manifest for a published release |
 | `.github\workflows\` | `ci.yml` checks and builds every pull request (the exe is attached to the run); `release.yml` publishes a release when a version tag is pushed |
 | `CHANGELOG.md` | Every change, by version |
 | `TESTING.md` | What to try on real PCs, for the parts that need administrator approval or particular hardware |
-| `%LOCALAPPDATA%\WindowsManager\` | settings.json, lastrun.json, descriptions.json, sizes.json, history.jsonl, health-history.jsonl (a reading a day), health-alerts.json (what was mentioned when), removed-apps.json (built-in apps to offer back), notification.png, Logs\, Drivers\ (administrator runs' scripts and logs), DriverBackups\, Previous\ (the version before the last update) |
+| `%LOCALAPPDATA%\WindowsManager\` | settings.json, lastrun.json, descriptions.json, sizes.json, history.jsonl, health-history.jsonl (a reading a day), health-alerts.json (what was mentioned when), removed-apps.json (built-in apps to offer back), feature-descriptions.json, notification.png, Logs\, Drivers\ (administrator runs' scripts and logs), DriverBackups\, Previous\ (the version before the last update) |
 | `assets\icon.ico` | App and exe icon (embedded in the exe by the build) |
 | `assets\logo.jpg` | Header logo (embedded in the exe by the build) |
 

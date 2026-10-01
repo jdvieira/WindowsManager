@@ -3,6 +3,17 @@
 All notable changes to Windows Manager (called Windows Software Manager in 2.0, and Windows Package Manager before
 1.0). The version is `$AppVersion` in `src\00-Startup.ps1`, which Build-Exe.ps1 also stamps on the exe.
 
+## 2.4.1.0 - 2026-10-01
+
+- **Windows Features describes what everything is.** Each optional feature has Windows' own description under its
+  name (for example "Transfer files using the Trivial File Transfer Protocol" for TFTP Client), and each built-in app
+  the description its package gives Start and the Store. Hover for the whole text; the filter searches descriptions
+  too. Features this version doesn't know (from newer Windows builds) are read from Windows when the app runs as
+  administrator, and remembered.
+- Built-in apps show the names and publishers their packages give, where they were a guess before (for example
+  *Microsoft News* rather than *Bing News*).
+- `CLAUDE.md`: how to contribute, step by step, for people and for Claude Code.
+
 ## 2.4.0.0 - 2026-10-01
 
 - **Network health.** Device Health's Network card measures the connection: the round trip to the router, latency,
