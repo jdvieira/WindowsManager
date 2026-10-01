@@ -403,7 +403,8 @@ ASCII-only (the build refuses anything else, since Windows PowerShell 5.1 reads 
 goes in `src\` with a number that puts it in the right place; a new tab registers itself in `$Panels` (see
 `40-State.ps1`).
 
-Before a pull request, run `.\tools\Test-Source.ps1 -SelfTest`. GitHub runs the same checks on every pull request and
+Before a pull request, run `.\tools\Test-Source.ps1 -SelfTest`. Don't commit the exe (`dist\` is ignored): releases
+build their own from the source, and their download is the only copy users get. GitHub runs the same checks on every pull request and
 attaches the built exe to the run, so it can be tried before merging.
 
 ### Publishing to winget

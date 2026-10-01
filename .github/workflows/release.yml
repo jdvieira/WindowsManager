@@ -23,8 +23,11 @@ jobs:
         shell: powershell
         env:
           GH_TOKEN: ${{ github.token }}
+        # GitHub runs PowerShell steps with $ErrorActionPreference = 'Stop', which turns a native command's stderr
+        # ("release not found") into an error; these steps go by exit codes instead
         run: |
-          gh release view $env:GITHUB_REF_NAME *> $null
+          $ErrorActionPreference = 'Continue'
+          gh release view $env:GITHUB_REF_NAME 2>&1 | Out-Null
           if ($LASTEXITCODE -eq 0) { "skip=true" >> $env:GITHUB_OUTPUT; "Release $env:GITHUB_REF_NAME already exists" } else { "skip=false" >> $env:GITHUB_OUTPUT }
           exit 0
 
@@ -39,6 +42,7 @@ jobs:
         if: steps.exists.outputs.skip != 'true'
         shell: powershell
         run: |
+          $ErrorActionPreference = 'Continue'
           .\tools\Test-Source.ps1
           if ($LASTEXITCODE) { exit 1 }
           $tag = $env:GITHUB_REF_NAME
@@ -46,7 +50,7 @@ jobs:
           .\Build-Exe.ps1 -Version $version
           $built = (Get-Item 'dist\Windows Manager.exe').VersionInfo.FileVersion
           $app = (Select-String -LiteralPath src\00-Startup.ps1 -Pattern "^\`$AppVersion = '([\d.]+)'").Matches[0].Groups[1].Value
-          if ($app -ne $version) { throw "The tag is $tag but `$AppVersion is $app" }
+          if ($app -ne $version) { Write-Host "The tag is $tag but `$AppVersion is $app"; exit 1 }
           "Built $built"
 
       - name: Create the release
@@ -55,8 +59,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          $ErrorActionPreference = 'Continue'
           $tag = $env:GITHUB_REF_NAME
           $version = ($tag.TrimStart('v') -split '-')[0]
           .\tools\Get-ReleaseNotes.ps1 $version | Set-Content -Encoding UTF8 notes.md
           $pre = if ($tag -like '*-*') { '--prerelease' } else { '--latest' }
           gh release create $tag "dist\Windows Manager.exe#Windows Manager.exe" --title "Windows Manager $($tag.TrimStart('v'))" --notes-file notes.md --verify-tag $pre
+          if ($LASTEXITCODE) { exit 1 }
