@@ -750,14 +750,35 @@ if ($Op -eq 'appxlist') {
     # with the names their manifests give them
     $items = New-Object Collections.Generic.List[object]
     $err = $null
+    # manifests often name a resource ("ms-resource:AppName") instead of the text; Windows resolves it from the package
+    if (-not ('WingetUM.Res' -as [type])) { Add-Type -Namespace WingetUM -Name Res -MemberDefinition '[DllImport("shlwapi.dll", CharSet=CharSet.Unicode)] public static extern int SHLoadIndirectString(string src, System.Text.StringBuilder buf, int cch, IntPtr r);' }
+    $resolve = {
+        param($p, [string]$s)
+        if ($s -notlike 'ms-resource:*') { return $s.Trim() }
+        $k = $s.Substring(12)
+        $uri = if ($k -like '//*') { "ms-resource:$k" } elseif ($k -like '/*') { "ms-resource://$($p.Name)$k" } else { "ms-resource://$($p.Name)/resources/$k" }
+        $sb = New-Object Text.StringBuilder 1024
+        if ([WingetUM.Res]::SHLoadIndirectString("@{$($p.PackageFullName)?$uri}", $sb, 1024, [IntPtr]::Zero) -eq 0) { return $sb.ToString().Trim() }
+        return ''
+    }
     try {
         Import-Module Appx -ErrorAction SilentlyContinue
         foreach ($p in @(Get-AppxPackage -PackageTypeFilter Main -ErrorAction Stop | Where-Object { -not $_.IsFramework -and -not $_.NonRemovable -and $_.SignatureKind -in 'Store', 'System' })) {
-            $display = ''; $pub = ''
-            try { $man = Get-AppxPackageManifest -Package $p.PackageFullName; $display = [string]$man.Package.Properties.DisplayName; $pub = [string]$man.Package.Properties.PublisherDisplayName } catch { }
-            if (-not $display -or $display -like 'ms-resource:*') { $display = ($p.Name -replace '^[^.]+\.', '' -creplace '([a-z])([A-Z])', '$1 $2') }
-            if ($pub -like 'ms-resource:*') { $pub = '' }
-            $items.Add(@{ Name = $display; Package = [string]$p.Name; Full = [string]$p.PackageFullName; Family = [string]$p.PackageFamilyName; Location = [string]$p.InstallLocation; Publisher = $pub; Version = [string]$p.Version })
+            $display = ''; $pub = ''; $desc = ''
+            try {
+                $man = Get-AppxPackageManifest -Package $p.PackageFullName
+                $display = & $resolve $p ([string]$man.Package.Properties.DisplayName)
+                $pub = & $resolve $p ([string]$man.Package.Properties.PublisherDisplayName)
+                # the description Start and the Store show, else the package's own
+                foreach ($d in @(@($man.Package.Applications.Application | ForEach-Object { [string]$_.VisualElements.Description }) + [string]$man.Package.Properties.Description)) {
+                    if (-not $d) { continue }
+                    $desc = & $resolve $p $d
+                    if ($desc) { break }
+                }
+            }
+            catch { }
+            if (-not $display) { $display = ($p.Name -replace '^[^.]+\.', '' -creplace '([a-z])([A-Z])', '$1 $2') }
+            $items.Add(@{ Name = $display; Package = [string]$p.Name; Full = [string]$p.PackageFullName; Family = [string]$p.PackageFamilyName; Location = [string]$p.InstallLocation; Publisher = $pub; Version = [string]$p.Version; Description = $desc })
         }
     }
     catch { $err = $_.Exception.Message }
@@ -787,5 +808,19 @@ if ($Op -eq 'features') {
         Send @{ T = 'features'; Items = $items; Error = $null }
     }
     catch { Send @{ T = 'features'; Items = @(); Error = $_.Exception.Message } }
+}
+
+if ($Op -eq 'featuredesc') {
+    # The descriptions of optional features (Arg.Names) from Windows (Get-WindowsOptionalFeature: administrator only)
+    $found = @{}
+    try {
+        Import-Module Dism -ErrorAction Stop
+        foreach ($n in @($Arg.Names)) {
+            # '' when Windows has none, so it isn't asked again
+            try { $d = [string](Get-WindowsOptionalFeature -Online -FeatureName $n -ErrorAction Stop).Description; $found[$n] = ($d.Trim() -replace '\s+', ' ') } catch { }
+        }
+    }
+    catch { }
+    Send @{ T = 'featuredesc'; Items = $found }
 }
 '@

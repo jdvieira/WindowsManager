@@ -334,6 +334,9 @@ namespace WingetUM {
         public string Name { get; set; }
         public string SubText { get; set; }
         public string Publisher { get; set; }
+        private string description = "";
+        public string Description { get { return description; } set { description = value ?? ""; Changed("Description", "HasDescription"); } }
+        public bool HasDescription { get { return description.Length > 0; } }
         // the package's full name or the feature's name; the package family and install folder, for reinstalling
         public string Key { get; set; }
         public string Family { get; set; }
