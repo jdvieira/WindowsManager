@@ -116,6 +116,20 @@ script to `src\`, delete it before committing (`Test-Source.ps1` refuses `src\94
 
 Write in the pull request what you tested and how.
 
+**Screenshots in every pull request that changes what the app shows**, so the change is easy to see:
+
+- **Before and after** of each screen it changes, from the real app (not mockups). `Windows_Manager.ps1 -SelfTest
+  -Screenshot <file>.png` renders the main screens; for others, open them in the app, or drive the joined
+  `dist\build\Windows_Manager.dev.ps1` from a scratch copy. The "before" comes from `origin/main`
+  (`git worktree add --detach <folder> origin/main`).
+- **Nothing private in them:** the header shows the PC's name, so take them with a placeholder
+  (`$env:COMPUTERNAME = 'MY-PC'` in the PowerShell that starts the app), and check for user names, serial numbers,
+  network names and the like before committing.
+- Save them as `docs/screenshots/pr/<issue or topic>-<what>.png`, commit them on the branch, and show them in the
+  pull request under **## Screenshots**, linked to the branch's commit so they keep working:
+  `![After](https://raw.githubusercontent.com/jdvieira/WindowsManager/<commit>/docs/screenshots/pr/<file>.png)`.
+- A change with nothing to see (an automatic run, the build, docs) says so instead.
+
 ### 5. Commit, push and open the pull request
 
 Every change reaches `main` through its own pull request; nothing is pushed to `main` directly. Before publishing,
