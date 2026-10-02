@@ -696,7 +696,7 @@ $Xaml = @'
         <ColumnDefinition Width="*"/>
         <ColumnDefinition Width="Auto"/>
       </Grid.ColumnDefinitions>
-      <Border x:Name="HeaderLogo" Width="52" Height="52" CornerRadius="12" Background="#000000" BorderBrush="#2A2A2A" BorderThickness="1" Margin="0,0,16,0"/>
+      <Border x:Name="HeaderLogo" Width="52" Height="52" CornerRadius="12" Background="Transparent" Margin="0,0,16,0"/>
       <StackPanel Grid.Column="1" VerticalAlignment="Center">
         <StackPanel Orientation="Horizontal">
           <TextBlock Text="Windows Manager" FontSize="26" FontWeight="Bold" Foreground="White"/>

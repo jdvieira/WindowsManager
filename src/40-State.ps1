@@ -3,6 +3,9 @@
 try {
     $icon = Get-AppIcon
     if ($icon) { $Window.Icon = $icon }
+    # the header shows the app's icon (its tile included); the About window keeps the original V logo
+    $big = Get-AppIcon 128
+    if ($big) { $UI.HeaderLogo.Background = New-Object System.Windows.Media.ImageBrush($big) }
     $bytes = Get-AssetBytes $EmbeddedLogo 'logo.jpg'
     if ($bytes) {
         $img = New-Object System.Windows.Media.Imaging.BitmapImage
@@ -10,7 +13,6 @@ try {
         $brush = New-Object System.Windows.Media.ImageBrush($img)
         $brush.Stretch = 'UniformToFill'
         $brush.Viewbox = New-Object System.Windows.Rect(0.185, 0.14, 0.63, 0.70)   # crop the black margin down to the symbol
-        $UI.HeaderLogo.Background = $brush
         $UI.AboutLogo.Background = $brush
     }
 }

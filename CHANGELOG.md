@@ -5,6 +5,12 @@ All notable changes to Windows Manager (called Windows Software Manager in 2.0, 
 version's section becomes its release notes, which the app shows under "What's new", so it lists only changes to the
 app, not to the repository.
 
+## 2.5.1.0 - 2026-10-02
+
+- **A new icon.** Windows Manager's icon is now a window with a heartbeat line, for an app that keeps the PC up to
+  date and healthy, in the same teal-to-violet colors. It shows in the taskbar, Start, the title bar, the header and
+  notifications, and stays crisp at small sizes. The About window keeps the original V logo.
+
 ## 2.5.0.0 - 2026-10-02
 
 - **Automatic maintenance.** Automatic updates did one thing, updating apps. Automatic maintenance (the header

@@ -26,10 +26,13 @@ function Set-SelfUpdating([string]$Id, [bool]$On) {
 $ToastAppId = 'JustinVieira.WindowsManager'
 $ToastProtocol = 'windowsmanager'
 function Register-ToastApp {
-    $icon = Join-Path $DataDir 'notification.png'
+    # named after the icon, so a new icon gets a new file (Windows keeps showing a cached picture under the old name)
+    $icon = Join-Path $DataDir 'notification-pulse.png'
     try {
+        $old = Join-Path $DataDir 'notification.png'
+        if (Test-Path -LiteralPath $old) { Remove-Item -LiteralPath $old -Force -ErrorAction SilentlyContinue }
         if (-not (Test-Path -LiteralPath $icon)) {
-            $frame = Get-AppIcon
+            $frame = Get-AppIcon 256
             if ($frame) {
                 $enc = New-Object System.Windows.Media.Imaging.PngBitmapEncoder
                 $enc.Frames.Add([System.Windows.Media.Imaging.BitmapFrame]::Create($frame))
