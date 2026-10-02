@@ -827,61 +827,6 @@ if ($Op -eq 'removeleftovers') {
     Send @{ T = 'leftoversdone' }
 }
 
-if ($Op -eq 'appxlist') {
-    # Built-in apps: your Store packages that Windows lets you remove (not frameworks, not parts of Windows itself),
-    # with the names their manifests give them
-    $items = New-Object Collections.Generic.List[object]
-    $err = $null
-    # manifests often name a resource ("ms-resource:AppName") instead of the text; Windows resolves it from the package
-    if (-not ('WingetUM.Res' -as [type])) { Add-Type -Namespace WingetUM -Name Res -MemberDefinition '[DllImport("shlwapi.dll", CharSet=CharSet.Unicode)] public static extern int SHLoadIndirectString(string src, System.Text.StringBuilder buf, int cch, IntPtr r);' }
-    $resolve = {
-        param($p, [string]$s)
-        if ($s -notlike 'ms-resource:*') { return $s.Trim() }
-        $k = $s.Substring(12)
-        $uri = if ($k -like '//*') { "ms-resource:$k" } elseif ($k -like '/*') { "ms-resource://$($p.Name)$k" } else { "ms-resource://$($p.Name)/resources/$k" }
-        $sb = New-Object Text.StringBuilder 1024
-        if ([WingetUM.Res]::SHLoadIndirectString("@{$($p.PackageFullName)?$uri}", $sb, 1024, [IntPtr]::Zero) -eq 0) { return $sb.ToString().Trim() }
-        return ''
-    }
-    try {
-        Import-Module Appx -ErrorAction SilentlyContinue
-        foreach ($p in @(Get-AppxPackage -PackageTypeFilter Main -ErrorAction Stop | Where-Object { -not $_.IsFramework -and -not $_.NonRemovable -and $_.SignatureKind -in 'Store', 'System' })) {
-            $display = ''; $pub = ''; $desc = ''
-            try {
-                $man = Get-AppxPackageManifest -Package $p.PackageFullName
-                $display = & $resolve $p ([string]$man.Package.Properties.DisplayName)
-                $pub = & $resolve $p ([string]$man.Package.Properties.PublisherDisplayName)
-                # the description Start and the Store show, else the package's own
-                foreach ($d in @(@($man.Package.Applications.Application | ForEach-Object { [string]$_.VisualElements.Description }) + [string]$man.Package.Properties.Description)) {
-                    if (-not $d) { continue }
-                    $desc = & $resolve $p $d
-                    if ($desc) { break }
-                }
-            }
-            catch { }
-            if (-not $display) { $display = ($p.Name -replace '^[^.]+\.', '' -creplace '([a-z])([A-Z])', '$1 $2') }
-            $items.Add(@{ Name = $display; Package = [string]$p.Name; Full = [string]$p.PackageFullName; Family = [string]$p.PackageFamilyName; Location = [string]$p.InstallLocation; Publisher = $pub; Version = [string]$p.Version; Description = $desc })
-        }
-    }
-    catch { $err = $_.Exception.Message }
-    Send @{ T = 'appxlist'; Items = $items.ToArray(); Error = $err }
-}
-
-if ($Op -eq 'appxchange') {
-    # Removes a built-in app for you (Arg.Full), or registers it again from its install folder (Arg.Location)
-    try {
-        Import-Module Appx -ErrorAction SilentlyContinue
-        if ($Arg.Remove) { Remove-AppxPackage -Package $Arg.Full -ErrorAction Stop }
-        else {
-            $man = Join-Path ([string]$Arg.Location) 'AppxManifest.xml'
-            if (-not $Arg.Location -or -not (Test-Path -LiteralPath $man)) { throw 'its files are gone from this PC' }
-            Add-AppxPackage -DisableDevelopmentMode -Register $man -ErrorAction Stop
-        }
-        Send @{ T = 'appxchanged'; Key = $Arg.Key; Remove = [bool]$Arg.Remove; Error = $null }
-    }
-    catch { Send @{ T = 'appxchanged'; Key = $Arg.Key; Remove = [bool]$Arg.Remove; Error = ($_.Exception.Message -split "`n")[0] } }
-}
-
 if ($Op -eq 'features') {
     # Windows' optional features (Win32_OptionalFeature, which needs no administrator rights to read):
     # InstallState 1 on, 2 off, 3 not available. Where each sits in Windows' own tree ("Turn Windows features on or

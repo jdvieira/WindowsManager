@@ -44,7 +44,6 @@ Tick each line once it has worked, with the PC and the date.
 | [ ] | An app on Updates whose update fails with "install technology is different" | Its row turns *updated by Windows* and Update all skips it from then on |
 | [ ] | **Diagnostics** | A zip on the desktop; Explorer opens with it selected |
 | [x] Dell laptop, 2026-10-01 | Windows Features > Optional features: **Turn on** a harmless one (TFTP Client), then **Turn off** | One approval each; the row says Turned on / Turned off; History has both |
-| [x] Dell laptop, 2026-10-01 (re-registered Calculator) | Windows Features > Built-in apps: **Remove** one you don't use, then **Reinstall** | It disappears from Start, then comes back; History has both |
 | [ ] | Windows Features: an optional feature that needs a restart (Windows Sandbox, Hyper-V) | The row says "Restart to finish" |
 | [x] Dell laptop, 2026-10-01 (a made-up app folder) | Installed Software: uninstall an app that leaves folders behind | The leftovers list opens with its folders ticked; **Remove ticked** moves them to the Recycle Bin |
 | [x] Dell laptop, 2026-10-01 | Startup lists scheduled tasks | Tasks that start at sign-in or startup appear as *Scheduled task* |

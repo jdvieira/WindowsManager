@@ -60,7 +60,7 @@ foreach ($name in 'TabCleanup', 'CleanupPanel', 'ClTitle', 'ClDriveBar', 'ClDriv
     'HlSecTitle', 'HlSecItems', 'HlSecOpen', 'HlPerfTitle', 'HlMemBar', 'HlPerfItems', 'HlPerfOpen', 'HlRelTitle', 'HlRelItems', 'HlRelOpen',
     'HlUpdTitle', 'HlUpdItems', 'HlUpdOpen', 'HlNetTitle', 'HlNetItems', 'HlNetOpen', 'HlCleanSumTitle', 'HlCleanSumText', 'HlCleanOpen', 'HlTempNote', 'HlTempGroups', 'HlTempGet',
     'PageApp', 'OptAppStatus', 'OptAppCheckNow', 'OptAppInstall', 'OptAppReleases', 'OptAppCheck', 'OptAppAuto', 'OptAppBack', 'OptAppBeta', 'HlReport', 'HlTrends', 'HlTrendsNote', 'HlTrendsLabel',
-    'TabFeatures', 'FeaturesPanel', 'FtTitle', 'FtText', 'FtViewApps', 'FtViewAppsText', 'FtViewFeatures', 'FtViewFeaturesText', 'FtSearch', 'FtOnOnly', 'FtRefresh',
+    'TabFeatures', 'FeaturesPanel', 'FtTitle', 'FtText', 'FtViewFeaturesText', 'FtSearch', 'FtOnOnly', 'FtRefresh',
     'FtHeader', 'FtHeadName', 'FtHeadPub', 'FtList', 'FtMsgPanel', 'FtMsgBar', 'FtMsgTitle', 'FtMsgText') {
     $UI[$name] = $Window.FindName($name)
     if (-not $UI[$name]) { throw "XAML element '$name' not found." }

@@ -1,12 +1,11 @@
 ﻿# Windows Manager - WinFeatures (part of src\; see Windows_Manager.ps1)
 
-# The Windows Features tab. Built-in apps: the Store apps that came with Windows and can be removed for you; removed
-# ones stay listed (removed-apps.json) with Reinstall, which registers them again from their files or, when those are
-# gone, opens their Microsoft Store page. Optional features: Windows' optional features, turned on or off with
-# administrator approval (Enable/Disable-WindowsOptionalFeature), and shown as Windows' own tree; some need a restart.
+# The Windows Features tab: Windows' optional features, turned on or off with administrator approval
+# (Enable/Disable-WindowsOptionalFeature), and shown as Windows' own tree; some need a restart. (Built-in Store apps
+# were listed here too in earlier versions; Installed Software lists and uninstalls them.)
 $FeatureItems = New-Object 'System.Collections.ObjectModel.ObservableCollection[WingetUM.FeatureItem]'
 $FeatureView = [System.Windows.Data.CollectionViewSource]::GetDefaultView($FeatureItems)
-# apps by name, optional features in tree order
+# in tree order
 $FeatureView.SortDescriptions.Add((New-Object System.ComponentModel.SortDescription('SortKey', 'Ascending')))
 function Test-FeatureMatch($f) {
     if ($UI.FtOnOnly.IsChecked -and -not $f.On) { return $false }
@@ -15,9 +14,7 @@ function Test-FeatureMatch($f) {
 }
 $FeatureView.Filter = [Predicate[object]] {
     param($f)
-    if ($f.Kind -ne $(if ($UI.FtViewFeatures.IsChecked) { 'feature' } else { 'app' })) { return $false }
-    if ($f.Kind -eq 'feature') { return $script:FtShown.Contains($f.Key) }
-    return (Test-FeatureMatch $f)
+    return $f.Kind -eq 'feature' -and $script:FtShown.Contains($f.Key)
 }
 $UI.FtList.ItemsSource = $FeatureView
 
@@ -77,17 +74,9 @@ function Update-FeatureTreeNotes {
         $f.TreeNote = if ($d.Count) { "$on of $($d.Count) under it on" } else { '' }
     }
 }
-$RemovedAppsPath = Join-Path $DataDir 'removed-apps.json'
 $FeatureDescPath = Join-Path $DataDir 'feature-descriptions.json'
 $script:FeatDescReader = $null
-$script:AppxState = 'none'; $script:AppxError = ''; $script:AppxReader = $null
 $script:FeatState = 'none'; $script:FeatError = ''; $script:FeatReader = $null
-
-function Read-RemovedApps {
-    try { if (Test-Path -LiteralPath $RemovedAppsPath) { return , @(Get-Content -LiteralPath $RemovedAppsPath -Raw | ConvertFrom-Json) } } catch { }
-    return , @()
-}
-function Save-RemovedApps($List) { try { ConvertTo-Json -InputObject @($List) -Depth 3 | Set-Content -LiteralPath $RemovedAppsPath -Encoding UTF8 } catch { } }
 
 # A description worth showing: not empty, and not just the name again (".NET Framework 4.8 Advanced Services" under
 # that name, or "SupportAssist" under "Dell SupportAssist for PCs")
@@ -114,31 +103,11 @@ function Get-FeatureDescription([string]$Name) {
 }
 
 function Start-FeatureScan {
-    if (-not $script:AppxReader) { $script:AppxState = 'running'; $script:AppxReader = Start-Tracked 'appxlist' @{} { $script:AppxReader = $null; if ($script:AppxState -eq 'running') { $script:AppxState = 'error' } } }
+
     if (-not $script:FeatReader) { $script:FeatState = 'running'; $script:FeatReader = Start-Tracked 'features' @{} { $script:FeatReader = $null; if ($script:FeatState -eq 'running') { $script:FeatState = 'error' } } }
     Update-View
 }
 
-$EventHandlers.appxlist = {
-    param($Ev)
-    foreach ($f in @($FeatureItems | Where-Object { $_.Kind -eq 'app' })) { [void]$FeatureItems.Remove($f) }
-    $have = @{}
-    foreach ($a in @($Ev.Items)) {
-        $f = New-Object WingetUM.FeatureItem
-        $f.Kind = 'app'; $f.Name = $a.Name; $f.SortKey = $a.Name; $f.SubText = $a.Package; $f.Publisher = $a.Publisher; $f.Description = Get-UsefulDescription $a.Name $a.Description; $f.Key = $a.Full; $f.Family = $a.Family; $f.Location = $a.Location; $f.On = $true
-        $FeatureItems.Add($f); $have[$a.Family] = $true
-    }
-    # removed earlier, and still gone: offered back
-    $removed = @(Read-RemovedApps | Where-Object { $_.Family -and -not $have.ContainsKey([string]$_.Family) })
-    foreach ($r in $removed) {
-        $f = New-Object WingetUM.FeatureItem
-        $f.Kind = 'app'; $f.Name = [string]$r.Name; $f.SortKey = [string]$r.Name; $f.SubText = [string]$r.Package; $f.Publisher = [string]$r.Publisher; $f.Description = Get-UsefulDescription ([string]$r.Name) ([string]$r.Description); $f.Key = [string]$r.Full; $f.Family = [string]$r.Family; $f.Location = [string]$r.Location; $f.On = $false
-        $FeatureItems.Add($f)
-    }
-    Save-RemovedApps $removed
-    if ($Ev.Error) { $script:AppxState = 'error'; $script:AppxError = $Ev.Error } else { $script:AppxState = 'ready' }
-    Update-View
-}
 $EventHandlers.features = {
     param($Ev)
     foreach ($f in @($FeatureItems | Where-Object { $_.Kind -eq 'feature' })) { [void]$FeatureItems.Remove($f) }
@@ -192,11 +161,6 @@ $EventHandlers.featuredesc = {
 
 function Request-FeatureChange($f) {
     if (-not $f -or -not $f.CanChange) { return }
-    if ($f.Kind -eq 'app') {
-        if ($f.On) { Show-Confirm 'ftapp' @{ Item = $f } "Remove $($f.Name)?" "$($f.Name) is removed for you ($($f.SubText)). It stays on this list, so Reinstall can bring it back; if Windows has cleared its files by then, Reinstall opens its Microsoft Store page instead." 'Remove' -Danger }
-        else { Start-FeatureChange $f }
-        return
-    }
     if ($script:Elev) { $script:LastSummary = "Wait for $($script:ElevTitle) to finish first"; Update-View; return }
     $verb = if ($f.On) { 'Turn off' } else { 'Turn on' }
     # what changes with it: the features it sits under turn on too; the ones under it that are on turn off too
@@ -205,20 +169,10 @@ function Request-FeatureChange($f) {
     $alsoText = if (-not $also.Count) { '' } elseif ($f.On) { "`n`nThese features under it turn off too:`n$(($also | Select-Object -First 12 | ForEach-Object { "  $([char]0x2022) $_" }) -join "`n")$(if ($also.Count -gt 12) { "`n  and $($also.Count - 12) more" })" } else { "`n`nIt sits under $($also -join ' > '), which turn$(if ($also.Count -eq 1) { 's' }) on too." }
     Show-Confirm 'ftfeature' @{ Item = $f } "$verb $($f.Name)?" "Windows $(if ($f.On) { 'removes' } else { 'adds' }) the optional feature $($f.SubText). It can take a few minutes, Windows asks for administrator approval, and some features need a restart to finish.$alsoText$(if ($Settings.DriverRestorePoint) { "`n`nA restore point is created first." })" $verb
 }
-$ConfirmHandlers.ftapp = { param($Payload) Start-FeatureChange $Payload.Item }
+
 $ConfirmHandlers.ftfeature = { param($Payload) Start-FeatureChange $Payload.Item }
 
 function Start-FeatureChange($f) {
-    if ($f.Kind -eq 'app') {
-        $f.State = 'running'; $f.Detail = $(if ($f.On) { 'Removing' } else { 'Reinstalling' }) + $Ellipsis
-        if ($f.On) {
-            # remember it first, so it can be offered back
-            $list = @(Read-RemovedApps | Where-Object { $_.Family -ne $f.Family }) + @([pscustomobject]@{ Name = $f.Name; Package = $f.SubText; Full = $f.Key; Family = $f.Family; Location = $f.Location; Publisher = $f.Publisher; Description = $f.Description; Removed = (Get-Date).ToString('o') })
-            Save-RemovedApps $list
-        }
-        $script:Showers.Add((Start-Background 'appxchange' @{ Key = $f.Key; Full = $f.Key; Location = $f.Location; Remove = [bool]$f.On }))
-        return
-    }
     $name = $f.Key -replace "'", "''"
     $body = if ($f.On) {
         "Say 'Turning off $name$Ellipsis'`r`n`$r = Disable-WindowsOptionalFeature -Online -FeatureName '$name' -NoRestart -ErrorAction Stop`r`nif (`$r.RestartNeeded) { Say 'Restart to finish.'; exit 3010 }`r`nSay 'Done.'`r`nexit 0"
@@ -245,46 +199,16 @@ $ElevHandlers.feature = {
     Update-FeatureTreeNotes
     Update-FeatureList
 }
-$EventHandlers.appxchanged = {
-    param($Ev)
-    $f = @($FeatureItems | Where-Object { $_.Kind -eq 'app' -and $_.Key -eq $Ev.Key }) | Select-Object -First 1
-    if (-not $f) { return }
-    if ($Ev.Error) {
-        if (-not $Ev.Remove -and $f.Family) {
-            # its files are gone: the Store can install it again
-            $f.State = ''; $f.Detail = ''
-            try { Start-Process "ms-windows-store://pdp/?PFN=$($f.Family)" } catch { }
-            $script:LastSummary = "$($f.Name) can't be registered again from this PC ($($Ev.Error)), so its Microsoft Store page is open"
-        }
-        else { $f.State = 'error'; $f.Detail = "Couldn't remove it: $($Ev.Error)" }
-    }
-    else {
-        $f.On = -not $Ev.Remove; $f.State = 'ok'; $f.Detail = if ($Ev.Remove) { 'Removed' } else { 'Reinstalled' }
-        if (-not $Ev.Remove) { Save-RemovedApps @(Read-RemovedApps | Where-Object { $_.Family -ne $f.Family }) }
-        Add-History $(if ($Ev.Remove) { 'uninstall' } else { 'install' }) $f.Name $f.SubText '' '' 'ok' "Built-in app $(if ($Ev.Remove) { 'removed' } else { 'reinstalled' })"
-        $script:LastSummary = "$($f.Name): $($f.Detail)"
-    }
-    $FeatureView.Refresh()
-    Update-View
-}
-
 function Update-FeaturesView {
-    $apps = $UI.FtViewApps.IsChecked
-    $state = if ($apps) { $script:AppxState } else { $script:FeatState }
-    $err = if ($apps) { $script:AppxError } else { $script:FeatError }
-    $n = @($FeatureItems | Where-Object { $_.Kind -eq 'app' }).Count
-    $removed = @($FeatureItems | Where-Object { $_.Kind -eq 'app' -and -not $_.On }).Count
+    $state = $script:FeatState
+    $err = $script:FeatError
     $fOn = @($FeatureItems | Where-Object { $_.Kind -eq 'feature' -and $_.On }).Count
     $fAll = @($FeatureItems | Where-Object { $_.Kind -eq 'feature' -and $_.Available }).Count
-    $UI.FtViewAppsText.Text = if ($n) { "Built-in apps ($n)" } else { 'Built-in apps' }
-    $UI.FtViewFeaturesText.Text = if ($fAll) { "Optional features ($fOn of $fAll on)" } else { 'Optional features' }
-    $UI.FtText.Text = if ($apps) { "Store apps that came with Windows (or that you added) and that Windows lets you remove for your account$(if ($removed) { "; $removed removed, which Reinstall brings back" }). Parts of Windows itself aren't listed." }
-    else { "Windows' optional features, grouped as Windows shows them: the arrow shows what's under one. Turning one on or off asks for administrator approval and can take a few minutes; some need a restart to finish." }
-    $UI.FtHeadName.Text = if ($apps) { 'APP' } else { 'FEATURE' }
-    $UI.FtHeadPub.Text = if ($apps) { 'PUBLISHER' } else { '' }
-    $UI.FtRefresh.IsEnabled = -not $script:AppxReader -and -not $script:FeatReader
+    $UI.FtViewFeaturesText.Text = if ($fAll) { "$fOn of $fAll on" } else { 'Optional features' }
+    $UI.FtText.Text = "Windows' optional features, grouped as Windows shows them: the arrow shows what's under one. Turning one on or off asks for administrator approval and can take a few minutes; some need a restart to finish."
+    $UI.FtRefresh.IsEnabled = -not $script:FeatReader
     $msg = $null
-    if ($state -eq 'running' -and -not @($FeatureView).Count) { $msg = @{ Bar = $true; Title = $(if ($apps) { 'Reading built-in apps' } else { 'Reading optional features' }); Text = '' } }
+    if ($state -eq 'running' -and -not @($FeatureView).Count) { $msg = @{ Bar = $true; Title = 'Reading optional features'; Text = '' } }
     elseif ($state -eq 'error' -and -not @($FeatureView).Count) { $msg = @{ Title = "Couldn't read them"; Text = $err } }
     elseif (-not @($FeatureView).Count) { $msg = @{ Title = 'Nothing matches'; Text = '' } }
     $UI.FtHeader.Visibility = ConvertTo-Visibility (-not $msg)
@@ -297,19 +221,18 @@ $Panels.features = @{
     Panel   = 'FeaturesPanel'
     Update  = { Update-FeaturesView }
     Status  = {
-        if ($script:AppxReader -or $script:FeatReader) { "Reading$Ellipsis" }
+        if ($script:FeatReader) { "Reading$Ellipsis" }
         else {
-            $n = @($FeatureItems | Where-Object { $_.Kind -eq 'app' -and $_.On }).Count; if ($n) { "$n built-in apps" }
             $fOn = @($FeatureItems | Where-Object { $_.Kind -eq 'feature' -and $_.On }).Count; if ($fOn) { "$fOn optional features on" }
         }
     }
-    Open    = { if ($script:AppxState -eq 'none' -or $script:FeatState -eq 'none') { Start-FeatureScan } }
+    Open    = { if ($script:FeatState -eq 'none') { Start-FeatureScan } }
     Refresh = { if ($UI.FtRefresh.IsEnabled) { Start-FeatureScan } }
 }
 
 $UI.TabFeatures.Add_Checked({ Set-Section 'features' })
 $UI.FtRefresh.Add_Click({ Start-FeatureScan })
-foreach ($c in 'FtViewApps', 'FtViewFeatures', 'FtOnOnly') { $UI[$c].Add_Click({ Update-FeatureList; Update-View }) }
+$UI.FtOnOnly.Add_Click({ Update-FeatureList; Update-View })
 $script:FtSearchTimer = New-Object System.Windows.Threading.DispatcherTimer
 $script:FtSearchTimer.Interval = [TimeSpan]::FromMilliseconds(180)
 $script:FtSearchTimer.Add_Tick({ $script:FtSearchTimer.Stop(); Update-FeatureList; Update-View })
