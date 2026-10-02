@@ -516,7 +516,17 @@ finally {
     $script = $prelude + "try {`r`n" + $who + $head + $Body.Replace('__DIR__', (& $q $DrvWorkDir)).Replace('__STAMP__', $stamp) +
     "`r`n}`r`ncatch { Say ('Error: ' + (`$_.Exception.Message -replace '(?s)\s*At [A-Za-z]:\\.*`$', '')); Say (`$_.InvocationInfo.PositionMessage); exit 99 }`r`n"
     $scriptPath = Join-Path $DrvWorkDir "$Name-$stamp.ps1"
-    [IO.File]::WriteAllText($scriptPath, $script, (New-Object Text.UTF8Encoding($true)))
+    [byte[]]$bytes = (New-Object Text.UTF8Encoding($true)).GetPreamble() + [Text.Encoding]::UTF8.GetBytes($script)   # + gives object[]
+    [IO.File]::WriteAllBytes($scriptPath, $bytes)
+    # Any program the user runs can change files in $DrvWorkDir, so the script could be swapped between being
+    # written here and the approval. The elevated copy is told the script's SHA-256 on its command line (which
+    # nothing else can change), reads the file once, checks it and runs what it read; a changed script doesn't run.
+    $hash = -join ([Security.Cryptography.SHA256]::Create().ComputeHash($bytes) | ForEach-Object { $_.ToString('X2') })
+    $boot = "`$b = [IO.File]::ReadAllBytes($(& $q $scriptPath))`r`n" +
+    "`$h = -join ([Security.Cryptography.SHA256]::Create().ComputeHash(`$b) | ForEach-Object { `$_.ToString('X2') })`r`n" +
+    "if (`$h -ne '$hash') { try { Add-Content -LiteralPath $(& $q $log) -Value 'Not run: the script was changed after Windows Manager wrote it.' -Encoding UTF8 } catch { }; exit 96 }`r`n" +
+    "& ([scriptblock]::Create([Text.Encoding]::UTF8.GetString(`$b).TrimStart([char]0xFEFF)))`r`nexit 0"
+    $bootArg = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($boot))
     $logs = @($log) + @($ExtraLogs | Where-Object { $_ } | ForEach-Object { $_.Replace('__STAMP__', $stamp) })
     $tagAll = $(if ($Tag) { $Tag } else { @{} }) + @{ Stamp = $stamp; Log = $log }
     Add-LogLine ''
@@ -532,7 +542,7 @@ finally {
     $Window.Cursor = [System.Windows.Input.Cursors]::Wait
     try {
         $proc = Start-Process -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -Verb RunAs -WindowStyle Hidden -PassThru `
-            -ArgumentList "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$scriptPath`""
+            -ArgumentList "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -EncodedCommand $bootArg"
     }
     catch {
         $ex = $_.Exception

@@ -28,7 +28,7 @@ foreach ($name in 'HeaderLogo', 'HeaderVersion', 'SubTitle', 'AdminBadge', 'Admi
     'BtnInstallSelected', 'InstallSelectedText', 'HdrVersion', 'HdrAvailable', 'LoadingTitle', 'LoadingText', 'EmptyTitle',
     'OptScopeDefault', 'OptScopeUser', 'OptScopeMachine', 'DetailsOverlay', 'DetClose', 'DetName', 'DetSub', 'DetLoading', 'DetDesc', 'DetFields',
     'DetHomepage', 'DetAction', 'ConfirmOverlay', 'ConfirmTitle', 'ConfirmText', 'ConfirmNo', 'ConfirmYes',
-    'HColVer', 'HColThird', 'HColSource', 'HColStatus', 'HdrStatus', 'BtnAbout', 'AboutOverlay', 'AboutLogo', 'AboutVersion', 'AboutMail', 'AboutCopy', 'AboutClose',
+    'HColVer', 'HColThird', 'HColSource', 'HColStatus', 'HdrStatus', 'BtnAbout', 'AboutOverlay', 'AboutLogo', 'AboutVersion', 'AboutMail', 'AboutRepo', 'AboutCopy', 'AboutClose',
     'OptCancel', 'OptSave', 'OptMessage', 'BtnShowHidden', 'ShowHiddenGlyph', 'ShowHiddenText', 'OptHiddenList', 'OptHiddenEmpty', 'OptHideAdd', 'OptHideAddBtn',
     'BtnImportList', 'BtnExportList', 'BtnHistory', 'SchModeInstall', 'SchModeNotify', 'SchModeHint', 'PageSources', 'OptSourceList', 'OptSourceEmpty',
     'OptSrcName', 'OptSrcUrl', 'OptSrcTypeRest', 'OptSrcTypeIndexed', 'OptSrcExplicit', 'OptSrcAdd',

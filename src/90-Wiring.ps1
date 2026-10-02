@@ -113,6 +113,7 @@ $UI.BtnAbout.Add_Click({ $UI.AboutOverlay.Visibility = 'Visible' })
 $UI.AboutClose.Add_Click({ $UI.AboutOverlay.Visibility = 'Collapsed' })
 $UI.AboutCopy.Add_Click({ [System.Windows.Clipboard]::SetText('jdvieira@icloud.com'); $UI.AboutCopy.Content = 'Copied' })
 $UI.AboutMail.Add_RequestNavigate({ param($s, $e) try { Start-Process $e.Uri.AbsoluteUri } catch { }; $e.Handled = $true })
+$UI.AboutRepo.Add_RequestNavigate({ param($s, $e) try { Start-Process $e.Uri.AbsoluteUri } catch { }; $e.Handled = $true })
 $UI.AboutOverlay.Add_MouseLeftButtonDown({ param($s, $e) if ($e.OriginalSource -eq $UI.AboutOverlay) { $UI.AboutOverlay.Visibility = 'Collapsed' } })
 
 # Details and confirmation overlays
