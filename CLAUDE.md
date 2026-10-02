@@ -116,18 +116,21 @@ Write in the pull request what you tested and how.
 ### 5. Commit, push and open the pull request
 
 Every change reaches `main` through its own pull request; nothing is pushed to `main` directly. Before publishing,
-the person making the change answers two separate questions, every time:
+the person making the change answers these questions separately, every time:
 
 1. **Publish these changes?** Push the branch, open the pull request, and (for the owner) merge it once CI passes.
-2. **Make a release with it?** Bump `$AppVersion` and add its `CHANGELOG.md` section, so that merging publishes a
-   version every copy of the app is offered. Without it, the change merges and waits for the next release.
+2. **Make a release with it?** Asked **only when the change touches the app**: anything that goes into the exe
+   (`src\`, `assets\`, `Build-Exe.ps1`). Yes bumps `$AppVersion` and adds its `CHANGELOG.md` section, so that
+   merging publishes a version every copy of the app is offered; no merges it to wait for the next release. A change
+   to the repository only (`CLAUDE.md`, `README.md`, `TESTING.md`, `CHANGELOG.md`, workflows, `tools\`,
+   `.gitignore`) is never released on its own, so the question isn't asked: it merges without a version bump.
 
 ```powershell
 git add -A
 git status                       # only the files you meant to change
 git commit -m "<what changed, in a short line>"
 git push -u origin <branch>
-gh pr create --base main --title "<version>: <what changed>" --body "<what's in it, how it was tested>"
+gh pr create --base main --title "<version>: <what changed>" --body "<what's in it, how it was tested>"   # no "<version>:" without a release
 ```
 
 If it fixes a GitHub issue, put `Closes #<number>` in the description; the issue closes when the pull request is
@@ -163,10 +166,17 @@ such as `v2.5.0.0-beta1`.
 - **Open issues:** when you start a change, check `gh issue list --state open` for issues it addresses and say which
   (or that none do). Put `Closes #<number>` in the pull request for each one it fixes, so publishing it closes them;
   use `Refs #<number>` for a partial fix, which leaves the issue open. After the merge, check they closed.
-- **After every change, ask the two questions in step 5 (publish it? make a release with it?) as two separate
-  questions**, even when the answer seems obvious, and even if an earlier change was approved: an approval covers
-  one change. Ask them as prompts with **Yes** and **No** buttons (the AskUserQuestion tool, both questions in one
-  prompt), not as text in a reply. Don't push, open a pull request or bump the version until the person has answered.
+- **After every change, ask the questions in step 5 as separate questions**: publish it? and, only when the change
+  touches the app, make a release with it? Ask even when the answer seems obvious, and even if an earlier change was
+  approved: an approval covers one change. Ask them as prompts with **Yes** and **No** buttons (the AskUserQuestion
+  tool, all of them in one prompt), not as text in a reply. Don't push, open a pull request or bump the version until
+  the person has answered. For a repository-only change, ask only whether to publish.
+- **Release notes:** a version's `CHANGELOG.md` section lists only changes to the app (house rules, step 3). If the
+  owner asks to correct a published release's notes, rewrite them from its `CHANGELOG.md` section
+  (`tools\Get-ReleaseNotes.ps1`) with `gh release edit <tag> --notes-file`, writing the file as UTF-8 without a
+  byte-order mark. That changes the text only; the exe and tag stay.
+- `.claude/` is ignored by git: Claude Code's settings and permission rules are each person's own. Allow rules the
+  owner relies on (such as `Bash(gh pr merge:*)`) belong in his user settings, not in the repository.
 - **Merging:** only when working with the owner (`jdvieira`) and he has said to publish, and only once CI passes
   on the commit you merge: the `gh pr merge ... --admin --match-head-commit` command in step 6. Then watch the
   *Release* run (`gh run watch`) and report the release, or that none was made. On a contributor's behalf, never
