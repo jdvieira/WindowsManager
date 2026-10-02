@@ -14,21 +14,35 @@ glance.
 
 ![Device Health](docs/screenshots/01-device-health.png)
 
-**Installed Software**, sorted by size, with uninstall on every row.
+**Installed Software**: every app on the PC, with its size, its source and uninstall on every row.
 
 ![Installed Software](docs/screenshots/02-installed-software.png)
-
-**Drivers**: the PC's vendor tool, and driver updates from Windows Update, the vendor, NVIDIA and AMD.
-
-![Drivers](docs/screenshots/03-drivers.png)
 
 **Startup**: apps that start when you sign in, turned on or off the way Task Manager does it.
 
 ![Startup](docs/screenshots/04-startup.png)
 
+**Drivers**: the PC's vendor tool, every device's driver (to roll back, reinstall or remove), and driver updates from
+Windows Update, the vendor, NVIDIA and AMD.
+
+![Drivers](docs/screenshots/03-drivers.png)
+
+**Windows Update**: Windows' own updates, ready to install, and what was installed recently.
+
+![Windows Update](docs/screenshots/06-windows-update.png)
+
+**Windows Features**: Windows' optional features, grouped as Windows shows them, turned on or off.
+
+![Windows Features](docs/screenshots/07-windows-features.png)
+
 **Cleanup**: leftover files measured and cleaned, plus large files and the biggest apps.
 
 ![Cleanup](docs/screenshots/05-cleanup.png)
+
+**Automatic maintenance**: a schedule that updates apps and Windows, cleans up and checks the PC's health, each job set
+to off, tell me, or do it.
+
+![Automatic maintenance](docs/screenshots/08-automatic-maintenance.png)
 
 ## Using it
 
