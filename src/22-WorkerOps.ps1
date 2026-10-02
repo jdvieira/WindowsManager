@@ -460,18 +460,25 @@ if ($Op -eq 'health') {
     # OpenHardwareMonitor when one is running (they publish their sensors to WMI); otherwise the hottest ACPI thermal
     # zone, which a standard user can read but which on many desktops is the motherboard rather than the processor.
     # Graphics cards report their temperature to Windows (WDDM 2.9 and later, as Task Manager shows it), for any make.
-    $temps = @{ Gpus = @() }
+    # The monitor gives every temperature of each processor (each core, the package) and graphics card (the core, hot
+    # spot, memory), with the highest each reached since it started.
+    $temps = @{ Gpus = @(); Detail = @(); Monitor = '' }
     foreach ($ns in 'root\LibreHardwareMonitor', 'root\OpenHardwareMonitor') {
         try {
-            $cpuT = @(Get-CimInstance -Namespace $ns -ClassName Sensor -ErrorAction Stop | Where-Object { $_.SensorType -eq 'Temperature' -and $_.Parent -match '/(amd|intel)cpu' -and $_.Value -gt 0 })
-            if (-not $cpuT.Count) { continue }
-            $pick = @($cpuT | Where-Object { $_.Name -match '^(CPU Package|Core \(Tctl/Tdie\)|Core \(Tctl\))$' }) | Select-Object -First 1
-            if (-not $pick) { $pick = $cpuT | Sort-Object Value -Descending | Select-Object -First 1 }
-            $temps.Cpu = @{ C = [Math]::Round([double]$pick.Value); Source = $(if ($ns -like '*Libre*') { 'LibreHardwareMonitor' } else { 'OpenHardwareMonitor' }); Sensor = [string]$pick.Name }
+            $hw = @{}; foreach ($x in @(Get-CimInstance -Namespace $ns -ClassName Hardware -ErrorAction Stop)) { $hw[[string]$x.Identifier] = [string]$x.Name }
+            $sens = @(Get-CimInstance -Namespace $ns -ClassName Sensor -ErrorAction Stop | Where-Object { $_.SensorType -eq 'Temperature' -and $_.Value -gt 0 -and $_.Name -notmatch 'Distance to TjMax' -and $_.Parent -match '^/(amdcpu|intelcpu|gpu-nvidia|gpu-amd|gpu-intel|nvidiagpu|atigpu)/' })
+            if (-not $sens.Count) { continue }
+            $temps.Monitor = if ($ns -like '*Libre*') { 'LibreHardwareMonitor' } else { 'OpenHardwareMonitor' }
+            $temps.Detail = @($sens | Group-Object { [string]$_.Parent } | Sort-Object { $_.Name -notmatch 'cpu' }, Name | ForEach-Object {
+                    @{ Kind = $(if ($_.Name -match 'cpu') { 'cpu' } else { 'gpu' }); Name = $(if ($hw[$_.Name]) { $hw[$_.Name] } else { $_.Name })
+                        Sensors = @($_.Group | Sort-Object { [int]$_.Index } | ForEach-Object { @{ Name = [string]$_.Name; C = [Math]::Round([double]$_.Value); Max = $(if ($_.Max -gt 0) { [Math]::Round([double]$_.Max) } else { $null }) } }) } })
             break
         }
         catch { }
     }
+    $temps.MonitorRunning = [bool](@(Get-Process -Name 'LibreHardwareMonitor', 'OpenHardwareMonitor' -ErrorAction SilentlyContinue).Count)
+    $temps.MonitorExe = @(@(Get-ChildItem -Path "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\LibreHardwareMonitor.LibreHardwareMonitor_*" -Directory -ErrorAction SilentlyContinue | ForEach-Object { Get-ChildItem -LiteralPath $_.FullName -Filter 'LibreHardwareMonitor.exe' -Recurse -Depth 2 -ErrorAction SilentlyContinue } | ForEach-Object { $_.FullName }) +
+        @("$env:ProgramFiles\LibreHardwareMonitor\LibreHardwareMonitor.exe", "${env:ProgramFiles(x86)}\LibreHardwareMonitor\LibreHardwareMonitor.exe") | Where-Object { $_ -and (Test-Path -LiteralPath $_) }) | Select-Object -First 1
     try {
         $zone = @(Get-CimInstance Win32_PerfFormattedData_Counters_ThermalZoneInformation -ErrorAction Stop | Where-Object { $_.HighPrecisionTemperature -gt 2732 } | Sort-Object HighPrecisionTemperature -Descending) | Select-Object -First 1
         if ($zone) { $temps.Zone = @{ C = [Math]::Round([double]$zone.HighPrecisionTemperature / 10 - 273.15); Name = [string]$zone.Name } }

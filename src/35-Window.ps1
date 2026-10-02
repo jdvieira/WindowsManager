@@ -58,7 +58,7 @@ foreach ($name in 'TabStartup', 'TabWindows', 'TabHealth', 'WinBadge', 'WinBadge
 # 2.1: Device Health's new cards and the Cleanup tab
 foreach ($name in 'TabCleanup', 'CleanupPanel', 'ClTitle', 'ClDriveBar', 'ClDriveText', 'ClRefresh', 'ClBigInfo', 'ClBigScan', 'ClBigList', 'ClAppsInfo', 'ClAllApps', 'ClAppList',
     'HlSecTitle', 'HlSecItems', 'HlSecOpen', 'HlPerfTitle', 'HlMemBar', 'HlPerfItems', 'HlPerfOpen', 'HlRelTitle', 'HlRelItems', 'HlRelOpen',
-    'HlUpdTitle', 'HlUpdItems', 'HlUpdOpen', 'HlNetTitle', 'HlNetItems', 'HlNetOpen', 'HlCleanSumTitle', 'HlCleanSumText', 'HlCleanOpen',
+    'HlUpdTitle', 'HlUpdItems', 'HlUpdOpen', 'HlNetTitle', 'HlNetItems', 'HlNetOpen', 'HlCleanSumTitle', 'HlCleanSumText', 'HlCleanOpen', 'HlTempNote', 'HlTempGroups', 'HlTempGet',
     'PageApp', 'OptAppStatus', 'OptAppCheckNow', 'OptAppInstall', 'OptAppReleases', 'OptAppCheck', 'OptAppAuto', 'OptAppBack', 'OptAppBeta', 'HlReport', 'HlTrends', 'HlTrendsNote', 'HlTrendsLabel',
     'TabFeatures', 'FeaturesPanel', 'FtTitle', 'FtText', 'FtViewApps', 'FtViewAppsText', 'FtViewFeatures', 'FtViewFeaturesText', 'FtSearch', 'FtOnOnly', 'FtRefresh',
     'FtHeader', 'FtHeadName', 'FtHeadPub', 'FtList', 'FtMsgPanel', 'FtMsgBar', 'FtMsgTitle', 'FtMsgText') {

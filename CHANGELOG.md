@@ -7,11 +7,16 @@ app, not to the repository.
 
 ## 2.6.0.0 - 2026-10-02
 
-- **CPU and GPU temperatures** on Device Health's Performance card, amber from 85 C and red from 95 C. Each
-  graphics card shows the temperature its driver reports to Windows (as Task Manager does), for NVIDIA, AMD and
-  Intel alike, without administrator rights. The processor's own sensor shows when LibreHardwareMonitor or
-  OpenHardwareMonitor is running; otherwise the card shows Windows' thermal zone, which on many desktops is the
-  motherboard rather than the processor.
+- **Temperatures card** on Device Health: a block for each processor and graphics card listing every sensor, with
+  its highest reading since the monitor started. With LibreHardwareMonitor (or OpenHardwareMonitor) running, that's
+  each CPU core and the package, and the GPU's core, hot spot and memory. Without one, the card shows what Windows
+  reports itself: one temperature per graphics card (NVIDIA, AMD and Intel alike, no administrator rights) and the
+  ACPI thermal zone, which on many desktops is the motherboard rather than the processor.
+- Cores are amber from 85 C and red from 95 C; hot spot and memory sensors, which run hotter by design, from 95 C
+  and 105 C.
+- **Get LibreHardwareMonitor** finds it on Discover to install with winget; once installed, **Start
+  LibreHardwareMonitor** starts it (Windows asks for administrator approval) and the card refreshes once it's reading.
+- The saved health report includes the temperatures.
 
 ## 2.5.1.0 - 2026-10-02
 

@@ -297,6 +297,11 @@ namespace WingetUM {
         public string Level { get; set; }
         public string Tip { get; set; }
     }
+    // Device Health's Temperatures card: one processor or graphics card and each of its sensors
+    public class HealthTempGroup {
+        public string Name { get; set; }
+        public HealthCheck[] Items { get; set; }
+    }
 
     // Cleanup: a large file in your folders
     public class BigFile : INotifyPropertyChanged {
