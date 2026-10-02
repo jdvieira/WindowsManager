@@ -11,6 +11,8 @@
 # fine-grained token of the repository owner with Contents read and write on this repository) creates the tag and
 # release, so they are the owner's: the v* tag rule lets only admins create them, and no workflow on another branch
 # can reach the token.
+# Actions are pinned to commit SHAs and ps2exe to one version (the same as ci.yml), so what builds a release changes
+# only through a reviewed pull request.
 name: Release
 
 on:
@@ -31,7 +33,7 @@ jobs:
     runs-on: windows-latest
     environment: release
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # GitHub runs PowerShell steps with $ErrorActionPreference = 'Stop', which turns a native command's stderr
       # (such as gh's "release not found") into an error; these steps go by exit codes instead
@@ -68,7 +70,7 @@ jobs:
         shell: powershell
         run: |
           Set-PSRepository PSGallery -InstallationPolicy Trusted
-          Install-Module ps2exe -Scope CurrentUser -Force
+          Install-Module ps2exe -RequiredVersion 1.0.18 -Scope CurrentUser -Force
 
       - name: Check and build
         if: steps.plan.outputs.skip == 'false'
