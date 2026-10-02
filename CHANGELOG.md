@@ -5,6 +5,14 @@ All notable changes to Windows Manager (called Windows Software Manager in 2.0, 
 version's section becomes its release notes, which the app shows under "What's new", so it lists only changes to the
 app, not to the repository.
 
+## 2.6.0.0 - 2026-10-02
+
+- **CPU and GPU temperatures** on Device Health's Performance card, amber from 85 C and red from 95 C. Each
+  graphics card shows the temperature its driver reports to Windows (as Task Manager does), for NVIDIA, AMD and
+  Intel alike, without administrator rights. The processor's own sensor shows when LibreHardwareMonitor or
+  OpenHardwareMonitor is running; otherwise the card shows Windows' thermal zone, which on many desktops is the
+  motherboard rather than the processor.
+
 ## 2.5.1.0 - 2026-10-02
 
 - **A new icon.** Windows Manager's icon is now a window with a heartbeat line, for an app that keeps the PC up to

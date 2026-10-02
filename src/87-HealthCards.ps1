@@ -39,6 +39,23 @@ function Get-NetQualityChecks($q, [bool]$Internet) {
     return , $list.ToArray()
 }
 
+# The Performance card's temperature lines (h.Temps): the processor and each graphics card. Amber from 85 C, red
+# from 95 C, where most processors and graphics cards start slowing themselves down to cool off.
+function Get-TempChecks($t) {
+    $list = New-Object System.Collections.Generic.List[object]
+    if (-not $t) { return , $list.ToArray() }
+    $deg = "$([char]0x00B0)C"
+    $lvl = { param($C) if ($C -ge 95) { 'bad' } elseif ($C -ge 85) { 'warn' } else { 'ok' } }
+    if ($t.Cpu) { $list.Add((New-Check 'CPU temperature' "$($t.Cpu.C) $deg" (& $lvl $t.Cpu.C) "The processor's $($t.Cpu.Sensor) sensor, read from $($t.Cpu.Source). Over 85 $deg under load is hot; check the fans and vents")) }
+    elseif ($t.Zone) { $list.Add((New-Check 'System temperature' "$($t.Zone.C) $deg" (& $lvl $t.Zone.C) "Windows' ACPI thermal zone ($($t.Zone.Name)). On laptops it usually follows the processor; on many desktops it's the motherboard. For the processor's own sensor, install LibreHardwareMonitor (search for it on Discover), keep it running and refresh")) }
+    else { $list.Add((New-Check 'CPU temperature' 'Not reported' 'info' "Windows doesn't read the processor's sensor itself. Install LibreHardwareMonitor (search for it on Discover), keep it running and refresh, and it shows here")) }
+    foreach ($g in @($t.Gpus)) {
+        $short = ([string]$g.Name -replace '^(NVIDIA|AMD|Intel\(R\)|Intel)\s+', '' -replace '^(GeForce|Radeon\(TM\)|Radeon)\s+', '').Trim()
+        $list.Add((New-Check 'GPU temperature' "$($g.C) $deg  $short" (& $lvl $g.C) "$($g.Name), as the graphics driver reports it to Windows"))
+    }
+    return , $list.ToArray()
+}
+
 function Update-HealthCards($h) {
     $issues = 0
     # ---- Security
@@ -79,6 +96,7 @@ function Update-HealthCards($h) {
         $UI.HlMemBar.Foreground = if ($used -ge 90) { $Window.FindResource('Bad') } elseif ($used -ge 80) { $Window.FindResource('Warn') } else { $Window.FindResource('BarGradient') }
         $perf.Add((New-Check 'Memory' "$(Format-Size $p.MemFree) free of $(Format-Size $p.MemTotal)" $(if ($used -ge 90) { 'bad' } elseif ($used -ge 80) { 'warn' } else { 'ok' })))
         if ($null -ne $p.Cpu) { $perf.Add((New-Check 'Processor' "$($p.Cpu)% busy right now" $(if ($p.Cpu -ge 85) { 'warn' } else { 'ok' }))) }
+        foreach ($c in Get-TempChecks $h.Temps) { $perf.Add($c) }
         $n = 0
         foreach ($t in @($p.Top)) { $n++; $perf.Add((New-Check $(if ($n -eq 1) { 'Most memory' } else { '' }) "$($t.Name)  $(Format-Size $t.Bytes)" 'info')) }
         $perf.Add((New-Check 'Programs running' "$($p.Processes) processes" 'info'))
