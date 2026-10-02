@@ -5,6 +5,19 @@ All notable changes to Windows Manager (called Windows Software Manager in 2.0, 
 version's section becomes its release notes, which the app shows under "What's new", so it lists only changes to the
 app, not to the repository.
 
+## 2.6.0.0 - 2026-10-02
+
+- **Temperatures card** on Device Health: a block for each processor and graphics card listing every sensor, with
+  its highest reading since the monitor started. With LibreHardwareMonitor (or OpenHardwareMonitor) running, that's
+  each CPU core and the package, and the GPU's core, hot spot and memory. Without one, the card shows what Windows
+  reports itself: one temperature per graphics card (NVIDIA, AMD and Intel alike, no administrator rights) and the
+  ACPI thermal zone, which on many desktops is the motherboard rather than the processor.
+- Cores are amber from 85 C and red from 95 C; hot spot and memory sensors, which run hotter by design, from 95 C
+  and 105 C.
+- **Get LibreHardwareMonitor** finds it on Discover to install with winget; once installed, **Start
+  LibreHardwareMonitor** starts it (Windows asks for administrator approval) and the card refreshes once it's reading.
+- The saved health report includes the temperatures.
+
 ## 2.5.1.0 - 2026-10-02
 
 - **A new icon.** Windows Manager's icon is now a window with a heartbeat line, for an app that keeps the PC up to

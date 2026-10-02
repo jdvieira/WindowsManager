@@ -1,8 +1,8 @@
 ﻿# Windows Manager - HealthCards (part of src\; see Windows_Manager.ps1)
 
-# Device Health's check cards: Security, Performance, Reliability, Updates, Network and Cleanup. Each line is a
-# HealthCheck (a dot that is green, amber, red or grey, what it is, and its value). Update-HealthCards returns how
-# many lines need attention, for the summary at the top.
+# Device Health's check cards: Security, Performance, Reliability, Updates, Network, Cleanup and Temperatures. Each
+# line is a HealthCheck (a dot that is green, amber, red or grey, what it is, and its value). Update-HealthCards returns
+# how many lines need attention, for the summary at the top.
 function New-Check([string]$Label, [string]$Value, [string]$Level = 'ok', [string]$Tip = '') {
     $c = New-Object WingetUM.HealthCheck
     $c.Label = $Label; $c.Value = $Value; $c.Level = $Level; $c.Tip = $(if ($Tip) { $Tip } else { "$Label`: $Value" })
@@ -37,6 +37,53 @@ function Get-NetQualityChecks($q, [bool]$Internet) {
         else { $list.Add((New-Check 'DNS lookup' "$(Format-Ms $d.Ms)$(if ($d.Failed) { ", $($d.Failed) of 2 failed" })" $(if ($d.Ms -gt 500) { 'bad' } elseif ($d.Ms -gt 150 -or $d.Failed) { 'warn' } else { 'ok' }) "How long looking up a web address takes$from. Slow lookups make every new website slow to start")) }
     }
     return , $list.ToArray()
+}
+
+# The Temperatures card (h.Temps): a block per processor and graphics card with each of its sensors. With
+# LibreHardwareMonitor (or OpenHardwareMonitor) running that's every core, the package, and the GPU's core, hot spot
+# and memory; without it, what Windows itself reports: one reading per graphics card and the ACPI thermal zone.
+# Cores and GPU cores are amber from 85 C and red from 95 C, where most start slowing themselves down to cool off;
+# hot spot and memory sensors run hotter by design, so 95 C and 105 C. Returns how many blocks need attention.
+function New-TempGroup([string]$Name, $Items) {
+    $g = New-Object WingetUM.HealthTempGroup
+    $g.Name = $Name; $g.Items = [WingetUM.HealthCheck[]]@($Items)
+    return $g
+}
+function Update-TempCard($t) {
+    $deg = "$([char]0x00B0)C"
+    $groups = New-Object System.Collections.Generic.List[object]
+    $issues = 0
+    $UI.HlTempGet.Visibility = 'Collapsed'
+    if (-not $t) { $UI.HlTempNote.Text = "Reading temperatures$Ellipsis"; $UI.HlTempGroups.ItemsSource = $null; return 0 }
+    $check = {
+        param([string]$Label, $C, $Max, [string]$Tip)
+        $hot = $Label -match 'Hot ?Spot|Memory|Junction'
+        $lv = if ($C -ge $(if ($hot) { 105 } else { 95 })) { 'bad' } elseif ($C -ge $(if ($hot) { 95 } else { 85 })) { 'warn' } else { 'ok' }
+        New-Check $Label "$C $deg$(if ($null -ne $Max -and $Max -gt $C) { "   (max $Max)" })" $lv $(if ($Tip) { $Tip } else { "$Label`: $C $deg now$(if ($null -ne $Max) { ", $Max $deg at most since $($t.Monitor) started" })" })
+    }
+    $detail = @($t.Detail)
+    $cpus = @($detail | Where-Object { $_.Kind -eq 'cpu' })
+    $gpus = @($detail | Where-Object { $_.Kind -eq 'gpu' })
+    foreach ($d in $cpus + $gpus) { $groups.Add((New-TempGroup $d.Name @($d.Sensors | ForEach-Object { & $check $_.Name $_.C $_.Max '' }))) }
+    if (-not $cpus.Count) {
+        $groups.Insert(0, $(if ($t.Zone) { New-TempGroup 'Processor (Windows thermal zone)' @(& $check 'Thermal zone' $t.Zone.C $null "Windows' ACPI thermal zone ($($t.Zone.Name)). On laptops it usually follows the processor; on many desktops it's the motherboard") }
+                else { New-TempGroup 'Processor' @(New-Check 'Cores' 'Not reported' 'info' "Windows doesn't read the processor's own sensors") }))
+    }
+    if (-not $gpus.Count) { foreach ($g in @($t.Gpus)) { $groups.Add((New-TempGroup $g.Name @(& $check 'GPU' $g.C $null "$($g.Name), as its driver reports it to Windows"))) } }
+    foreach ($g in $groups) { if (@($g.Items | Where-Object { $_.Level -in 'warn', 'bad' }).Count) { $issues++ } }
+    $UI.HlTempGroups.ItemsSource = $groups.ToArray()
+    if ($t.Monitor) { $UI.HlTempNote.Text = "Every sensor, from $($t.Monitor). Max is the highest since it started." }
+    else {
+        $UI.HlTempNote.Text = "Windows reports one temperature per graphics card and none for the processor's cores. For every core, the package, and the GPU's hot spot and memory, keep LibreHardwareMonitor running (it's free, and asks for administrator rights)." +
+        $(if ($t.MonitorRunning) { " It's running but hasn't reported yet: refresh in a few seconds." } elseif ($t.MonitorExe) { " It's installed but not running." } else { '' })
+        if (-not $t.MonitorRunning) {
+            $UI.HlTempGet.Content = if ($t.MonitorExe) { 'Start LibreHardwareMonitor' } else { 'Get LibreHardwareMonitor' }
+            $UI.HlTempGet.ToolTip = if ($t.MonitorExe) { "Start it (Windows asks for administrator approval); this card refreshes once it's reading" } else { 'Find it on Discover to install it with winget' }
+            $UI.HlTempGet.Tag = [string]$t.MonitorExe
+            $UI.HlTempGet.Visibility = 'Visible'
+        }
+    }
+    return $issues
 }
 
 function Update-HealthCards($h) {
@@ -163,6 +210,7 @@ function Update-HealthCards($h) {
     $UI.HlCleanSumTitle.Text = if ($script:CleanReader) { "Measuring$Ellipsis" } elseif ($all -gt 0) { "$(Format-Size $all) can be freed" } else { 'Nothing much to clean' }
     $UI.HlCleanSumText.Text = "Leftover files from apps, installers and Windows." + $(if ($sys) { " $env:SystemDrive has $(Format-Size $sys.Free) free of $(Format-Size $sys.Size)." } else { '' }) + " Cleanup also lists your largest files and the apps that take the most space."
     if ($sys -and $sys.Size -and $sys.Free / $sys.Size -lt 0.15) { $issues++ }
+    $issues += Update-TempCard $h.Temps
     return $issues
 }
 
@@ -170,6 +218,31 @@ $UI.HlSecOpen.Add_Click({ try { Start-Process 'windowsdefender:' } catch { } })
 $UI.HlPerfOpen.Add_Click({ try { Start-Process taskmgr.exe } catch { } })
 $UI.HlRelOpen.Add_Click({ try { Start-Process perfmon.exe -ArgumentList '/rel' } catch { } })
 $UI.HlNetOpen.Add_Click({ try { Start-Process 'ms-settings:network' } catch { } })
+# Temperatures: start LibreHardwareMonitor and read the page again once it has had time to publish its sensors (about
+# 12 seconds, then twice more if it hasn't yet), or find it on Discover to install it
+$script:TempWaits = 0
+$script:TempTimer = New-Object System.Windows.Threading.DispatcherTimer
+$script:TempTimer.Interval = [TimeSpan]::FromSeconds(12)
+$script:TempTimer.Add_Tick({
+        $t = if ($script:HealthInfo) { $script:HealthInfo.Temps } else { $null }
+        if (($t -and $t.Monitor) -or $script:TempWaits -ge 3) { $script:TempTimer.Stop(); return }
+        $script:TempWaits++
+        Start-HealthScan
+    })
+$UI.HlTempGet.Add_Click({
+        $exe = [string]$UI.HlTempGet.Tag
+        if ($exe) {
+            try { Start-Process -FilePath $exe -WorkingDirectory (Split-Path -Parent $exe) } catch { $script:LastSummary = "Couldn't start LibreHardwareMonitor: $($_.Exception.Message)"; Update-View; return }
+            $UI.HlTempNote.Text = "Starting LibreHardwareMonitor$Ellipsis This card refreshes once it's reading."
+            $UI.HlTempGet.Visibility = 'Collapsed'
+            $script:TempWaits = 0; $script:TempTimer.Stop(); $script:TempTimer.Start()
+        }
+        else {
+            $UI.TabDiscover.IsChecked = $true
+            $UI.Search.Text = 'LibreHardwareMonitor'
+            Start-Search
+        }
+    })
 $UI.HlCleanOpen.Add_Click({ $UI.TabCleanup.IsChecked = $true })
 $UI.HlUpdOpen.Add_Click({
         $soft = @($Packages | Where-Object { -not $_.IsDone -and -not $_.IsConcealed }).Count
@@ -362,6 +435,11 @@ th{color:#666;font-weight:600;border-top:0}td:last-child{text-align:right}.wide 
     $vols = foreach ($v in @($UI.HlVolumes.ItemsSource)) { "<tr><td>$(& $e $v.Name)</td><td>$(& $e $v.Detail) ({0:0}% used)</td></tr>" -f $v.UsedPct }
     $disks = foreach ($d in @($UI.HlDisks.ItemsSource)) { "<tr><td>$(& $e $d.Name)</td><td>$(& $e $d.Detail)  &middot;  $(& $e $d.Health)</td></tr>" }
     [void]$sb.Append("<section><h2>Drives</h2><table>$($vols -join '')$($disks -join '')</table></section>")
+    if (@($UI.HlTempGroups.ItemsSource).Count) {
+        [void]$sb.Append("<div class='grid'>")
+        foreach ($g in @($UI.HlTempGroups.ItemsSource)) { [void]$sb.Append((& $checks $g.Name $g.Items '')) }
+        [void]$sb.Append("</div><p class='sub'>$(& $e $UI.HlTempNote.Text)</p>")
+    }
     $pending = @($Packages | Where-Object { -not $_.IsDone }) | ForEach-Object { "<tr><td>$(& $e $_.Name)</td><td>$(& $e "$($_.Version) to $($_.Available)")</td></tr>" }
     $pending += @($WinUpdates) | ForEach-Object { "<tr><td>$(& $e $_.Title)</td><td>Windows Update</td></tr>" }
     $pending += @($DrvUpdates) | ForEach-Object { "<tr><td>$(& $e $_.Name)</td><td>$(& $e "$($_.Version) ($($_.Source))")</td></tr>" }

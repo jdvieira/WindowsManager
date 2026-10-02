@@ -456,6 +456,87 @@ if ($Op -eq 'health') {
         $h.Perf = $perf
     }
     catch { }
+    # Temperatures. The processor's own sensor needs a kernel driver, so it comes from LibreHardwareMonitor or
+    # OpenHardwareMonitor when one is running (they publish their sensors to WMI); otherwise the hottest ACPI thermal
+    # zone, which a standard user can read but which on many desktops is the motherboard rather than the processor.
+    # Graphics cards report their temperature to Windows (WDDM 2.9 and later, as Task Manager shows it), for any make.
+    # The monitor gives every temperature of each processor (each core, the package) and graphics card (the core, hot
+    # spot, memory), with the highest each reached since it started.
+    $temps = @{ Gpus = @(); Detail = @(); Monitor = '' }
+    foreach ($ns in 'root\LibreHardwareMonitor', 'root\OpenHardwareMonitor') {
+        try {
+            $hw = @{}; foreach ($x in @(Get-CimInstance -Namespace $ns -ClassName Hardware -ErrorAction Stop)) { $hw[[string]$x.Identifier] = [string]$x.Name }
+            $sens = @(Get-CimInstance -Namespace $ns -ClassName Sensor -ErrorAction Stop | Where-Object { $_.SensorType -eq 'Temperature' -and $_.Value -gt 0 -and $_.Name -notmatch 'Distance to TjMax' -and $_.Parent -match '^/(amdcpu|intelcpu|gpu-nvidia|gpu-amd|gpu-intel|nvidiagpu|atigpu)/' })
+            if (-not $sens.Count) { continue }
+            $temps.Monitor = if ($ns -like '*Libre*') { 'LibreHardwareMonitor' } else { 'OpenHardwareMonitor' }
+            $temps.Detail = @($sens | Group-Object { [string]$_.Parent } | Sort-Object { $_.Name -notmatch 'cpu' }, Name | ForEach-Object {
+                    @{ Kind = $(if ($_.Name -match 'cpu') { 'cpu' } else { 'gpu' }); Name = $(if ($hw[$_.Name]) { $hw[$_.Name] } else { $_.Name })
+                        Sensors = @($_.Group | Sort-Object { [int]$_.Index } | ForEach-Object { @{ Name = [string]$_.Name; C = [Math]::Round([double]$_.Value); Max = $(if ($_.Max -gt 0) { [Math]::Round([double]$_.Max) } else { $null }) } }) } })
+            break
+        }
+        catch { }
+    }
+    $temps.MonitorRunning = [bool](@(Get-Process -Name 'LibreHardwareMonitor', 'OpenHardwareMonitor' -ErrorAction SilentlyContinue).Count)
+    $temps.MonitorExe = @(@(Get-ChildItem -Path "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\LibreHardwareMonitor.LibreHardwareMonitor_*" -Directory -ErrorAction SilentlyContinue | ForEach-Object { Get-ChildItem -LiteralPath $_.FullName -Filter 'LibreHardwareMonitor.exe' -Recurse -Depth 2 -ErrorAction SilentlyContinue } | ForEach-Object { $_.FullName }) +
+        @("$env:ProgramFiles\LibreHardwareMonitor\LibreHardwareMonitor.exe", "${env:ProgramFiles(x86)}\LibreHardwareMonitor\LibreHardwareMonitor.exe") | Where-Object { $_ -and (Test-Path -LiteralPath $_) }) | Select-Object -First 1
+    try {
+        $zone = @(Get-CimInstance Win32_PerfFormattedData_Counters_ThermalZoneInformation -ErrorAction Stop | Where-Object { $_.HighPrecisionTemperature -gt 2732 } | Sort-Object HighPrecisionTemperature -Descending) | Select-Object -First 1
+        if ($zone) { $temps.Zone = @{ C = [Math]::Round([double]$zone.HighPrecisionTemperature / 10 - 273.15); Name = [string]$zone.Name } }
+    }
+    catch { }
+    try {
+        if (-not ('WsmKmt.Kmt' -as [type])) {
+            # (a plain string: this code is itself inside the worker's here-string)
+            Add-Type -Namespace WsmKmt -Name Kmt -MemberDefinition (@(
+                    '[StructLayout(LayoutKind.Sequential)] public struct LUID { public uint Low; public int High; }'
+                    '[StructLayout(LayoutKind.Sequential)] public struct ADAPTERINFO { public uint hAdapter; public LUID AdapterLuid; public uint NumOfSources; public int bPrecisePresentRegionsPreferred; }'
+                    '[StructLayout(LayoutKind.Sequential)] public struct ENUMADAPTERS2 { public uint NumAdapters; public IntPtr pAdapters; }'
+                    '[StructLayout(LayoutKind.Sequential)] public struct QUERYADAPTERINFO { public uint hAdapter; public int Type; public IntPtr pPrivateDriverData; public uint PrivateDriverDataSize; }'
+                    '[StructLayout(LayoutKind.Sequential)] public struct CLOSEADAPTER { public uint hAdapter; }'
+                    '[DllImport("gdi32.dll")] public static extern int D3DKMTEnumAdapters2(ref ENUMADAPTERS2 p);'
+                    '[DllImport("gdi32.dll")] public static extern int D3DKMTQueryAdapterInfo(ref QUERYADAPTERINFO p);'
+                    '[DllImport("gdi32.dll")] public static extern int D3DKMTCloseAdapter(ref CLOSEADAPTER p);'
+                ) -join "`n")
+        }
+        $M = [Runtime.InteropServices.Marshal]
+        $en = New-Object WsmKmt.Kmt+ENUMADAPTERS2
+        if ([WsmKmt.Kmt]::D3DKMTEnumAdapters2([ref]$en) -eq 0 -and $en.NumAdapters) {
+            $sz = $M::SizeOf([type][WsmKmt.Kmt+ADAPTERINFO])
+            $en.pAdapters = $M::AllocHGlobal($sz * $en.NumAdapters)
+            # 62 is KMTQAITYPE_ADAPTERPERFDATA (temperature in tenths of a degree at offset 56), 8 the adapter's name
+            $perfBuf = $M::AllocHGlobal(64); $nameBuf = $M::AllocHGlobal(2080)
+            try {
+                if ([WsmKmt.Kmt]::D3DKMTEnumAdapters2([ref]$en) -eq 0) {
+                    $gpus = New-Object Collections.Generic.List[object]
+                    for ($i = 0; $i -lt $en.NumAdapters; $i++) {
+                        $ad = $M::PtrToStructure([IntPtr]($en.pAdapters.ToInt64() + $i * $sz), [type][WsmKmt.Kmt+ADAPTERINFO])
+                        for ($b = 0; $b -lt 64; $b++) { $M::WriteByte($perfBuf, $b, 0) }
+                        $q = New-Object WsmKmt.Kmt+QUERYADAPTERINFO
+                        $q.hAdapter = $ad.hAdapter; $q.Type = 62; $q.pPrivateDriverData = $perfBuf; $q.PrivateDriverDataSize = 64
+                        $deci = if ([WsmKmt.Kmt]::D3DKMTQueryAdapterInfo([ref]$q) -eq 0) { $M::ReadInt32($perfBuf, 56) } else { 0 }
+                        if ($deci -gt 0 -and $deci -lt 1500) {
+                            $q.Type = 8; $q.pPrivateDriverData = $nameBuf; $q.PrivateDriverDataSize = 2080
+                            $name = if ([WsmKmt.Kmt]::D3DKMTQueryAdapterInfo([ref]$q) -eq 0) { ([string]$M::PtrToStringUni($nameBuf)).Trim() } else { 'Graphics' }
+                            $gpus.Add(@{ Name = $name; C = [Math]::Round($deci / 10.0) })
+                        }
+                        $cl = New-Object WsmKmt.Kmt+CLOSEADAPTER; $cl.hAdapter = $ad.hAdapter; $null = [WsmKmt.Kmt]::D3DKMTCloseAdapter([ref]$cl)
+                    }
+                    $temps.Gpus = $gpus.ToArray()
+                }
+            }
+            finally { $M::FreeHGlobal($en.pAdapters); $M::FreeHGlobal($perfBuf); $M::FreeHGlobal($nameBuf) }
+        }
+    }
+    catch { }
+    # older drivers don't report it to Windows: NVIDIA's own tool, which comes with its driver
+    if (-not @($temps.Gpus).Count) {
+        try {
+            $smi = @("$env:SystemRoot\System32\nvidia-smi.exe", "$env:ProgramFiles\NVIDIA Corporation\NVSMI\nvidia-smi.exe") | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+            if ($smi) { $temps.Gpus = @(& $smi --query-gpu=name,temperature.gpu --format=csv,noheader 2>$null | ForEach-Object { $f = ([string]$_).Split(','); if ($f.Count -ge 2 -and $f[1].Trim() -match '^\d+$') { @{ Name = $f[0].Trim(); C = [int]$f[1].Trim() } } }) }
+        }
+        catch { }
+    }
+    $h.Temps = $temps
     # Reliability: Windows' stability index, unexpected shutdowns and blue screens (30 days), app crashes (7 days),
     # devices with a problem
     $rel = @{}

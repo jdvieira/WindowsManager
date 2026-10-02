@@ -1579,6 +1579,24 @@ $Xaml = @'
           </Border>
           <Border Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16" Margin="0,12,0,0">
             <StackPanel>
+              <TextBlock Text="TEMPERATURES" Style="{StaticResource Label}"/>
+              <TextBlock x:Name="HlTempNote" Foreground="{StaticResource Muted}" FontSize="12.5" Margin="0,6,0,0" TextWrapping="Wrap"/>
+              <ItemsControl x:Name="HlTempGroups" Margin="0,2,0,0">
+                <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <StackPanel Width="300" Margin="0,10,36,0">
+                      <TextBlock Text="{Binding Name}" Foreground="#F2F2F2" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
+                      <ItemsControl ItemsSource="{Binding Items}" Margin="0,4,0,0" ItemTemplate="{StaticResource CheckRow}"/>
+                    </StackPanel>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <Button x:Name="HlTempGet" Style="{StaticResource Ghost}" HorizontalAlignment="Left" Margin="0,12,0,0" Visibility="Collapsed"/>
+            </StackPanel>
+          </Border>
+          <Border Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16" Margin="0,12,0,0">
+            <StackPanel>
               <TextBlock x:Name="HlTrendsLabel" Text="TRENDS" Style="{StaticResource Label}"/>
               <TextBlock x:Name="HlTrendsNote" Foreground="{StaticResource Muted}" FontSize="12.5" Margin="0,6,0,0" TextWrapping="Wrap"/>
               <StackPanel x:Name="HlTrends" Margin="0,6,0,0"/>
