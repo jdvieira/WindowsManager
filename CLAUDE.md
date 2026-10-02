@@ -159,7 +159,8 @@ such as `v2.5.0.0-beta1`.
   `origin/main`. Don't reset, stash or discard anyone's local changes; ask.
 - **After every change, ask the two questions in step 5 (publish it? make a release with it?) as two separate
   questions**, even when the answer seems obvious, and even if an earlier change was approved: an approval covers
-  one change. Don't push, open a pull request or bump the version until the person has answered.
+  one change. Ask them as prompts with **Yes** and **No** buttons (the AskUserQuestion tool, both questions in one
+  prompt), not as text in a reply. Don't push, open a pull request or bump the version until the person has answered.
 - **Merging:** only when working with the owner (`jdvieira`) and he has said to publish, and only once CI passes
   on the commit you merge: the `gh pr merge ... --admin --match-head-commit` command in step 6. Then watch the
   *Release* run (`gh run watch`) and report the release, or that none was made. On a contributor's behalf, never
