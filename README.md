@@ -397,6 +397,7 @@ until you do). It also replaces the old name's notification registration with it
 | `tools\Get-ReleaseNotes.ps1` | Prints one version's `CHANGELOG.md` section (the release notes) |
 | `tools\New-WingetManifest.ps1` | Writes the winget manifest for a published release |
 | `.github\workflows\` | `ci.yml` checks and builds every pull request (the exe is attached to the run); `release.yml` publishes a release when a version tag is pushed |
+| `.github\CODEOWNERS` | Names the owner as the reviewer of every file, so a pull request needs the owner's approval to merge |
 | `CHANGELOG.md` | Every change, by version |
 | `TESTING.md` | What to try on real PCs, for the parts that need administrator approval or particular hardware |
 | `%LOCALAPPDATA%\WindowsManager\` | settings.json, lastrun.json, descriptions.json, sizes.json, history.jsonl, health-history.jsonl (a reading a day), health-alerts.json (what was mentioned when), removed-apps.json (built-in apps to offer back), feature-descriptions.json, notification.png, Logs\, Drivers\ (administrator runs' scripts and logs), DriverBackups\, Previous\ (the version before the last update) |

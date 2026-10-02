@@ -10,8 +10,9 @@ Every copy of the app checks GitHub's latest release when it opens and offers to
 
 1. You change the code on a **branch** and open a **pull request** to `main`.
 2. **CI** checks and builds it (`.github/workflows/ci.yml`). It must pass.
-3. The **owner reviews and approves** it, then merges it. Nobody else can merge to `main`, push to it directly, or
-   create release tags.
+3. The **owner reviews and approves** it, then merges it. `.github/CODEOWNERS` names the owner, so only the owner's
+   approval counts; another contributor's doesn't. Nobody else can merge to `main`, push to it directly, or create
+   release tags.
 4. If the pull request **bumps `$AppVersion`**, merging it **publishes that version** as a release
    (`.github/workflows/release.yml`), and users are offered it. No version bump means no release.
 

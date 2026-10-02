@@ -1,0 +1,3 @@
+# The repository owner reviews every change. With "Require review from Code Owners" on in the Main-2 ruleset, a pull
+# request needs the owner's approval to merge; another contributor's approval doesn't count.
+* @jdvieira
