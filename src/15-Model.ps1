@@ -360,6 +360,18 @@ namespace WingetUM {
             }
         }
         public string ActionText { get { return Kind == "app" ? (on ? "Remove" : "Reinstall") : (on ? "Turn off" : "Turn on"); } }
+        // Optional features' tree, as Windows shows it: the feature it sits under, how deep, whether features sit
+        // under it and are showing, and how many of those are on. SortKey keeps the list in tree order (apps: name).
+        public string ParentKey { get; set; }
+        public int Depth { get; set; }
+        public double IndentWidth { get { return Depth * 24; } }
+        private bool hasChildren, expanded;
+        public bool HasChildren { get { return hasChildren; } set { hasChildren = value; Changed("HasChildren"); } }
+        public bool IsExpanded { get { return expanded; } set { expanded = value; Changed("IsExpanded"); } }
+        public string SortKey { get; set; }
+        private string treeNote = "";
+        public string TreeNote { get { return treeNote; } set { treeNote = value ?? ""; Changed("TreeNote", "HasTreeNote"); } }
+        public bool HasTreeNote { get { return treeNote.Length > 0; } }
     }
 
     // One line of the History panel (history.jsonl)

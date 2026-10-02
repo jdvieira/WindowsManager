@@ -884,9 +884,32 @@ if ($Op -eq 'appxchange') {
 
 if ($Op -eq 'features') {
     # Windows' optional features (Win32_OptionalFeature, which needs no administrator rights to read):
-    # InstallState 1 on, 2 off, 3 not available
+    # InstallState 1 on, 2 off, 3 not available. Where each sits in Windows' own tree ("Turn Windows features on or
+    # off") comes from the servicing manifests (Windows\servicing\Packages\*.mum, readable by everyone): a feature's
+    # <applicable> lists what it needs, as <parent name=...> or <update name=...>, and the first of those is where it
+    # sits (MSMQ-HTTP lists MSMQ-Server first, then the IIS features it also needs).
     try {
-        $items = @(Get-CimInstance Win32_OptionalFeature -ErrorAction Stop | ForEach-Object { @{ Name = [string]$_.Name; Caption = [string]$_.Caption; State = [int]$_.InstallState } })
+        $items = @(Get-CimInstance Win32_OptionalFeature -ErrorAction Stop | ForEach-Object { @{ Name = [string]$_.Name; Caption = [string]$_.Caption; State = [int]$_.InstallState; Parent = '' } })
+        $listed = @{}; foreach ($i in $items) { $listed[$i.Name] = $true }
+        $links = @{}
+        try {
+            foreach ($file in [IO.Directory]::GetFiles("$env:SystemRoot\servicing\Packages", '*.mum')) {
+                $text = [IO.File]::ReadAllText($file)
+                if ($text.IndexOf('<selectable', [StringComparison]::Ordinal) -lt 0) { continue }
+                try { [xml]$x = $text } catch { continue }
+                foreach ($u in $x.GetElementsByTagName('update')) {
+                    $n = [string]$u.name
+                    if (-not $n -or -not $u.selectable -or $links.ContainsKey($n) -or -not $listed.ContainsKey($n)) { continue }
+                    $det = @($u.applicable.detectUpdate | Where-Object { $_ })
+                    # the first entry is the parent; one that isn't a feature itself (a package) means the top level
+                    $first = @($det | ForEach-Object { $_.ChildNodes } | Where-Object { $_.LocalName -in 'parent', 'update' -and $_.name }) | Select-Object -First 1
+                    $p = if ($first) { [string]$first.name } else { '' }
+                    $links[$n] = $(if ($p -and $p -ne $n -and $listed.ContainsKey($p)) { $p } else { '' })
+                }
+            }
+        }
+        catch { }
+        foreach ($i in $items) { if ($links.ContainsKey($i.Name)) { $i.Parent = $links[$i.Name] } }
         Send @{ T = 'features'; Items = $items; Error = $null }
     }
     catch { Send @{ T = 'features'; Items = @(); Error = $_.Exception.Message } }

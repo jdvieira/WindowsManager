@@ -5,6 +5,20 @@ All notable changes to Windows Manager (called Windows Software Manager in 2.0, 
 version's section becomes its release notes, which the app shows under "What's new", so it lists only changes to the
 app, not to the repository.
 
+## 2.7.0.0 - 2026-10-02
+
+- **Optional features are a tree**, grouped the way Windows' own "Turn Windows features on or off" shows them:
+  Internet Information Services > World Wide Web Services > Application Development Features, .NET Framework 4.8
+  Advanced Services > WCF Services, SMB 1.0/CIFS File Sharing Support > Client and Server, and so on. The list
+  starts collapsed; the arrow beside a feature shows what's under it, and a parent says how many of those are on
+  ("2 of 8 under it on").
+- **Filter** and **On only** show each match with the features it sits under, opened, so it's clear where it
+  belongs.
+- **Turn on** says which features it sits under turn on with it, and **Turn off** lists the features under it that
+  turn off too. Afterwards the list is read again, so every row shows what Windows did.
+- Parts of a feature that Windows doesn't list by name (such as Sysmon-Service) are left out, as Windows leaves them
+  out of its own dialog.
+
 ## 2.6.0.0 - 2026-10-02
 
 - **Temperatures card** on Device Health: a block for each processor and graphics card listing every sensor, with

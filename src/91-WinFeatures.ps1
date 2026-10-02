@@ -3,18 +3,79 @@
 # The Windows Features tab. Built-in apps: the Store apps that came with Windows and can be removed for you; removed
 # ones stay listed (removed-apps.json) with Reinstall, which registers them again from their files or, when those are
 # gone, opens their Microsoft Store page. Optional features: Windows' optional features, turned on or off with
-# administrator approval (Enable/Disable-WindowsOptionalFeature); some need a restart.
+# administrator approval (Enable/Disable-WindowsOptionalFeature), and shown as Windows' own tree; some need a restart.
 $FeatureItems = New-Object 'System.Collections.ObjectModel.ObservableCollection[WingetUM.FeatureItem]'
 $FeatureView = [System.Windows.Data.CollectionViewSource]::GetDefaultView($FeatureItems)
-$FeatureView.SortDescriptions.Add((New-Object System.ComponentModel.SortDescription('Name', 'Ascending')))
-$FeatureView.Filter = [Predicate[object]] {
-    param($f)
-    if ($f.Kind -ne $(if ($UI.FtViewFeatures.IsChecked) { 'feature' } else { 'app' })) { return $false }
+# apps by name, optional features in tree order
+$FeatureView.SortDescriptions.Add((New-Object System.ComponentModel.SortDescription('SortKey', 'Ascending')))
+function Test-FeatureMatch($f) {
     if ($UI.FtOnOnly.IsChecked -and -not $f.On) { return $false }
     $q = $UI.FtSearch.Text.Trim()
     return (-not $q) -or ("$($f.Name) $($f.SubText) $($f.Publisher) $($f.Description)".IndexOf($q, [StringComparison]::OrdinalIgnoreCase) -ge 0)
 }
+$FeatureView.Filter = [Predicate[object]] {
+    param($f)
+    if ($f.Kind -ne $(if ($UI.FtViewFeatures.IsChecked) { 'feature' } else { 'app' })) { return $false }
+    if ($f.Kind -eq 'feature') { return $script:FtShown.Contains($f.Key) }
+    return (Test-FeatureMatch $f)
+}
 $UI.FtList.ItemsSource = $FeatureView
+
+# ---- Optional features as a tree, like Windows' "Turn Windows features on or off": collapsed to start with; a
+# chevron shows what's under a feature. Filtering (or On only) shows each match with the features it sits under.
+$script:FtByKey = @{}        # feature name -> its row
+$script:FtChildren = @{}     # feature name -> the rows directly under it
+$script:FtExpanded = @{}     # feature name -> open (kept across refreshes)
+$script:FtShown = New-Object 'System.Collections.Generic.HashSet[string]'
+function Get-FeatureAncestors($f) {
+    $list = New-Object System.Collections.Generic.List[object]
+    $seen = @{}
+    $p = $f.ParentKey
+    while ($p -and $script:FtByKey.ContainsKey($p) -and -not $seen.ContainsKey($p)) { $seen[$p] = $true; $a = $script:FtByKey[$p]; $list.Add($a); $p = $a.ParentKey }
+    return $list.ToArray()
+}
+function Get-FeatureDescendants($f) {
+    $list = New-Object System.Collections.Generic.List[object]
+    $stack = New-Object System.Collections.Generic.Stack[object]
+    $stack.Push($f)
+    while ($stack.Count) {
+        $kids = $script:FtChildren[$stack.Pop().Key]
+        if (-not $kids) { continue }
+        foreach ($c in $kids) { if ($list.Count -lt 1000) { $list.Add($c); $stack.Push($c) } }
+    }
+    return $list.ToArray()
+}
+# Which features show: with no filter, those whose parents are all open; with one, the matches and what they sit under
+function Update-FeatureList {
+    $script:FtShown.Clear()
+    $filtering = $UI.FtOnOnly.IsChecked -or $UI.FtSearch.Text.Trim()
+    foreach ($f in $script:FtByKey.Values) {
+        if ($filtering) {
+            if (-not (Test-FeatureMatch $f)) { continue }
+            [void]$script:FtShown.Add($f.Key)
+            foreach ($a in Get-FeatureAncestors $f) { [void]$script:FtShown.Add($a.Key) }
+        }
+        elseif (-not @(Get-FeatureAncestors $f | Where-Object { -not $_.IsExpanded }).Count) { [void]$script:FtShown.Add($f.Key) }
+    }
+    # while filtering, a parent that's showing for a match is shown open
+    if ($filtering) { foreach ($f in $script:FtByKey.Values) { if ($f.HasChildren) { $f.IsExpanded = @($script:FtChildren[$f.Key] | Where-Object { $_ -and $script:FtShown.Contains($_.Key) }).Count -gt 0 } } }
+    else { foreach ($f in $script:FtByKey.Values) { if ($f.HasChildren) { $f.IsExpanded = [bool]$script:FtExpanded[$f.Key] } } }
+    $FeatureView.Refresh()
+}
+function Set-FeatureExpanded([string]$Key, [bool]$Open) {
+    if (-not $script:FtByKey.ContainsKey($Key)) { return }
+    $script:FtExpanded[$Key] = $Open
+    Update-FeatureList
+}
+# "2 of 5 under it on", like the half-filled box Windows shows for a feature with some of its parts on
+function Update-FeatureTreeNotes {
+    foreach ($f in $script:FtByKey.Values) {
+        if (-not $f.HasChildren) { $f.TreeNote = ''; continue }
+        $d = @(Get-FeatureDescendants $f | Where-Object { $_.Available })
+        $on = @($d | Where-Object { $_.On }).Count
+        $f.TreeNote = if ($d.Count) { "$on of $($d.Count) under it on" } else { '' }
+    }
+}
 $RemovedAppsPath = Join-Path $DataDir 'removed-apps.json'
 $FeatureDescPath = Join-Path $DataDir 'feature-descriptions.json'
 $script:FeatDescReader = $null
@@ -63,14 +124,14 @@ $EventHandlers.appxlist = {
     $have = @{}
     foreach ($a in @($Ev.Items)) {
         $f = New-Object WingetUM.FeatureItem
-        $f.Kind = 'app'; $f.Name = $a.Name; $f.SubText = $a.Package; $f.Publisher = $a.Publisher; $f.Description = Get-UsefulDescription $a.Name $a.Description; $f.Key = $a.Full; $f.Family = $a.Family; $f.Location = $a.Location; $f.On = $true
+        $f.Kind = 'app'; $f.Name = $a.Name; $f.SortKey = $a.Name; $f.SubText = $a.Package; $f.Publisher = $a.Publisher; $f.Description = Get-UsefulDescription $a.Name $a.Description; $f.Key = $a.Full; $f.Family = $a.Family; $f.Location = $a.Location; $f.On = $true
         $FeatureItems.Add($f); $have[$a.Family] = $true
     }
     # removed earlier, and still gone: offered back
     $removed = @(Read-RemovedApps | Where-Object { $_.Family -and -not $have.ContainsKey([string]$_.Family) })
     foreach ($r in $removed) {
         $f = New-Object WingetUM.FeatureItem
-        $f.Kind = 'app'; $f.Name = [string]$r.Name; $f.SubText = [string]$r.Package; $f.Publisher = [string]$r.Publisher; $f.Description = Get-UsefulDescription ([string]$r.Name) ([string]$r.Description); $f.Key = [string]$r.Full; $f.Family = [string]$r.Family; $f.Location = [string]$r.Location; $f.On = $false
+        $f.Kind = 'app'; $f.Name = [string]$r.Name; $f.SortKey = [string]$r.Name; $f.SubText = [string]$r.Package; $f.Publisher = [string]$r.Publisher; $f.Description = Get-UsefulDescription ([string]$r.Name) ([string]$r.Description); $f.Key = [string]$r.Full; $f.Family = [string]$r.Family; $f.Location = [string]$r.Location; $f.On = $false
         $FeatureItems.Add($f)
     }
     Save-RemovedApps $removed
@@ -80,13 +141,37 @@ $EventHandlers.appxlist = {
 $EventHandlers.features = {
     param($Ev)
     foreach ($f in @($FeatureItems | Where-Object { $_.Kind -eq 'feature' })) { [void]$FeatureItems.Remove($f) }
-    foreach ($o in @($Ev.Items)) {
+    $script:FtByKey = @{}; $script:FtChildren = @{}
+    # Windows' dialog leaves out the features with no name to show (parts of another feature); so does this list
+    foreach ($o in @($Ev.Items | Where-Object { $_.Caption })) {
         $f = New-Object WingetUM.FeatureItem
-        $f.Kind = 'feature'; $f.Name = $(if ($o.Caption) { $o.Caption } else { $o.Name }); $f.SubText = $o.Name; $f.Key = $o.Name; $f.Publisher = ''
+        $f.Kind = 'feature'; $f.Name = $o.Caption; $f.SubText = $o.Name; $f.Key = $o.Name; $f.Publisher = ''; $f.ParentKey = [string]$o.Parent
         $f.Description = Get-UsefulDescription $f.Name (Get-FeatureDescription $o.Name)
         $f.Available = $o.State -ne 3; $f.On = $o.State -eq 1
-        $FeatureItems.Add($f)
+        $script:FtByKey[$f.Key] = $f
     }
+    foreach ($f in $script:FtByKey.Values) {
+        if ($f.ParentKey -and -not $script:FtByKey.ContainsKey($f.ParentKey)) { $f.ParentKey = '' }
+        if ($f.ParentKey) { if ($script:FtChildren.ContainsKey($f.ParentKey)) { $script:FtChildren[$f.ParentKey] += $f } else { $script:FtChildren[$f.ParentKey] = [object[]]@($f) } }
+    }
+    # tree order: each feature, then what's under it, siblings by name (a loop in the links is cut at the top)
+    $walk = {
+        param($f, [int]$Depth)
+        $script:FtOrderSeen[$f.Key] = $true
+        $f.Depth = $Depth; $f.SortKey = '{0:D5}' -f (++$script:FtOrder)
+        $kids = @($script:FtChildren[$f.Key] | Where-Object { $_ -and -not $script:FtOrderSeen.ContainsKey($_.Key) } | Sort-Object Name)
+        $f.HasChildren = $kids.Count -gt 0
+        $f.IsExpanded = [bool]$script:FtExpanded[$f.Key]
+        foreach ($c in $kids) { & $walk $c ($Depth + 1) }
+    }
+    $script:FtOrder = 0; $script:FtOrderSeen = @{}
+    foreach ($f in @($script:FtByKey.Values | Where-Object { -not $_.ParentKey } | Sort-Object Name)) { & $walk $f 0 }
+    foreach ($f in @($script:FtByKey.Values | Where-Object { -not $script:FtOrderSeen.ContainsKey($_.Key) } | Sort-Object Name)) { $f.ParentKey = ''; & $walk $f 0 }
+    foreach ($f in $script:FtByKey.Values) { $FeatureItems.Add($f) }
+    if ($script:FtKeep -and $script:FtByKey.ContainsKey($script:FtKeep.Key)) { $k = $script:FtByKey[$script:FtKeep.Key]; $k.State = $script:FtKeep.State; $k.Detail = $script:FtKeep.Detail }
+    $script:FtKeep = $null
+    Update-FeatureTreeNotes
+    Update-FeatureList
     if ($Ev.Error) { $script:FeatState = 'error'; $script:FeatError = $Ev.Error } else { $script:FeatState = 'ready' }
     # features this app has no words for (newer Windows builds): Windows can say, but only to an administrator
     Read-FeatureDescCache
@@ -113,7 +198,11 @@ function Request-FeatureChange($f) {
     }
     if ($script:Elev) { $script:LastSummary = "Wait for $($script:ElevTitle) to finish first"; Update-View; return }
     $verb = if ($f.On) { 'Turn off' } else { 'Turn on' }
-    Show-Confirm 'ftfeature' @{ Item = $f } "$verb $($f.Name)?" "Windows $(if ($f.On) { 'removes' } else { 'adds' }) the optional feature $($f.SubText). It can take a few minutes, Windows asks for administrator approval, and some features need a restart to finish.$(if ($Settings.DriverRestorePoint) { "`n`nA restore point is created first." })" $verb
+    # what changes with it: the features it sits under turn on too; the ones under it that are on turn off too
+    if ($f.On) { $also = @(Get-FeatureDescendants $f | Where-Object { $_.On } | ForEach-Object { $_.Name }) }
+    else { $also = @(Get-FeatureAncestors $f | Where-Object { -not $_.On } | ForEach-Object { $_.Name }); [array]::Reverse($also) }
+    $alsoText = if (-not $also.Count) { '' } elseif ($f.On) { "`n`nThese features under it turn off too:`n$(($also | Select-Object -First 12 | ForEach-Object { "  $([char]0x2022) $_" }) -join "`n")$(if ($also.Count -gt 12) { "`n  and $($also.Count - 12) more" })" } else { "`n`nIt sits under $($also -join ' > '), which turn$(if ($also.Count -eq 1) { 's' }) on too." }
+    Show-Confirm 'ftfeature' @{ Item = $f } "$verb $($f.Name)?" "Windows $(if ($f.On) { 'removes' } else { 'adds' }) the optional feature $($f.SubText). It can take a few minutes, Windows asks for administrator approval, and some features need a restart to finish.$alsoText$(if ($Settings.DriverRestorePoint) { "`n`nA restore point is created first." })" $verb
 }
 $ConfirmHandlers.ftapp = { param($Payload) Start-FeatureChange $Payload.Item }
 $ConfirmHandlers.ftfeature = { param($Payload) Start-FeatureChange $Payload.Item }
@@ -147,7 +236,13 @@ $ElevHandlers.feature = {
     else { $f.State = 'error'; $f.Detail = "Didn't change$(if ($last) { ": $last" })" }
     Add-History $(if ($tag.On) { 'install' } else { 'uninstall' }) "Windows feature: $($f.Name)" $f.Key '' '' $f.State $f.Detail
     $script:LastSummary = "$($f.Name): $($f.Detail)"
-    $FeatureView.Refresh()
+    # the features above or under it may have changed too: read them all again, keeping this one's result showing
+    if ($f.State -in 'ok', 'reboot' -and -not $script:FeatReader) {
+        $script:FtKeep = @{ Key = $f.Key; State = $f.State; Detail = $f.Detail }
+        $script:FeatState = 'running'; $script:FeatReader = Start-Tracked 'features' @{} { $script:FeatReader = $null; if ($script:FeatState -eq 'running') { $script:FeatState = 'error' } }
+    }
+    Update-FeatureTreeNotes
+    Update-FeatureList
 }
 $EventHandlers.appxchanged = {
     param($Ev)
@@ -183,12 +278,12 @@ function Update-FeaturesView {
     $UI.FtViewAppsText.Text = if ($n) { "Built-in apps ($n)" } else { 'Built-in apps' }
     $UI.FtViewFeaturesText.Text = if ($fAll) { "Optional features ($fOn of $fAll on)" } else { 'Optional features' }
     $UI.FtText.Text = if ($apps) { "Store apps that came with Windows (or that you added) and that Windows lets you remove for your account$(if ($removed) { "; $removed removed, which Reinstall brings back" }). Parts of Windows itself aren't listed." }
-    else { "Windows' optional features. Turning one on or off asks for administrator approval and can take a few minutes; some need a restart to finish." }
+    else { "Windows' optional features, grouped as Windows shows them: the arrow shows what's under one. Turning one on or off asks for administrator approval and can take a few minutes; some need a restart to finish." }
     $UI.FtHeadName.Text = if ($apps) { 'APP' } else { 'FEATURE' }
     $UI.FtHeadPub.Text = if ($apps) { 'PUBLISHER' } else { '' }
     $UI.FtRefresh.IsEnabled = -not $script:AppxReader -and -not $script:FeatReader
     $msg = $null
-    if ($state -eq 'running') { $msg = @{ Bar = $true; Title = $(if ($apps) { 'Reading built-in apps' } else { 'Reading optional features' }); Text = '' } }
+    if ($state -eq 'running' -and -not @($FeatureView).Count) { $msg = @{ Bar = $true; Title = $(if ($apps) { 'Reading built-in apps' } else { 'Reading optional features' }); Text = '' } }
     elseif ($state -eq 'error' -and -not @($FeatureView).Count) { $msg = @{ Title = "Couldn't read them"; Text = $err } }
     elseif (-not @($FeatureView).Count) { $msg = @{ Title = 'Nothing matches'; Text = '' } }
     $UI.FtHeader.Visibility = ConvertTo-Visibility (-not $msg)
@@ -213,13 +308,19 @@ $Panels.features = @{
 
 $UI.TabFeatures.Add_Checked({ Set-Section 'features' })
 $UI.FtRefresh.Add_Click({ Start-FeatureScan })
-foreach ($c in 'FtViewApps', 'FtViewFeatures', 'FtOnOnly') { $UI[$c].Add_Click({ $FeatureView.Refresh(); Update-View }) }
+foreach ($c in 'FtViewApps', 'FtViewFeatures', 'FtOnOnly') { $UI[$c].Add_Click({ Update-FeatureList; Update-View }) }
 $script:FtSearchTimer = New-Object System.Windows.Threading.DispatcherTimer
 $script:FtSearchTimer.Interval = [TimeSpan]::FromMilliseconds(180)
-$script:FtSearchTimer.Add_Tick({ $script:FtSearchTimer.Stop(); $FeatureView.Refresh(); Update-View })
+$script:FtSearchTimer.Add_Tick({ $script:FtSearchTimer.Stop(); Update-FeatureList; Update-View })
 $UI.FtSearch.Add_TextChanged({ $script:FtSearchTimer.Stop(); $script:FtSearchTimer.Start() })
 $UI.FtList.AddHandler([System.Windows.Controls.Primitives.ButtonBase]::ClickEvent, [System.Windows.RoutedEventHandler] {
         param($s, $e)
         $src = $e.OriginalSource
         if ($src -is [System.Windows.Controls.Button] -and $src.Tag -eq 'ftaction') { Request-FeatureChange $src.DataContext }
+        # the chevron: show or hide what's under it (while filtering, every match already shows with its parents)
+        elseif ($src -is [System.Windows.Controls.Button] -and $src.Tag -eq 'fttoggle' -and $src.DataContext.HasChildren) {
+            if ($UI.FtOnOnly.IsChecked -or $UI.FtSearch.Text.Trim()) { return }
+            Set-FeatureExpanded $src.DataContext.Key (-not $src.DataContext.IsExpanded)
+            Update-View
+        }
     })

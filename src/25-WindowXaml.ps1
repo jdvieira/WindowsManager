@@ -1691,14 +1691,22 @@ $Xaml = @'
                     <ColumnDefinition Width="120"/>
                     <ColumnDefinition Width="110"/>
                   </Grid.ColumnDefinitions>
-                  <StackPanel VerticalAlignment="Center" Margin="0,9,14,9">
-                    <TextBlock Text="{Binding Name}" Foreground="#F2F2F2" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
-                    <TextBlock x:Name="FtDesc" Text="{Binding Description}" Foreground="#A8A8A8" FontSize="12.5" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" ToolTip="{Binding Description}"/>
-                    <TextBlock Text="{Binding SubText}" Foreground="#8A8A8A" FontSize="12" FontFamily="Consolas" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" ToolTip="{Binding SubText}"/>
-                  </StackPanel>
+                  <!-- optional features are a tree: indented by depth, with a chevron on the ones that have features under them -->
+                  <DockPanel VerticalAlignment="Center" Margin="0,9,14,9">
+                    <Border x:Name="FtIndent" DockPanel.Dock="Left" Width="{Binding IndentWidth}"/>
+                    <Button x:Name="FtToggle" DockPanel.Dock="Left" Tag="fttoggle" Style="{StaticResource HeaderButton}" Width="26" Height="20" VerticalAlignment="Top" Margin="0,0,4,0" ToolTip="Show or hide the features under it">
+                      <TextBlock x:Name="FtChevron" Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Button>
+                    <StackPanel>
+                      <TextBlock Text="{Binding Name}" Foreground="#F2F2F2" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
+                      <TextBlock x:Name="FtDesc" Text="{Binding Description}" Foreground="#A8A8A8" FontSize="12.5" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" ToolTip="{Binding Description}"/>
+                      <TextBlock Text="{Binding SubText}" Foreground="#8A8A8A" FontSize="12" FontFamily="Consolas" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" ToolTip="{Binding SubText}"/>
+                    </StackPanel>
+                  </DockPanel>
                   <TextBlock Grid.Column="1" Text="{Binding Publisher}" Foreground="#9A9A9A" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,10,0"/>
                   <StackPanel Grid.Column="2" VerticalAlignment="Center">
                     <TextBlock x:Name="FtStatus" Text="{Binding StatusText}" Foreground="{StaticResource Good}" FontSize="12.5" TextTrimming="CharacterEllipsis" ToolTip="{Binding StatusText}"/>
+                    <TextBlock x:Name="FtTreeNote" Text="{Binding TreeNote}" Foreground="#8A8A8A" FontSize="12" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding TreeNote}"/>
                     <ProgressBar x:Name="FtBar" Style="{StaticResource Bar}" IsIndeterminate="True" Margin="0,6,10,0" Visibility="Collapsed"/>
                   </StackPanel>
                   <Button Grid.Column="3" Content="{Binding ActionText}" Tag="ftaction" Style="{StaticResource RowButton}" IsEnabled="{Binding CanChange}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
@@ -1706,6 +1714,10 @@ $Xaml = @'
                 <DataTemplate.Triggers>
                   <DataTrigger Binding="{Binding On}" Value="False"><Setter TargetName="FtStatus" Property="Foreground" Value="#8A8A8A"/></DataTrigger>
                   <DataTrigger Binding="{Binding HasDescription}" Value="False"><Setter TargetName="FtDesc" Property="Visibility" Value="Collapsed"/></DataTrigger>
+                  <DataTrigger Binding="{Binding HasTreeNote}" Value="False"><Setter TargetName="FtTreeNote" Property="Visibility" Value="Collapsed"/></DataTrigger>
+                  <DataTrigger Binding="{Binding HasChildren}" Value="False"><Setter TargetName="FtToggle" Property="Visibility" Value="Hidden"/></DataTrigger>
+                  <DataTrigger Binding="{Binding IsExpanded}" Value="True"><Setter TargetName="FtChevron" Property="Text" Value="&#xE70D;"/></DataTrigger>
+                  <DataTrigger Binding="{Binding Kind}" Value="app"><Setter TargetName="FtToggle" Property="Visibility" Value="Collapsed"/><Setter TargetName="FtIndent" Property="Visibility" Value="Collapsed"/></DataTrigger>
                   <DataTrigger Binding="{Binding State}" Value="running"><Setter TargetName="FtBar" Property="Visibility" Value="Visible"/><Setter TargetName="FtStatus" Property="Foreground" Value="White"/></DataTrigger>
                   <DataTrigger Binding="{Binding State}" Value="error"><Setter TargetName="FtStatus" Property="Foreground" Value="{StaticResource Bad}"/></DataTrigger>
                   <DataTrigger Binding="{Binding State}" Value="reboot"><Setter TargetName="FtStatus" Property="Foreground" Value="{StaticResource Warn}"/></DataTrigger>
