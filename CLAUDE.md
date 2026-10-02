@@ -78,7 +78,10 @@ Check open pull requests first (`gh pr list`), so two people don't take the same
   ANSI). Use `[char]0x2026` and the like for special characters.
 - **Bump `$AppVersion`** in `src\00-Startup.ps1` when the change is to be released (the owner decides, see step 5),
   and add a **`CHANGELOG.md`** section with the same number at the top (`## <version> - <yyyy-mm-dd>`). An app
-  change merged without a bump reaches users with the next release; give it a line in that release's section. Its text becomes the release notes users see.
+  change merged without a bump reaches users with the next release; give it a line in that release's section.
+  That section becomes the release notes the app shows under "What's new", so **it lists only changes to the app**:
+  what someone using it would notice. Changes to the repository (`CLAUDE.md`, `README.md`, `TESTING.md`, workflows,
+  build scripts, `tools\`, `.gitignore`) never go in it; the commit message and pull request describe them.
   Versions are `major.minor.patch.build`: a new feature bumps the second or third number (2.4.0.0 to 2.5.0.0 or
   2.4.1.0), a small fix the last (2.4.1.0 to 2.4.1.1). Changes that don't touch the app (docs, workflows) don't bump it.
 - **Update the docs** the change affects: `README.md` (what each tab does), `TESTING.md` (real-PC checks for things
