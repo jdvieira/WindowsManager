@@ -234,8 +234,8 @@ runs as administrator and kept in `feature-descriptions.json`.
 - winget does one thing at a time. Installs, updates and uninstalls queue up, so you can keep adding more while one
   runs. **Stop after current app** cancels the rest of the queue.
 - Search the current list with Ctrl+F. Esc clears the search.
-- **History** (bottom right) lists every install, update, uninstall and hold, from the app and from automatic updates,
-  newest first, with the versions and the result. Filter by app, show only automatic updates or only failures, or clear
+- **History** (bottom right) lists every install, update, uninstall and hold, from the app and from automatic maintenance,
+  newest first, with the versions and the result. Filter by app, show only automatic runs or only failures, or clear
   it. It keeps the last year (up to 2,000 entries) in `%LOCALAPPDATA%\WindowsManager\history.jsonl`.
 - **Show log** shows what winget is doing. **Log folder** opens the daily log files.
 - **Diagnostics** saves a zip on the desktop with this app's logs and error log, the administrator runs' scripts and
@@ -290,39 +290,50 @@ update check itself runs `winget upgrade --include-pinned` and reads `winget pin
 (tagged *hidden*) instead of disappearing. `--version` is added to an install of a chosen version, and to an uninstall
 when that package is installed more than once.
 
-## Automatic updates
+## Automatic maintenance
 
-Click **Automatic updates** in the header to schedule unattended updates.
+Click **Automatic maintenance** in the header (it reads "Automatic: <schedule>" once it's set up) to have Windows
+Manager look after the PC on a schedule.
 
-- **When**: daily or on chosen weekdays, at a time you pick (for example `3:00 AM` or `15:30`).
-- **What it does**: the scheduled task *Windows Manager* runs `Windows Manager.exe -Auto` as you, while
-  you are signed in (winget needs your session). It updates every listed app silently. It skips hidden apps (and any
-  app pinned in winget) and apps tagged *explicit*. Automatic runs only update; they never install or uninstall.
-- **What to do**: **Install updates** (the default), or **Just tell me what's available**: the run installs nothing,
-  and when updates are waiting a notification lists them (with their versions) and a button to open the app. The
-  header button then reads "Update check: ..." instead of "Automatic: ...".
-- **Notifications**: nothing appears unless an update fails or the check fails. Then a Windows notification says what
-  happened (it stays in the notification center), with **Open Windows Manager** and **View log** buttons. You
-  can also turn on notifications for restarts, or a summary after every run that installs something. When Windows
-  notifications are off for the app, or Options > Automatic runs picks *This app's pop-up*, the app's own pop-up lists
-  every app's result instead. The app registers its name and icon for notifications, and a `windowsmanager:`
-  link for the buttons, under your user account.
-- **Run elevated** (on by default): the task runs with your highest privileges, so installers never stop to ask for
-  approval. Saving this needs administrator approval once. An elevated task runs a **protected copy** of the app in
-  `C:\Program Files\Windows Manager`, which only administrators can change, so no other program can swap the app
-  and get administrator rights through the task. Saving copies the app there. After the app updates itself, it offers
-  to update the copy (one approval; until then automatic runs use the older copy), and so does the panel. A task made
-  by an earlier version, which runs the app where it is, is offered the move once. Turning automatic updates off
-  removes the copy.
+- **When**: daily or on chosen weekdays, at a time you pick (for example `3:00 AM` or `15:30`). The scheduled task
+  *Windows Manager* runs `Windows Manager.exe -Auto` as you, while you are signed in (winget needs your session).
+- **What to do**: four jobs, each **Off**, **Tell me** (nothing changes; the notification says what's waiting) or
+  **Do it**, and each **every run**, **weekly** or **monthly** (for example apps every run, Windows and cleanup
+  weekly). A job that isn't due yet is skipped, and the log says when it last ran.
+
+| Job | Do it | Settings |
+| --- | --- | --- |
+| **App updates** | Updates every app winget offers, silently. Hidden apps (and any app pinned in winget), apps tagged *explicit*, and apps Windows updates itself are left alone. Automatic runs never install or uninstall apps | Try failed updates again once, 30 seconds later |
+| **Windows updates** | Installs Windows' own security, cumulative, .NET and Defender updates through Windows Update, one at a time, with History lines. Needs **Run elevated**; without it, they're only listed. Nothing ever restarts by itself | Include optional updates; include feature updates (a new version of Windows). Both off by default |
+| **Cleanup** | Cleans up the Cleanup tab's items you tick. Items with a shield (Windows' own folders) need **Run elevated**; without it they're left out. *Tell me* only notifies once 1 GB or more can be freed | Which items |
+| **Health check** | (Tell me only.) Checks antivirus, firewall, drives, battery and blue screens, and notifies about each new problem once (again after a week if it's still there). Each check saves a reading for Device Health's trends | |
+
+- **Restore point**: Options > Automatic runs > *Create a restore point before installing* makes one before a run's
+  first app or Windows update (needs Run elevated and System Protection on).
+- **Notifications**: one for the whole run, only when something failed or is waiting for you, plus (switches in the
+  panel) when something needs a restart (on by default) and, if you like, after every run that changed something.
+  It's a Windows notification that stays in the notification center, with **Open Windows Manager** and **View log**
+  buttons. When Windows notifications are off for the app, or Options > Automatic runs picks *This app's pop-up*, the
+  app's own pop-up lists each job and its results instead. Health problems get their own notification. The app
+  registers its name and icon for notifications, and a `windowsmanager:` link for the buttons, under your user
+  account.
+- **Run elevated** (on by default): the task runs with your highest privileges, so installs and Windows' own cleanup
+  never stop to ask for approval. Saving this needs administrator approval once. An elevated task runs a **protected
+  copy** of the app in `C:\Program Files\Windows Manager`, which only administrators can change, so no other program
+  can swap the app and get administrator rights through the task. Saving copies the app there. After the app updates
+  itself, it offers to update the copy (one approval; until then automatic runs use the older copy), and so does the
+  panel. A task made by an earlier version, which runs the app where it is, is offered the move once. Turning
+  automatic maintenance off removes the copy.
 - **Run as soon as possible after a missed start**: if the PC was off or asleep, the task runs when it is next available.
-- **Run now** starts the task immediately. **Test notification** runs `-Auto -DryRun`: a real check that shows the
-  notification with what would be updated, and installs nothing.
-- Each automatic run is logged in the daily log, and every update it installs (or fails to) goes into History. Its result goes to `%LOCALAPPDATA%\WindowsManager\lastrun.json`,
-  which the panel shows as "Last run".
+- **Run now** starts the task immediately (the jobs that are due). **Test run** runs `-Auto -DryRun`: every job that's
+  on, due or not, goes through what it would do and shows the notification, changing nothing.
+- Each run is logged in the daily log; every update it installs (or fails to) and every cleanup goes into History.
+  Its result goes to `%LOCALAPPDATA%\WindowsManager\lastrun.json`, which the panel shows as "Last run", and when
+  each job last ran to `autojobs.json`.
 
 A task that isn't elevated points at the exe's current location. If you move the exe, open the panel and **Save**
-again (the panel warns you when the task points somewhere else). Turning **Update apps automatically** off and saving deletes the task.
-
+again (the panel warns you when the task points somewhere else). Turning **Run automatic maintenance** off and saving
+deletes the task.
 ## Keeping Windows Manager up to date
 
 Each time it opens, the app reads the latest release on GitHub
@@ -381,7 +392,7 @@ Version 2.0 was called Windows Software Manager; before its 1.0 release the app 
 logs, history, saved descriptions and sizes, driver backups and the hidden list from the folder one of those used
 (`%LOCALAPPDATA%\WindowsSoftwareManager`, `WindowsPackageManager`, `WingetManager`, `WingetPackageManager` or
 `WingetUpdateManager`). If a scheduled task still has one of those names, the app offers to move it to *Windows
-Manager* with the same schedule, pointing at the new exe (the header button reads "Automatic updates: move needed"
+Manager* with the same schedule, pointing at the new exe (the header button reads "Automatic maintenance: move needed"
 until you do). It also replaces the old name's notification registration with its own.
 
 ## Files

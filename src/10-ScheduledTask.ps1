@@ -214,6 +214,12 @@ function Format-LastRun($Run) {
     if (-not $Run) { return $null }
     $when = "$($Run.Time)"
     try { $when = ([datetime]$Run.Time).ToString('ddd M/d, h:mm tt') } catch { }
+    # from 2.5 on, a run keeps each job's result
+    if ($Run.PSObject.Properties['Jobs']) {
+        $jobs = @($Run.Jobs | Where-Object { $_ })
+        $text = if ($jobs.Count) { ($jobs | ForEach-Object { "$($_.Name.ToLower()) $(Format-AutoJobSummary $_ ([bool]$Run.DryRun))" }) -join '; ' } else { 'nothing was due' }
+        return "Last run $when$(if ($Run.DryRun) { ' (test run)' }): $text"
+    }
     if ($Run.Error) { return "Last run $when failed: $($Run.Error)" }
     if ($Run.Mode -eq 'notify' -and -not $Run.DryRun) {
         $n = [int]$Run.Available

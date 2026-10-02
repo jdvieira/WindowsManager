@@ -33,7 +33,7 @@ function Save-Diagnostics([string]$Zip) {
     try {
         $s = Get-AutoSchedule
         $copy = if ($s -and $s.Elevated) { ', protected copy ' + $(if ($v = Get-TaskCopyVersion) { $v } else { 'missing' }) } else { '' }
-        $t.Add("Schedule:    $(if ($s) { "$(Format-Schedule $s), elevated $($s.Elevated)$copy, mode $($Settings.AutoMode), notifications $($Settings.NotifyStyle)" } else { 'none' })$(if (Test-LegacyTask) { '; an old-name task exists' })")
+        $t.Add("Schedule:    $(if ($s) { "$(Format-Schedule $s), elevated $($s.Elevated)$copy, jobs $((@(Get-AutoJobs | ForEach-Object { "$($_.Key) $($_.Mode)/$($_.Every)" })) -join ', '), notifications $($Settings.NotifyStyle)" } else { 'none' })$(if (Test-LegacyTask) { '; an old-name task exists' })")
     }
     catch { $t.Add("Schedule:    couldn't read it ($($_.Exception.Message))") }
     if ($script:DrvSys) {

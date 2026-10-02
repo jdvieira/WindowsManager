@@ -709,10 +709,10 @@ $Xaml = @'
           <TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="15"/>
         </Button>
         <Button x:Name="BtnSchedule" Style="{StaticResource Ghost}" Margin="0,0,12,0" BorderBrush="#383838" Padding="12,6"
-                ToolTip="Update apps, or check for updates, on a schedule">
+                ToolTip="Automatic maintenance: app and Windows updates, cleanup and a health check, on a schedule">
           <StackPanel Orientation="Horizontal">
             <TextBlock Text="&#xE823;" FontFamily="Segoe MDL2 Assets" FontSize="13" Margin="0,1,8,0" VerticalAlignment="Center"/>
-            <TextBlock x:Name="ScheduleText" Text="Automatic updates: off" FontSize="12.5" VerticalAlignment="Center"/>
+            <TextBlock x:Name="ScheduleText" Text="Automatic maintenance: off" FontSize="12.5" VerticalAlignment="Center"/>
           </StackPanel>
         </Button>
         <Border x:Name="AdminBadge" CornerRadius="13" Padding="11,5" Background="#262626" BorderBrush="#383838" BorderThickness="1" VerticalAlignment="Center">
@@ -1882,9 +1882,9 @@ $Xaml = @'
       </DockPanel>
     </Border>
 
-    <!-- Automatic updates (scheduled task) panel -->
+    <!-- Automatic maintenance (scheduled task) panel -->
     <Grid x:Name="ScheduleOverlay" Grid.RowSpan="5" Background="#B8000000" Visibility="Collapsed">
-      <Border Width="580" Margin="24" Background="#252525" BorderBrush="#3A3A3A" BorderThickness="1" CornerRadius="12" Padding="30,26,20,24"
+      <Border x:Name="SchCard" Width="660" Margin="24" Background="#252525" BorderBrush="#3A3A3A" BorderThickness="1" CornerRadius="12" Padding="30,26,20,24"
               HorizontalAlignment="Center" VerticalAlignment="Center">
         <Grid>
           <Grid.RowDefinitions>
@@ -1893,10 +1893,10 @@ $Xaml = @'
           </Grid.RowDefinitions>
           <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,10,0">
           <StackPanel>
-          <TextBlock Text="Automatic updates" FontSize="21" FontWeight="Bold" Foreground="White"/>
+          <TextBlock Text="Automatic maintenance" FontSize="21" FontWeight="Bold" Foreground="White"/>
           <TextBlock Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,5,0,20"
-                     Text="A scheduled task checks for updates while you are signed in, and either installs them silently or tells you what's waiting. Hidden apps are left alone."/>
-          <CheckBox x:Name="SchEnabled" Content="Update apps automatically" FontSize="14"/>
+                     Text="A scheduled task runs while you are signed in and does the jobs you choose below. For each job, Tell me only lets you know what's waiting, and Do it takes care of it."/>
+          <CheckBox x:Name="SchEnabled" Content="Run automatic maintenance" FontSize="14"/>
           <StackPanel x:Name="SchOptions" Margin="0,22,0,0">
             <TextBlock Text="WHEN" Style="{StaticResource Label}"/>
             <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
@@ -1914,20 +1914,17 @@ $Xaml = @'
               <ToggleButton Content="Sat" Tag="Saturday" Style="{StaticResource Chip}"/>
               <ToggleButton Content="Sun" Tag="Sunday" Style="{StaticResource Chip}"/>
             </WrapPanel>
-            <TextBlock Text="WHAT TO DO" Style="{StaticResource Label}" Margin="0,16,0,10"/>
-            <StackPanel Orientation="Horizontal">
-              <RadioButton x:Name="SchModeInstall" Content="Install updates" GroupName="Mode" Style="{StaticResource Chip}"/>
-              <RadioButton x:Name="SchModeNotify" Content="Just tell me what's available" GroupName="Mode" Style="{StaticResource Chip}"/>
-            </StackPanel>
-            <TextBlock x:Name="SchModeHint" Foreground="{StaticResource Muted}" FontSize="12.5" TextWrapping="Wrap" Margin="0,0,0,0"/>
-            <TextBlock Text="OPTIONS" Style="{StaticResource Label}" Margin="0,16,0,12"/>
-            <CheckBox x:Name="SchElevated" Content="Run elevated, so installers never ask for approval" Margin="0,0,0,12"
-                      ToolTip="Runs the task with your highest privileges. Saving this needs administrator approval once."/>
-            <CheckBox x:Name="SchCatchUp" Content="Run as soon as possible after a missed start" Margin="0,0,0,12"
+            <CheckBox x:Name="SchElevated" Content="Run elevated, so installs and Windows' own cleanup never ask for approval" Margin="0,8,0,12"
+                      ToolTip="Runs the task with your highest privileges, from a protected copy of the app. Needed to install Windows updates and to clean up Windows' folders. Saving this needs administrator approval once."/>
+            <CheckBox x:Name="SchCatchUp" Content="Run as soon as possible after a missed start"
                       ToolTip="If the computer was off or asleep at the scheduled time, run when it is next available."/>
-            <CheckBox x:Name="SchNotifyReboot" Content="Also tell me when an update needs a restart" Margin="0,0,0,12"/>
-            <CheckBox x:Name="SchNotifyAlways" Content="Show a summary after every run that installs updates"/>
-
+            <TextBlock Text="WHAT TO DO" Style="{StaticResource Label}" Margin="0,22,0,10"/>
+            <StackPanel x:Name="SchJobs"/>
+            <TextBlock Text="NOTIFICATIONS" Style="{StaticResource Label}" Margin="0,12,0,12"/>
+            <CheckBox x:Name="SchNotifyReboot" Content="Tell me when something needs a restart" Margin="0,0,0,12"
+                      ToolTip="Nothing ever restarts by itself; this tells you when updates are waiting for a restart to finish."/>
+            <CheckBox x:Name="SchNotifyAlways" Content="Show a summary after every run that changes something"
+                      ToolTip="Otherwise you only hear about problems, things waiting for you, and restarts."/>
           </StackPanel>
           <Border Background="#1C1C1C" CornerRadius="8" Padding="14,11" Margin="0,20,0,0">
             <TextBlock x:Name="SchStatus" TextWrapping="Wrap" Foreground="#BDBDBD" FontSize="12.5" LineHeight="19"/>
@@ -1938,8 +1935,8 @@ $Xaml = @'
           <DockPanel Grid.Row="1" Margin="0,22,10,0">
             <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
               <Button x:Name="SchRunNow" Content="Run now" ToolTip="Start the scheduled task now"/>
-              <Button x:Name="SchDryRun" Content="Test notification" Style="{StaticResource Ghost}"
-                      ToolTip="Check for updates and show the notification with what would be installed, without installing anything"/>
+              <Button x:Name="SchDryRun" Content="Test run" Style="{StaticResource Ghost}"
+                      ToolTip="Go through the jobs that are on as saved, changing nothing, and show the notification a real run would send"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
               <Button x:Name="SchCancel" Content="Cancel"/>
@@ -2143,10 +2140,7 @@ $Xaml = @'
                 <TextBlock Text="Automatic runs" Style="{StaticResource PageTitle}"/>
                 <TextBlock x:Name="OptTaskNote" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,4,0,22"/>
                 <TextBlock Text="DURING A RUN" Style="{StaticResource Label}" Margin="0,0,0,12"/>
-                <CheckBox x:Name="OptRetry" Content="Retry failed updates once"/>
-                <TextBlock Text="Tries again 30 seconds after the first pass. Helps when an app was open or a download dropped." Style="{StaticResource Hint}" Margin="48,3,0,14"/>
-                <CheckBox x:Name="OptHealthAlerts" Content="Check the PC's health and tell me about problems"/>
-                <TextBlock Text="After each run: antivirus or firewall off, old virus definitions, a nearly full drive, a disk that isn't healthy, a worn battery, blue screens, or a restart waiting for days. Each problem is mentioned once (and again after a week if it's still there). Every run also saves a reading for Device Health's trends." Style="{StaticResource Hint}" Margin="48,3,0,14"/>
+                <TextBlock Text="What each run does (app and Windows updates, cleanup, the health check) is set in Automatic maintenance, from the header." Style="{StaticResource Hint}" Margin="0,0,0,14"/>
                 <CheckBox x:Name="OptRestorePoint" Content="Create a restore point before installing"/>
                 <TextBlock Text="Needs the task to run elevated and System Protection turned on. Windows creates at most one restore point every 24 hours; the updates go ahead either way." Style="{StaticResource Hint}" Margin="48,3,0,20"/>
                 <TextBlock Text="WHEN TO RUN" Style="{StaticResource Label}" Margin="0,0,0,12"/>
@@ -2175,7 +2169,7 @@ $Xaml = @'
                   <TextBox x:Name="OptDismiss" Width="70" MinHeight="32" Padding="10,4"/>
                   <TextBlock Text="minutes (0 keeps them open)" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="10,0,0,0"/>
                 </StackPanel>
-                <TextBlock Text="For the pop-up: applies to summaries and restart reminders. Failure notifications stay until you close them. Which notifications appear is set under Automatic updates." Style="{StaticResource Hint}" Margin="0,6,0,0"/>
+                <TextBlock Text="For the pop-up: applies to summaries and restart reminders. Failure notifications stay until you close them. Which notifications appear is set in Automatic maintenance." Style="{StaticResource Hint}" Margin="0,6,0,0"/>
               </StackPanel>
             </ScrollViewer>
 
@@ -2317,7 +2311,7 @@ $Xaml = @'
             </Grid>
             <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
               <RadioButton x:Name="HistAll" Content="Everything" GroupName="HistKind" Style="{StaticResource Chip}" Margin="0,0,8,0" IsChecked="True"/>
-              <RadioButton x:Name="HistAutoOnly" Content="Automatic updates" GroupName="HistKind" Style="{StaticResource Chip}" Margin="0,0,8,0"/>
+              <RadioButton x:Name="HistAutoOnly" Content="Automatic runs" GroupName="HistKind" Style="{StaticResource Chip}" Margin="0,0,8,0"/>
               <RadioButton x:Name="HistFailed" Content="Failed" GroupName="HistKind" Style="{StaticResource Chip}" Margin="0"/>
             </StackPanel>
           </Grid>

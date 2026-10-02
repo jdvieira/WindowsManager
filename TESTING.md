@@ -25,15 +25,20 @@ Tick each line once it has worked, with the PC and the date.
 | [x] Dell laptop, 2026-10-01 | Cleanup > Clean up with a shield item ticked (Windows temporary files) | One approval; each item shows what it freed; History has a *Cleaned up* line |
 | [ ] | Cleanup > Clean up > Windows Update downloads | Windows Update still works afterwards (check the Windows Update tab) |
 | [ ] | Cleanup > Large files > **Delete** on a file you don't need | Asks first; the file goes to the Recycle Bin (and can be restored from there) |
-| [ ] | First start after the rename to Windows Manager | Settings, history and saved drivers are still there; the app offers to move the old scheduled task; **Test notification** shows *Windows Manager* as the sender |
+| [ ] | First start after the rename to Windows Manager | Settings, history and saved drivers are still there; the app offers to move the old scheduled task; **Test run** shows *Windows Manager* as the sender |
 | [x] 2026-10-01 (2.2.0.0 to 2.2.0.1) | After the next release is published, open the older exe | The update prompt shows the new version and its notes; **Update now** restarts on the new version and History has the update; the `.old` file is gone |
-| [ ] | With an elevated schedule made by 2.4.1.0 or earlier, open 2.4.2.0 | It offers **Protect automatic updates**; one approval; `C:\Program Files\Windows Manager\Windows Manager.exe` appears and Task Scheduler's *Windows Manager* task runs it; the panel says it runs a protected copy |
-| [ ] | Automatic updates > **Run now** with the protected copy | The run works as before (History, lastrun.json); the notification's **Open Windows Manager** opens your own copy, not the one in Program Files |
-| [ ] | After the app updates itself, with an elevated schedule | It offers **Update the copy automatic updates use**; one approval; the copy's version (file properties) matches |
-| [ ] | Automatic updates: turn off and **Save** | One approval; the task and `C:\Program Files\Windows Manager` are gone |
+| [ ] | With an elevated schedule made by 2.4.1.0 or earlier, open 2.4.2.0 | It offers **Protect automatic maintenance**; one approval; `C:\Program Files\Windows Manager\Windows Manager.exe` appears and Task Scheduler's *Windows Manager* task runs it; the panel says it runs a protected copy |
+| [ ] | Automatic maintenance > **Run now** with the protected copy | The run works as before (History, lastrun.json); the notification's **Open Windows Manager** opens your own copy, not the one in Program Files |
+| [ ] | After the app updates itself, with an elevated schedule | It offers **Update the copy automatic maintenance uses**; one approval; the copy's version (file properties) matches |
+| [ ] | Automatic maintenance: turn off and **Save** | One approval; the task and `C:\Program Files\Windows Manager` are gone |
 | [ ] | Options > App updates > **Update without asking**, then open an older exe | It updates and restarts by itself, without a prompt |
-| [ ] | Automatic updates > **Test notification** | A Windows notification (not the pop-up) with **Open Windows Manager** and **View log** buttons; both work |
-| [ ] | Turn off notifications for Windows Manager in Settings > System > Notifications, then **Test notification** again | The app's own pop-up appears instead |
+| [ ] | Automatic maintenance > **Test run** | A Windows notification (not the pop-up) with **Open Windows Manager** and **View log** buttons; both work |
+| [ ] | Turn off notifications for Windows Manager in Settings > System > Notifications, then **Test run** again | The app's own pop-up appears instead, listing each job and what it would do |
+| [ ] | First start of 2.5 with a schedule set up by an earlier version, then open Automatic maintenance | App updates keeps your earlier choice (Do it for "Install updates", Tell me for "Just tell me"), every run; Health check is on (Tell me) unless you had turned it off in Options; Windows updates and Cleanup are Off |
+| [ ] | Windows updates on **Do it** (elevated task), **Run now** when one is waiting (a Defender definition update is ideal) | It installs; History has a *Windows update* line marked automatic; a restart is never started, and when one is needed the notification says so |
+| [ ] | Windows updates on **Do it** with **Run elevated** off | The panel warns before saving; the run lists the updates and its notification says installing needs Run elevated |
+| [ ] | Cleanup on **Do it** with a shield item ticked (Windows temporary files), elevated task, **Run now** | Each ticked item is cleaned; History has a *Cleaned up* line marked automatic; the notification (with the summary switch on) shows what each freed |
+| [ ] | Set a job to **Weekly**, **Run now** twice | The second run skips it; its log says it's not due yet and when it last ran |
 | [ ] | Options > Maintenance > **Back up this PC's setup**, then **Set up from a backup** on a second PC | Discover lists the apps with the missing ones ticked; Options opens with the options and schedule filled in |
 | [ ] | An app on Updates whose update fails with "install technology is different" | Its row turns *updated by Windows* and Update all skips it from then on |
 | [ ] | **Diagnostics** | A zip on the desktop; Explorer opens with it selected |

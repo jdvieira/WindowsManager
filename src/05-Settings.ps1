@@ -14,8 +14,12 @@ $DefaultLogDir = Join-Path $DataDir 'Logs'
 #   Packages:       Source ('' = all, 'winget', 'msstore'), InstallScope ('' = installer default, 'user', 'machine'), Silent, IncludeUnknown, UninstallPrevious, ScanOnOpen,
 #                   Hidden (IDs kept at their version: not listed on Updates, and pinned so nothing updates them),
 #                   Excluded (the old "skip in automatic updates" list, folded into Hidden when settings load)
-#   Automatic runs: AutoMode ('install' = install updates, 'notify' = only list them in a notification),
-#                   NotifyReboot / NotifyAlways (notifications beyond failures), AutoRetry, RestorePoint,
+#   Automatic runs: one job each, 'install' (do it), 'notify' (tell me) or 'off', and how often ('run' = every run,
+#                   'week', 'month'): app updates AutoMode / AutoAppsEvery (AutoRetry: one more try for failures),
+#                   Windows updates AutoWin / AutoWinEvery (AutoWinOptional, AutoWinFeature: include optional and
+#                   feature updates), cleanup AutoClean / AutoCleanEvery (AutoCleanItems: Cleanup's item keys, empty =
+#                   its defaults), health check HealthAlerts (on = tell me) / AutoHealthEvery.
+#                   NotifyReboot / NotifyAlways (notifications beyond failures), RestorePoint,
 #                   RequireNetwork, RequireAC, RandomDelayMin, MaxRunHours (task conditions), AutoDismissMin (0 = never)
 #   Logs:           LogRetentionDays, LogDir ('' = default), VerboseLogs
 #   Notifications:  NotifyStyle ('toast' = a Windows notification, 'window' = this app's own pop-up)
@@ -29,7 +33,9 @@ $DefaultLogDir = Join-Path $DataDir 'Logs'
 function New-DefaultSettings {
     return @{
         Source = ''; InstallScope = ''; Silent = $true; IncludeUnknown = $false; UninstallPrevious = $false; ScanOnOpen = $true; Excluded = @(); Hidden = @()
-        AutoMode = 'install'; NotifyReboot = $false; NotifyAlways = $false; AutoRetry = $true; RestorePoint = $false
+        AutoMode = 'install'; NotifyReboot = $true; NotifyAlways = $false; AutoRetry = $true; RestorePoint = $false
+        AutoAppsEvery = 'run'; AutoWin = 'off'; AutoWinEvery = 'week'; AutoWinOptional = $false; AutoWinFeature = $false
+        AutoClean = 'off'; AutoCleanEvery = 'week'; AutoCleanItems = @(); AutoHealthEvery = 'run'
         RequireNetwork = $true; RequireAC = $false; RandomDelayMin = 0; MaxRunHours = 4; AutoDismissMin = 0
         LogRetentionDays = 30; LogDir = ''; VerboseLogs = $false
         NotifyStyle = 'toast'; WindowsUpdated = @(); WingetUpdates = @(); DriverRestorePoint = $true
@@ -52,7 +58,9 @@ function Merge-Settings($Target, $Saved) {
 }
 $Settings = New-DefaultSettings
 try { if (Test-Path -LiteralPath $SettingsPath) { Merge-Settings $Settings (Get-Content -LiteralPath $SettingsPath -Raw | ConvertFrom-Json) } } catch { }
-if ($Settings.AutoMode -notin 'install', 'notify') { $Settings.AutoMode = 'install' }
+if ($Settings.AutoMode -notin 'install', 'notify', 'off') { $Settings.AutoMode = 'install' }
+foreach ($k in 'AutoWin', 'AutoClean') { if ($Settings[$k] -notin 'install', 'notify', 'off') { $Settings[$k] = 'off' } }
+foreach ($k in 'AutoAppsEvery', 'AutoWinEvery', 'AutoCleanEvery', 'AutoHealthEvery') { if ($Settings[$k] -notin 'run', 'week', 'month') { $Settings[$k] = 'run' } }
 if ($Settings.NotifyStyle -notin 'toast', 'window') { $Settings.NotifyStyle = 'toast' }
 function Get-SettingsCopy {
     $copy = @{}
@@ -61,6 +69,7 @@ function Get-SettingsCopy {
     $copy.Hidden = [string[]]@($Settings.Hidden)
     $copy.WindowsUpdated = [string[]]@($Settings.WindowsUpdated)
     $copy.WingetUpdates = [string[]]@($Settings.WingetUpdates)
+    $copy.AutoCleanItems = [string[]]@($Settings.AutoCleanItems)
     return $copy
 }
 function Save-Settings {

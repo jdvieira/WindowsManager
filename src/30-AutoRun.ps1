@@ -59,22 +59,38 @@ function Invoke-WorkerNow([string]$Op, $Arg) {
     return , $events.ToArray()
 }
 
+# The run as a whole: its title, one line about what the jobs did, a hint, and how serious it is
+function Get-RunSummary($Run) {
+    $jobs = @($Run.Jobs)
+    $problems = @($jobs | Where-Object { $_.Error -or $_.Failed })
+    $reboot = [bool](@($jobs | Where-Object { $_.Reboot }).Count)
+    $waiting = @($jobs | Where-Object { $_.Key -ne 'health' -and (Test-AutoJobWaiting $_) })
+    $lines = @($jobs | Where-Object { $_.Key -ne 'health' -or $_.Available -or $_.Error } | ForEach-Object { "$($_.Name): $(Format-AutoJobSummary $_ $Run.DryRun)" })
+    $s = @{ Line = ($lines -join '. ') + $(if ($lines.Count) { '.' } else { '' }); Kind = 'ok' }
+    if ($Run.DryRun) { $s.Title = 'Test run: what automatic maintenance would do'; $s.Hint = 'Nothing was changed. This is how automatic maintenance will notify you.'; $s.Kind = 'info' }
+    elseif ($problems.Count) {
+        $s.Title = if ($problems.Count -eq 1) { "$($problems[0].Name) didn't all go to plan" } else { "Automatic maintenance hit $($problems.Count) problems" }
+        $failed = @($problems | ForEach-Object { @($_.Items | Where-Object { $_.State -eq 'error' } | ForEach-Object { $_.Name }) })
+        $s.Hint = if ($failed.Count) { "Not done: $((@($failed) | Select-Object -First 3) -join ', ')$(if ($failed.Count -gt 3) { " and $($failed.Count - 3) more" }). Open the app to retry." } else { 'Open the app, or View log, for details.' }
+        $s.Kind = 'error'
+    }
+    elseif ($reboot) { $s.Title = 'Restart to finish updating'; $s.Hint = "Some updates finish when Windows restarts. Nothing restarts by itself: restart when it suits you."; $s.Kind = 'warn' }
+    elseif ($waiting.Count) {
+        $s.Title = if ($waiting.Count -eq 1) { "$($waiting[0].Name): $(Format-AutoJobSummary $waiting[0] $false)" } else { "$($waiting.Count) things are waiting for you" }
+        $s.Hint = 'Nothing was changed. Open the app to choose what to do.'; $s.Kind = 'info'
+    }
+    else { $s.Title = 'Automatic maintenance finished'; $s.Hint = 'Everything went to plan.' }
+    $notes = @($jobs | Where-Object { $_.Note } | ForEach-Object { $_.Note })
+    if ($notes.Count) { $s.Hint = "$($s.Hint) $($notes -join ' ')" }
+    return $s
+}
+
 # The run's result as a Windows notification (the default) or, when those are off or the pop-up is chosen, as this
-# app's own pop-up with every app's result
+# app's own pop-up with each job and what it did
 function Show-RunNotification($Run) {
+    $sum = Get-RunSummary $Run
     if ($Settings.NotifyStyle -eq 'toast' -and -not $Screenshot) {
-        $failed = @($Run.Items | Where-Object { $_.State -eq 'error' })
-        $reboot = @($Run.Items | Where-Object { $_.State -eq 'reboot' })
-        $done = [int]$Run.Updated + [int]$Run.Reboot
-        $n = @($Run.Items).Count
-        $names = { param($list) $s = @($list | Select-Object -First 3 | ForEach-Object { $_.Name }) -join ', '; if (@($list).Count -gt 3) { $s += " and $(@($list).Count - 3) more" }; $s }
-        $t = if ($Run.Error) { @("Automatic updates couldn't check for updates", $Run.Error, '') }
-        elseif ($Run.DryRun) { @($(if ($n) { "Test run: $n app$(if ($n -ne 1) { 's' }) would be $(if ($Run.Mode -eq 'notify') { 'listed' } else { 'updated' })" } else { 'Test run: everything is up to date' }), 'Nothing was installed. This is how automatic updates will notify you.', (& $names $Run.Items)) }
-        elseif ($Run.Mode -eq 'notify') { @("$n update$(if ($n -ne 1) { 's are' } else { ' is' }) available", (& $names $Run.Items), 'Nothing was installed. Open the app to choose what to update.') }
-        elseif ($failed.Count) { @("$($failed.Count) automatic update$(if ($failed.Count -ne 1) { 's' }) failed", (& $names $failed), $(if ($done) { "$done other app$(if ($done -ne 1) { 's' }) updated." } else { 'Open the app to retry them.' })) }
-        elseif ($reboot.Count) { @('Restart to finish updating', "$done app$(if ($done -ne 1) { 's' }) updated; some need a restart.", (& $names $reboot)) }
-        else { @("$done app$(if ($done -ne 1) { 's' }) updated", (& $names $Run.Items), 'Automatic updates finished without problems.') }
-        if (Show-Toast $t[0] $t[1] $t[2] -Important:([bool]($Run.Error -or $failed.Count))) { return }
+        if (Show-Toast $sum.Title $sum.Line $sum.Hint -Important:($sum.Kind -eq 'error')) { return }
     }
     $resources = [regex]::Match($Xaml, '(?s)<Window\.Resources>.*?</Window\.Resources>').Value
     $win = [System.Windows.Markup.XamlReader]::Parse($NotifyXaml.Replace('__RESOURCES__', $resources))
@@ -82,55 +98,49 @@ function Show-RunNotification($Run) {
     if ($icon) { $win.Icon = $icon }
     $f = @{}
     foreach ($n in 'Head', 'Sub', 'Glyph', 'GlyphBg', 'Items', 'BtnClose', 'BtnViewLog', 'BtnOpenApp') { $f[$n] = $win.FindName($n) }
-
-    $failed = @($Run.Items | Where-Object { $_.State -eq 'error' })
-    $reboot = @($Run.Items | Where-Object { $_.State -eq 'reboot' })
-    $done = [int]$Run.Updated + [int]$Run.Reboot
-    if ($Run.Error) {
-        $f.Head.Text = "Automatic updates couldn't check for updates"; $f.Sub.Text = $Run.Error; $kind = 'error'
-    }
-    elseif ($Run.DryRun) {
-        $n = @($Run.Items).Count
-        $f.Head.Text = if ($n) { "Test run: $n app$(if ($n -ne 1) { 's' }) would be $(if ($Run.Mode -eq 'notify') { 'listed' } else { 'updated' })" } else { 'Test run: everything is up to date' }
-        $f.Sub.Text = 'Nothing was installed. This is how automatic updates will notify you.'; $kind = 'info'
-    }
-    elseif ($Run.Mode -eq 'notify') {
-        $n = @($Run.Items).Count
-        $f.Head.Text = "$n update$(if ($n -ne 1) { 's are' } else { ' is' }) available"
-        $f.Sub.Text = 'Nothing was installed. Open the app to choose what to update.'; $kind = 'info'
-    }
-    elseif ($failed.Count) {
-        $f.Head.Text = "$($failed.Count) automatic update$(if ($failed.Count -ne 1) { 's' }) failed"
-        $f.Sub.Text = if ($done) { "$done other app$(if ($done -ne 1) { 's' }) updated." } else { 'Open the app to retry, or update interactively to see the installer.' }
-        $kind = 'error'
-    }
-    elseif ($reboot.Count) {
-        $f.Head.Text = 'Restart to finish updating'; $f.Sub.Text = "$done app$(if ($done -ne 1) { 's' }) updated; some need a restart."; $kind = 'warn'
-    }
-    else { $f.Head.Text = "$done app$(if ($done -ne 1) { 's' }) updated"; $f.Sub.Text = 'Automatic updates finished without problems.'; $kind = 'ok' }
-
+    $kind = $sum.Kind
+    $f.Head.Text = $sum.Title
+    $f.Sub.Text = $sum.Hint
     $colors = @{ error = '#FF7B6B'; warn = '#F6B115'; ok = '#5BC27A'; info = '#4FD8E0' }
     $bgs = @{ error = '#3A2220'; warn = '#3A3120'; ok = '#1F3326'; info = '#17414C' }
     $glyphs = @{ error = [string][char]0xE783; warn = [string][char]0xE777; ok = [string][char]0xE73E; info = [string][char]0xE946 }
     $conv = New-Object System.Windows.Media.BrushConverter
     $f.Glyph.Text = $glyphs[$kind]; $f.Glyph.Foreground = $conv.ConvertFrom($colors[$kind]); $f.GlyphBg.Background = $conv.ConvertFrom($bgs[$kind])
 
-    # Failures first, then restarts, then the rest; each app with its result
-    $stateColor = @{ error = '#FF7B6B'; reboot = '#F6B115'; ok = '#5BC27A'; skipped = '#9A9A9A'; cancelled = '#9A9A9A'; pending = '#4FD8E0' }
-    $order = @{ error = 0; reboot = 1; ok = 2 }
-    foreach ($item in @($Run.Items | Sort-Object { if ($order.ContainsKey("$($_.State)")) { $order["$($_.State)"] } else { 3 } }, Name)) {
-        $row = New-Object System.Windows.Controls.StackPanel
-        $row.Margin = '0,0,0,9'
-        $name = New-Object System.Windows.Controls.TextBlock
-        $name.Text = $item.Name; $name.FontWeight = 'SemiBold'; $name.TextTrimming = 'CharacterEllipsis'
-        $detail = New-Object System.Windows.Controls.TextBlock
-        $detail.Text = $item.Detail; $detail.FontSize = 12.5; $detail.TextWrapping = 'Wrap'
-        $c = $stateColor["$($item.State)"]; if (-not $c) { $c = '#BDBDBD' }
-        $detail.Foreground = $conv.ConvertFrom($c)
-        [void]$row.Children.Add($name); [void]$row.Children.Add($detail)
-        [void]$f.Items.Children.Add($row)
+    # Each job with what it did, then its items: failures first, then restarts, then the rest
+    $stateColor = @{ error = '#FF7B6B'; reboot = '#F6B115'; warn = '#F6B115'; ok = '#5BC27A'; skipped = '#9A9A9A'; cancelled = '#9A9A9A'; pending = '#4FD8E0' }
+    $order = @{ error = 0; reboot = 1; warn = 1; ok = 2 }
+    $shown = 0
+    foreach ($job in @($Run.Jobs)) {
+        $head = New-Object System.Windows.Controls.TextBlock
+        $head.Text = "$($job.Name.ToUpper()): $(Format-AutoJobSummary $job $Run.DryRun)"
+        $head.Foreground = $conv.ConvertFrom('#9A9A9A'); $head.FontSize = 11.5; $head.FontWeight = 'SemiBold'; $head.TextWrapping = 'Wrap'
+        $head.Margin = $(if ($shown) { '0,8,0,8' } else { '0,0,0,8' })
+        [void]$f.Items.Children.Add($head)
+        $shown++
+        $list = @($job.Items | Sort-Object { if ($order.ContainsKey("$($_.State)")) { $order["$($_.State)"] } else { 3 } }, Name)
+        foreach ($item in @($list | Select-Object -First 8)) {
+            $row = New-Object System.Windows.Controls.StackPanel
+            $row.Margin = '0,0,0,9'
+            $name = New-Object System.Windows.Controls.TextBlock
+            $name.Text = $item.Name; $name.FontWeight = 'SemiBold'; $name.TextTrimming = 'CharacterEllipsis'
+            [void]$row.Children.Add($name)
+            if ($item.Detail) {
+                $detail = New-Object System.Windows.Controls.TextBlock
+                $detail.Text = $item.Detail; $detail.FontSize = 12.5; $detail.TextWrapping = 'Wrap'
+                $c = $stateColor["$($item.State)"]; if (-not $c) { $c = '#BDBDBD' }
+                $detail.Foreground = $conv.ConvertFrom($c)
+                [void]$row.Children.Add($detail)
+            }
+            [void]$f.Items.Children.Add($row)
+        }
+        if ($list.Count -gt 8) {
+            $more = New-Object System.Windows.Controls.TextBlock
+            $more.Text = "and $($list.Count - 8) more (see the log)"; $more.Foreground = $conv.ConvertFrom('#9A9A9A'); $more.FontSize = 12.5; $more.Margin = '0,0,0,9'
+            [void]$f.Items.Children.Add($more)
+        }
     }
-    if (-not @($Run.Items).Count) { $f.Items.Parent.Visibility = 'Collapsed' }
+    if (-not $shown) { $f.Items.Parent.Visibility = 'Collapsed' }
 
     $f.BtnClose.Add_Click({ $win.Close() })
     if ($kind -in 'ok', 'warn' -and $Settings.AutoDismissMin -gt 0) {
@@ -166,92 +176,53 @@ function Show-RunNotification($Run) {
     [void]$win.ShowDialog()
 }
 
-# One pass over the given rows; results land in $Items (keyed Id|Source)
-function Invoke-AutoPass($Rows, $Items) {
-    foreach ($r in $Rows) { $Sync.Jobs.Enqueue(@{ Key = "$($r.Id)|$($r.Source)"; Id = $r.Id; Name = $r.Name; Source = $r.Source; Explicit = $false; Interactive = $false; Silent = $true; UninstallPrevious = $Settings.UninstallPrevious; Verbose = $Settings.VerboseLogs }) }
-    foreach ($ev in (Invoke-WorkerNow 'upgrade' $null)) {
-        if ($ev.T -eq 'state' -and $ev.SelfUpdating) { Set-SelfUpdating $ev.Id $true; Write-RunLog "$($ev.Id) is updated by Windows or by itself; automatic updates leave it alone from now on." }
-        if ($ev.T -eq 'state' -and $ev.State -in $TerminalStates -and $Items.Contains($ev.Key)) {
-            $Items[$ev.Key].State = $ev.State
-            $Items[$ev.Key].Detail = if ($ev.State -in 'ok', 'reboot') { "$($ev.Detail): $($Items[$ev.Key].From) to $($Items[$ev.Key].To)" } else { $ev.Detail }
-        }
-    }
-}
-
-# Restore point before installing. Needs administrator rights (an elevated task) and System Protection on the system
-# drive; Windows also creates at most one every 24 hours. A missing restore point never stops the updates.
-function New-RunRestorePoint {
-    if (-not $IsAdmin) { Write-RunLog 'Restore point skipped: turn on "Run elevated" for the scheduled task to create one.'; return }
-    try {
-        $warn = $null
-        Checkpoint-Computer -Description 'Before Windows Manager automatic updates' -RestorePointType APPLICATION_INSTALL -WarningAction SilentlyContinue -WarningVariable warn
-        if ($warn) { Write-RunLog "Restore point not created: $($warn -join ' ')" } else { Write-RunLog 'Restore point created.' }
-    }
-    catch { Write-RunLog "Restore point not created: $($_.Exception.Message)" }
-}
-
-# Unattended update of everything winget offers, except hidden (or pinned), explicit and shortened-ID apps
+# An automatic run (what the scheduled task starts with -Auto): each job that is on and due (29-AutoJobs.ps1), then
+# one notification for the run, when there's something to say. A test run (-DryRun) does every job that is on,
+# whether due or not, and changes nothing.
 function Invoke-AutoRun {
-    $notifyOnly = $Settings.AutoMode -eq 'notify'
-    $run = [ordered]@{ Time = (Get-Date).ToString('o'); DryRun = [bool]$DryRun; Mode = $(if ($notifyOnly) { 'notify' } else { 'install' }); Available = 0
-        Updated = 0; Reboot = 0; Failed = 0; Skipped = 0; Error = $null; Items = @()
+    $run = [ordered]@{ Time = (Get-Date).ToString('o'); DryRun = [bool]$DryRun; Jobs = @(); Error = $null
+        # totals, as runs before 2.5 kept them
+        Mode = $Settings.AutoMode; Available = 0; Updated = 0; Reboot = 0; Failed = 0; Skipped = 0; Items = @()
     }
     Write-RunLog ''
-    Write-RunLog "==== Automatic $(if ($notifyOnly) { 'update check (notify only)' } else { 'update run' })$(if ($DryRun) { ' (dry run)' }) ===="
-    if (-not $WingetPath) { $run.Error = 'winget is not installed.' }
-    else {
-        $scan = @(Invoke-WorkerNow 'scan' (Get-ScanArg)) | Where-Object { $_.T -eq 'scan' } | Select-Object -Last 1
-        if (-not $scan) { $run.Error = 'The update check stopped unexpectedly.' }
-        elseif ($scan.Error) { $run.Error = ($scan.Error -split "`n")[0] }
-        else {
-            # An empty list can arrive as $null, and $null | Where-Object would pass one empty row through
-            $rows = @($scan.Rows | Where-Object { $_ -and $_.Id })
-            $todo = @($rows | Where-Object { -not $_.Explicit -and -not $_.Truncated -and -not $_.Pin -and $Settings.Hidden -notcontains $_.Id -and -not (Test-SelfUpdating $_.Id) })
-            $left = $rows.Count - $todo.Count
-            if ($left) { Write-RunLog "Skipping $left app(s) that are hidden (kept at their version), updated by Windows, or need an explicit upgrade." }
-            $items = [ordered]@{}
-            foreach ($r in $todo) { $items["$($r.Id)|$($r.Source)"] = [ordered]@{ Name = $r.Name; Id = $r.Id; From = $r.Version; To = $r.Available; State = 'pending'; Detail = "$($r.Version) to $($r.Available)" } }
-            if ($DryRun) { foreach ($i in $items.Values) { $i.Detail = "Would $(if ($notifyOnly) { 'list' } else { 'update' }) $($i.From) to $($i.To)" } }
-            elseif ($notifyOnly) {
-                $run.Available = $todo.Count
-                Write-RunLog "$($todo.Count) update(s) available; notify-only mode installs nothing."
-            }
-            elseif ($todo.Count) {
-                if ($Settings.RestorePoint) { New-RunRestorePoint }
-                $byKey = @{}
-                foreach ($r in $todo) { $byKey["$($r.Id)|$($r.Source)"] = $r }
-                Invoke-AutoPass $todo $items
-                # One more try for failures that may be temporary (app in use, download hiccup); policy and approval failures are final
-                $retry = @($items.Keys | Where-Object { $items[$_].State -in 'error', 'pending' -and $items[$_].Detail -notmatch 'policy|declined|shortened' } | ForEach-Object { $byKey[$_] })
-                if ($Settings.AutoRetry -and $retry.Count) {
-                    Write-RunLog "Retrying $($retry.Count) failed update(s) in 30 seconds."
-                    Start-Sleep -Seconds 30
-                    Invoke-AutoPass $retry $items
-                    foreach ($r in $retry) { $i = $items["$($r.Id)|$($r.Source)"]; if ($i.State -in 'ok', 'reboot') { $i.Detail += ' (second try)' } }
-                }
-                foreach ($i in $items.Values) {
-                    switch ($i.State) { 'ok' { $run.Updated++ } 'reboot' { $run.Reboot++ } 'error' { $run.Failed++ } 'pending' { $i.State = 'error'; $i.Detail = 'Did not finish; see the log'; $run.Failed++ } default { $run.Skipped++ } }
-                    Add-History 'update' $i.Name $i.Id $i.From $i.To $i.State $i.Detail 'auto'
-                }
-            }
-            $run.Items = @($items.Values | ForEach-Object { [pscustomobject]$_ })
+    Write-RunLog "==== Automatic maintenance$(if ($DryRun) { ' (test run: nothing is changed)' }) ===="
+    $times = Read-AutoJobTimes
+    $script:RunRestorePoint = $false
+    foreach ($job in Get-AutoJobs) {
+        if ($job.Mode -eq 'off') { continue }
+        if (-not $DryRun -and -not (Test-AutoJobDue $job $times)) {
+            Write-RunLog "$($job.Name): not due yet (it runs $($AutoEveryText[[string]$job.Every]); last ran $($times[$job.Key].ToString('g')))."
+            continue
         }
-    }
-    Write-RunLog ("Automatic run finished: {0} updated, {1} need a restart, {2} failed, {3} skipped{4}" -f $run.Updated, $run.Reboot, $run.Failed, $run.Skipped, $(if ($run.Error) { "; error: $($run.Error)" }))
-    try { [pscustomobject]$run | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $LastRunPath -Encoding UTF8 } catch { }
-
-    $notify = $DryRun -or $run.Error -or $run.Failed -or ($notifyOnly -and $run.Available) -or ($Settings.NotifyReboot -and $run.Reboot) -or ($Settings.NotifyAlways -and ($run.Updated + $run.Reboot))
-    if ($notify) { Show-RunNotification ([pscustomobject]$run) }
-    # then the PC's health: a reading for Device Health's trends, and a notification about any new problem
-    if ($Settings.HealthAlerts -and -not $DryRun) {
+        Write-RunLog "---- $($job.Name) ($(if ($job.Mode -eq 'notify') { 'tell me' } else { 'do it' })) ----"
+        $r = New-AutoJobResult $job
         try {
-            $hev = @(Invoke-WorkerNow 'health' @{}) | Where-Object { $_.T -eq 'health' } | Select-Object -Last 1
-            if ($hev) { Add-HealthSnapshot $hev; Invoke-HealthAlerts $hev }
+            switch ($job.Key) {
+                'apps' { Invoke-AutoApps $r }
+                'win' { Invoke-AutoWindows $r }
+                'clean' { Invoke-AutoClean $r }
+                'health' { Invoke-AutoHealth $r }
+            }
         }
-        catch { Write-RunLog "Health check failed: $($_.Exception.Message)" }
+        catch { $r.Error = $_.Exception.Message }
+        if (-not $DryRun -and -not $r.Error) { Save-AutoJobTime $job.Key }
+        Write-RunLog "$($job.Name): $(Format-AutoJobSummary $r $DryRun)"
+        $run.Jobs += [pscustomobject]$r
     }
-    return [int]([bool]($run.Error -or $run.Failed))
+    foreach ($j in $run.Jobs) { $run.Updated += $j.Updated; $run.Reboot += $j.Reboot; $run.Failed += $j.Failed; $run.Skipped += $j.Skipped }
+    $apps = @($run.Jobs | Where-Object { $_.Key -eq 'apps' }) | Select-Object -First 1
+    if ($apps) { $run.Available = $apps.Available; $run.Items = $apps.Items; $run.Error = $apps.Error }
+    if (-not $run.Jobs.Count) { Write-RunLog 'Nothing to do: every job is off or not due yet.' }
+    Write-RunLog ("Automatic maintenance finished: {0} done, {1} need a restart, {2} failed" -f $run.Updated, $run.Reboot, $run.Failed)
+    try { [IO.File]::WriteAllText($LastRunPath, ([pscustomobject]$run | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false))) } catch { }
+
+    $jobs = @($run.Jobs | Where-Object { $_.Key -ne 'health' })   # health problems get their own notification
+    $problem = [bool](@($jobs | Where-Object { $_.Error -or $_.Failed }).Count)
+    $waiting = [bool](@($jobs | Where-Object { Test-AutoJobWaiting $_ }).Count)
+    $changed = [bool](@($jobs | Where-Object { -not $_.Listed -and ($_.Updated -or $_.Reboot) }).Count)
+    $notify = $DryRun -or $problem -or $waiting -or ($Settings.NotifyReboot -and $run.Reboot) -or ($Settings.NotifyAlways -and $changed)
+    if ($notify -and $run.Jobs.Count) { Show-RunNotification ([pscustomobject]$run) }
+    return [int]$problem
 }
 
-$TerminalStates = 'ok', 'reboot', 'skipped', 'error', 'cancelled'
 if ($Auto) { exit (Invoke-AutoRun) }
