@@ -32,7 +32,8 @@ function Save-Diagnostics([string]$Zip) {
     $t.Add("Windows-updated apps: learned $(@($Settings.WindowsUpdated) -join ', '); set back to winget $(@($Settings.WingetUpdates) -join ', ')")
     try {
         $s = Get-AutoSchedule
-        $t.Add("Schedule:    $(if ($s) { "$(Format-Schedule $s), elevated $($s.Elevated), mode $($Settings.AutoMode), notifications $($Settings.NotifyStyle)" } else { 'none' })$(if (Test-LegacyTask) { '; an old-name task exists' })")
+        $copy = if ($s -and $s.Elevated) { ', protected copy ' + $(if ($v = Get-TaskCopyVersion) { $v } else { 'missing' }) } else { '' }
+        $t.Add("Schedule:    $(if ($s) { "$(Format-Schedule $s), elevated $($s.Elevated)$copy, mode $($Settings.AutoMode), notifications $($Settings.NotifyStyle)" } else { 'none' })$(if (Test-LegacyTask) { '; an old-name task exists' })")
     }
     catch { $t.Add("Schedule:    couldn't read it ($($_.Exception.Message))") }
     if ($script:DrvSys) {

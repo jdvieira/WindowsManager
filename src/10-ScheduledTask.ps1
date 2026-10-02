@@ -8,6 +8,26 @@ $TaskName = 'Windows Manager'
 $LegacyTaskNames = @('Windows Software Manager', 'Windows Package Manager', 'Winget Manager', 'Winget Package Manager', 'Winget Update Manager')
 $CurrentUser = [Security.Principal.WindowsIdentity]::GetCurrent().Name
 
+# An elevated task runs a protected copy of the app in Program Files, which only administrators can change. Run from
+# where the app is (Downloads, the desktop: folders any program you run can change), the task would let such a program
+# swap the app and get administrator rights without anyone approving. Saving an elevated schedule copies the app there
+# (with the approval that saving already needs); after the app updates itself, it offers to update the copy.
+# The known folder, not $env:ProgramFiles, which the user can change
+$TaskCopyDir = Join-Path ([Environment]::GetFolderPath('ProgramFiles')) $AppName
+# the file this app runs from: the exe, or the joined script when it runs from source
+$AppFile = if ($IsCompiled) { $ExePath } else { $PSCommandPath }
+$TaskCopyFile = Join-Path $TaskCopyDir $(if ($IsCompiled) { "$AppName.exe" } else { 'Windows_Manager.ps1' })
+
+# Run as administrator: this app copies itself (never a file it is told about) into $TaskCopyDir
+function Copy-AppForTask {
+    if ($AppFile -eq $TaskCopyFile) { return }   # this is the copy
+    New-Item -ItemType Directory -Path $TaskCopyDir -Force | Out-Null
+    try { Copy-Item -LiteralPath $AppFile -Destination $TaskCopyFile -Force }
+    catch { throw "Couldn't copy $AppName to $TaskCopyDir (an automatic run may be running right now; try again when it has finished): $($_.Exception.Message)" }
+    # from source, the icon and logo are files next to the script
+    if (-not $IsCompiled -and $AssetsDir -and (Test-Path -LiteralPath $AssetsDir)) { Copy-Item -LiteralPath $AssetsDir -Destination $TaskCopyDir -Recurse -Force }
+}
+
 function Invoke-TaskOperation($Spec) {
     switch ($Spec.Op) {
         { $_ -in 'register', 'migrate' } {
@@ -15,6 +35,7 @@ function Invoke-TaskOperation($Spec) {
             if ([int]$Spec.RandomDelayMin -gt 0) { $trig.RandomDelay = New-TimeSpan -Minutes ([int]$Spec.RandomDelayMin) }
             $trigger = if ($Spec.Frequency -eq 'Weekly') { New-ScheduledTaskTrigger -Weekly -DaysOfWeek ([DayOfWeek[]]@($Spec.Days)) @trig }
             else { New-ScheduledTaskTrigger -Daily @trig }
+            if ($Spec.Copy) { Copy-AppForTask }
             $action = New-ScheduledTaskAction -Execute $Spec.Execute -Argument $Spec.Arguments
             $hours = if ([int]$Spec.MaxRunHours -gt 0) { [int]$Spec.MaxRunHours } else { 4 }
             $set = @{ StartWhenAvailable = [bool]$Spec.CatchUp; ExecutionTimeLimit = (New-TimeSpan -Hours $hours); MultipleInstances = 'IgnoreNew'
@@ -28,7 +49,10 @@ function Invoke-TaskOperation($Spec) {
             # Moving from the old name: the new task exists now, so the old one can go
             if ($Spec.Op -eq 'migrate' -and $Spec.Legacy) { Unregister-ScheduledTask -TaskName $Spec.Legacy -TaskPath '\' -Confirm:$false -ErrorAction SilentlyContinue }
         }
-        'unregister' { Unregister-ScheduledTask -TaskName $TaskName -TaskPath '\' -Confirm:$false }
+        'unregister' {
+            Unregister-ScheduledTask -TaskName $TaskName -TaskPath '\' -Confirm:$false
+            if ($Spec.Copy) { Remove-Item -LiteralPath $TaskCopyDir -Recurse -Force -ErrorAction SilentlyContinue }
+        }
         'start' { Start-ScheduledTask -TaskName $TaskName -TaskPath '\' }
     }
 }
@@ -66,8 +90,10 @@ function Invoke-TaskOperationElevated($Spec) {
     if ($msg -ne 'OK') { throw $(if ($msg) { $msg } else { "The elevated helper exited with code $($proc.ExitCode)." }) }
 }
 
-# Tries the change as the current user first; creating an elevated task (or changing one) may need administrator rights.
+# Tries the change as the current user first; creating an elevated task (or changing one) may need administrator rights,
+# and the protected copy always does.
 function Invoke-TaskAction($Spec) {
+    if ($Spec.Copy -and -not $IsAdmin) { Invoke-TaskOperationElevated $Spec; return }
     try { Invoke-TaskOperation $Spec }
     catch {
         if (-not $IsAdmin -and (Test-AccessDenied $_)) { Invoke-TaskOperationElevated $Spec }
@@ -127,17 +153,44 @@ function Get-AutoSchedule([string]$Name = $TaskName) {
     try { if ($task.LastRunTime.Year -gt 2000) { $s.LastRun = $task.LastRunTime } } catch { }
     return $s
 }
-# What the task runs: the exe itself, or Windows PowerShell with this script when it is not compiled
-function Get-AutoCommand {
-    if ($IsCompiled) { return @{ Execute = $ExePath; Arguments = '-Auto' } }
-    return @{ Execute = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"; Arguments = "-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File `"$AppScript`" -Auto" }
+# What the task runs: the exe itself, or Windows PowerShell with this script when it is not compiled; the protected
+# copy of either when it runs elevated
+function Get-AutoCommand([bool]$Elevated) {
+    if ($IsCompiled) { return @{ Execute = $(if ($Elevated) { $TaskCopyFile } else { $ExePath }); Arguments = '-Auto' } }
+    $file = if ($Elevated) { $TaskCopyFile } else { $AppScript }
+    return @{ Execute = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"; Arguments = "-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File `"$file`" -Auto" }
+}
+
+# The protected copy's version ('' when there is none)
+function Get-TaskCopyVersion {
+    if (-not (Test-Path -LiteralPath $TaskCopyFile)) { return '' }
+    try {
+        if ($IsCompiled) { return [string](Get-Item -LiteralPath $TaskCopyFile).VersionInfo.FileVersion }
+        return [regex]::Match([IO.File]::ReadAllText($TaskCopyFile), '(?m)^\$AppVersion = ''([^'']*)''').Groups[1].Value
+    }
+    catch { return '' }
+}
+
+# What an elevated task needs: 'protect' when it runs this app (or another copy of the exe) from where it is, 'update'
+# when it runs a protected copy older than this app, '' when nothing (or it isn't elevated)
+function Get-TaskCopyNeed($S) {
+    if (-not $S -or -not $S.Elevated) { return '' }
+    $safe = Get-AutoCommand $true
+    if ($S.Execute -eq $safe.Execute -and $S.Arguments -eq $safe.Arguments) {
+        $v = $null
+        if (-not [version]::TryParse((Get-TaskCopyVersion), [ref]$v) -or $v -lt [version]$AppVersion) { return 'update' }
+        return ''
+    }
+    $plain = Get-AutoCommand $false
+    if (($S.Execute -eq $plain.Execute -and $S.Arguments -eq $plain.Arguments) -or ($IsCompiled -and $S.Execute -like '*.exe' -and $S.Arguments -eq '-Auto')) { return 'protect' }
+    return ''
 }
 
 # A register request: the schedule itself (from the panel, the existing task or an import) plus the run conditions from Options
 function New-RegisterSpec($S) {
-    $cmd = Get-AutoCommand
+    $cmd = Get-AutoCommand ([bool]$S.Elevated)
     return @{
-        Op = 'register'; User = $CurrentUser; Execute = $cmd.Execute; Arguments = $cmd.Arguments
+        Op = 'register'; User = $CurrentUser; Execute = $cmd.Execute; Arguments = $cmd.Arguments; Copy = [bool]$S.Elevated
         Frequency = $S.Frequency; Days = @($S.Days); Time = $S.Time; Elevated = [bool]$S.Elevated; CatchUp = [bool]$S.CatchUp
         RequireNetwork = $Settings.RequireNetwork; RequireAC = $Settings.RequireAC; RandomDelayMin = $Settings.RandomDelayMin; MaxRunHours = $Settings.MaxRunHours
     }
