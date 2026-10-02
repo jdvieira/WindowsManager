@@ -83,7 +83,10 @@ jobs:
           if (-not (Test-Path 'dist\Windows Manager.exe')) { exit 1 }
           $built = (Get-Item 'dist\Windows Manager.exe').VersionInfo.FileVersion
           if ($built -ne '${{ steps.plan.outputs.version }}') { "::error::The exe says $built"; exit 1 }
-          .\tools\Get-ReleaseNotes.ps1 ${{ steps.plan.outputs.version }} | Set-Content -Encoding UTF8 notes.md
+          # UTF-8 without a byte-order mark: Set-Content -Encoding UTF8 adds one, and it became the first character of
+          # the release notes (the app's update prompt showed it as three odd characters)
+          $notes = .\tools\Get-ReleaseNotes.ps1 ${{ steps.plan.outputs.version }}
+          [IO.File]::WriteAllText((Join-Path $PWD 'notes.md'), ($notes -join "`n"), (New-Object Text.UTF8Encoding($false)))
           if ($LASTEXITCODE -or -not (Get-Content notes.md -Raw)) { "::error::CHANGELOG.md has no section for ${{ steps.plan.outputs.version }}"; exit 1 }
           "Built $built"
 
