@@ -33,11 +33,11 @@ function Update-HistoryView {
     $script:HistView.Refresh()
     $shown = $script:HistView.Count
     $n = $script:HistCount
-    $UI.HistSub.Text = if ($n) { "$n change$(if ($n -ne 1) { 's' }) recorded$(if ($shown -ne $n) { ", $shown shown" }), from this app and from automatic updates. Kept for a year." }
+    $UI.HistSub.Text = if ($n) { "$n change$(if ($n -ne 1) { 's' }) recorded$(if ($shown -ne $n) { ", $shown shown" }), from this app and from automatic maintenance. Kept for a year." }
     else { 'Nothing recorded yet.' }
     $UI.HistEmpty.Visibility = ConvertTo-Visibility ($shown -eq 0)
     $UI.HistList.Visibility = if ($shown) { 'Visible' } else { 'Hidden' }
-    $UI.HistEmptyText.Text = if ($n) { 'Nothing matches.' } else { 'Installs, updates, uninstalls and held apps show up here, from this app and from automatic updates.' }
+    $UI.HistEmptyText.Text = if ($n) { 'Nothing matches.' } else { 'Installs, updates, uninstalls and held apps show up here, from this app and from automatic maintenance.' }
     $UI.HistClear.IsEnabled = $n -gt 0
 }
 

@@ -27,13 +27,7 @@ $EventHandlers.health = {
     Update-View
 }
 
-function Format-Size([double]$Bytes) {
-    if ($Bytes -ge 1TB) { return '{0:0.0} TB' -f ($Bytes / 1TB) }
-    if ($Bytes -ge 10GB) { return '{0:0} GB' -f ($Bytes / 1GB) }
-    if ($Bytes -ge 1GB) { return '{0:0.0} GB' -f ($Bytes / 1GB) }
-    if ($Bytes -ge 1MB) { return '{0:0} MB' -f ($Bytes / 1MB) }
-    return '{0:0} KB' -f [Math]::Max(0, $Bytes / 1KB)
-}
+# Format-Size is in 29-AutoJobs.ps1 (automatic runs use it too)
 function Format-Span([TimeSpan]$T) {
     if ($T.TotalDays -ge 2) { return "$([int][Math]::Floor($T.TotalDays)) days" }
     if ($T.TotalHours -ge 2) { return "$([int][Math]::Floor($T.TotalHours)) hours" }
@@ -134,35 +128,8 @@ $script:CleanReader = $null
 $script:Cleaner = $null
 $script:CleanMeasured = $null
 
-# What Clean up offers. Admin items are cleaned in one administrator run; Special ones need more than deleting
-# (Windows Update's service stops while its download folder empties; Delivery Optimization has its own cmdlet).
-function Get-CleanCatalog {
-    $sd = $env:SystemDrive; $win = $env:SystemRoot; $pd = $env:ProgramData; $lad = $env:LOCALAPPDATA
-    return @(
-        @{ Key = 'temp'; Name = 'Temporary files'; About = 'Files in your temporary folder older than two days, left behind by apps and installers.'; Paths = @($env:TEMP); OlderDays = 2; Skip = @('WinGet'); On = $true }
-        @{ Key = 'winget'; Name = 'winget downloads'; About = "Installers winget downloaded; they aren't needed once the app is installed."; Paths = @((Join-Path $env:TEMP 'WinGet')); On = $true }
-        @{ Key = 'downloads'; Name = 'Old downloads'; About = "Files in your Downloads folder you haven't changed in 90 days. Look first: they may include things you want to keep."; Paths = @((Get-DownloadsFolder)); OlderDays = 90; On = $false }
-        @{ Key = 'recycle'; Name = 'Recycle Bin'; About = "Files you deleted. Emptying it can't be undone."; Recycle = $true; On = $false; Always = $true }
-        @{ Key = 'crash'; Name = 'App crash dumps'; About = 'Memory dumps apps wrote when they crashed.'; Paths = @((Join-Path $lad 'CrashDumps')); On = $true }
-        @{ Key = 'wer'; Name = 'Your error reports'; About = 'Windows Error Reporting files about apps that stopped working.'; Paths = @((Join-Path $lad 'Microsoft\Windows\WER\ReportArchive'), (Join-Path $lad 'Microsoft\Windows\WER\ReportQueue')); On = $true }
-        @{ Key = 'appdrv'; Name = "This app's old driver files"; About = "Logs, scan reports and installers in this app's Drivers folder older than 30 days."; Paths = @($DrvWorkDir); OlderDays = 30; On = $true }
-        @{ Key = 'backups'; Name = 'Saved drivers'; About = 'Drivers saved for Roll back on the Drivers tab. Once deleted, those devices can''t be rolled back.'; Paths = @($DriverBackupDir); On = $false }
-        @{ Key = 'wintemp'; Name = 'Windows temporary files'; About = "Files in Windows' own temporary folder older than two days."; Paths = @((Join-Path $win 'Temp')); OlderDays = 2; Admin = $true; On = $true }
-        @{ Key = 'wudl'; Name = 'Windows Update downloads'; About = 'Update files Windows has already installed. Windows downloads them again if it needs them; the update service restarts while they go.'; Paths = @((Join-Path $win 'SoftwareDistribution\Download')); Admin = $true; Special = 'wu'; On = $false }
-        @{ Key = 'do'; Name = 'Delivery Optimization files'; About = 'Pieces of updates Windows keeps to share with other PCs.'; Admin = $true; Special = 'do'; On = $false; Always = $true }
-        @{ Key = 'dumps'; Name = 'Windows crash dumps'; About = "Memory dumps from blue screens (MEMORY.DMP and minidumps). Keep them if someone is looking into why Windows crashed."; Paths = @((Join-Path $win 'Minidump'), (Join-Path $win 'MEMORY.DMP')); Admin = $true; On = $false }
-        @{ Key = 'wersys'; Name = 'Windows error reports'; About = 'Error reports Windows keeps for every user and for itself.'; Paths = @((Join-Path $pd 'Microsoft\Windows\WER\ReportArchive'), (Join-Path $pd 'Microsoft\Windows\WER\ReportQueue')); Admin = $true; On = $true }
-        @{ Key = 'dell'; Name = 'Dell Command | Update downloads'; About = 'Updates Dell Command | Update downloaded and has finished with.'; Paths = @((Join-Path $pd 'Dell\UpdateService\Downloads')); Admin = $true; On = $true }
-        @{ Key = 'nvidia'; Name = 'NVIDIA installer files'; About = "What NVIDIA's driver installers unpacked to $sd\NVIDIA."; Paths = @((Join-Path $sd 'NVIDIA')); Admin = $true; On = $true }
-        @{ Key = 'amd'; Name = 'AMD installer files'; About = "What AMD's driver installers unpacked to $sd\AMD."; Paths = @((Join-Path $sd 'AMD')); Admin = $true; On = $true }
-    )
-}
+# What Clean up offers (Get-CleanCatalog) and Get-DownloadsFolder are in 29-AutoJobs.ps1: automatic runs clean up too
 $CleanCatalog = @{}
-# The Downloads folder, wherever it has been moved to
-function Get-DownloadsFolder {
-    try { $p = (New-Object -ComObject Shell.Application).NameSpace('shell:Downloads').Self.Path; if ($p) { return $p } } catch { }
-    return (Join-Path $env:USERPROFILE 'Downloads')
-}
 
 function Start-CleanScan {
     if ($script:CleanReader -or $script:Cleaner) { return }

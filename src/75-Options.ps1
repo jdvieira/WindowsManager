@@ -67,7 +67,6 @@ function Set-OptionControls($S) {
     $script:OptHidden.Clear()
     foreach ($id in @($S.Hidden)) { if ($id -and -not $script:OptHidden.Contains($id)) { $script:OptHidden.Add($id) } }
     Update-IdList 'Hidden'
-    $UI.OptRetry.IsChecked = $S.AutoRetry
     $UI.OptRestorePoint.IsChecked = $S.RestorePoint
     $UI.OptNetwork.IsChecked = $S.RequireNetwork
     $UI.OptAC.IsChecked = $S.RequireAC
@@ -81,7 +80,6 @@ function Set-OptionControls($S) {
     $UI.OptAppCheck.IsChecked = $S.AppUpdateCheck
     $UI.OptAppAuto.IsChecked = $S.AppUpdateAuto
     $UI.OptAppBeta.IsChecked = $S.AppUpdateBeta
-    $UI.OptHealthAlerts.IsChecked = $S.HealthAlerts
     $UI.OptNotifyWindow.IsChecked = $S.NotifyStyle -eq 'window'
     $script:OptLearned = @($S.WindowsUpdated)
     $script:OptToWinget = @($S.WingetUpdates)
@@ -116,7 +114,6 @@ function Read-OptionControls {
     $n.ScanOnOpen = [bool]$UI.OptScanOnOpen.IsChecked
     $n.Excluded = @()
     $n.Hidden = @($script:OptHidden | Sort-Object -Unique)
-    $n.AutoRetry = [bool]$UI.OptRetry.IsChecked
     $n.RestorePoint = [bool]$UI.OptRestorePoint.IsChecked
     $n.RequireNetwork = [bool]$UI.OptNetwork.IsChecked
     $n.RequireAC = [bool]$UI.OptAC.IsChecked
@@ -129,7 +126,6 @@ function Read-OptionControls {
     $n.AppUpdateCheck = [bool]$UI.OptAppCheck.IsChecked
     $n.AppUpdateAuto = [bool]$UI.OptAppAuto.IsChecked
     $n.AppUpdateBeta = [bool]$UI.OptAppBeta.IsChecked
-    $n.HealthAlerts = [bool]$UI.OptHealthAlerts.IsChecked
     $n.WindowsUpdated = @($script:OptLearned | Where-Object { $_ })
     $n.WingetUpdates = @($script:OptToWinget | Where-Object { $_ })
     $dir = $UI.OptLogDir.Text.Trim()
@@ -174,7 +170,7 @@ function Update-OptionInfo {
     $s = Get-AutoSchedule
     $UI.OptTaskNote.Text = if ($s -and $s.Elevated -and -not $IsAdmin) { "These settings apply to the scheduled task ($(Format-Schedule $s)). Because the task runs elevated, changing any of them asks for administrator approval when you click Save. Other options save without a prompt." }
     elseif ($s) { "These settings apply to the scheduled task ($(Format-Schedule $s)). Saving updates the task." }
-    else { 'There is no scheduled task yet. These settings apply once you turn on Automatic updates.' }
+    else { 'There is no scheduled task yet. These settings apply once you turn on Automatic maintenance.' }
     if (-not $script:WingetVersion) { Start-WingetVersion }
     Update-WingetInfo
     Update-MaintenanceButtons

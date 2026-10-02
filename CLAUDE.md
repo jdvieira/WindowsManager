@@ -71,6 +71,9 @@ Check open pull requests first (`gh pr list`), so two people don't take the same
 - Anything needing administrator rights goes through `Start-Elevated` (one approval, with a script and log kept in
   `%LOCALAPPDATA%\WindowsManager\Drivers`).
 - Window layout is XAML in `src\25-WindowXaml.ps1`; a named element must also be listed in `src\35-Window.ps1`.
+- Automatic runs (`-Auto`) stop at `src\30-AutoRun.ps1`, before the window's parts load: what a job uses must be
+  defined in a part numbered 29 or lower. The jobs themselves are in `src\29-AutoJobs.ps1`; the panel is
+  `src\70-AutoUpdatesPanel.ps1`.
 
 ### 3. Follow the house rules
 
@@ -197,6 +200,8 @@ such as `v2.5.0.0-beta1`.
 - Windows PowerShell 5.1 pitfalls seen here:
   - `[IO.FileAttributes]0x400000` throws; use integer masks.
   - `$hashtable.Count` is the number of entries, never a key named Count.
+  - Variable names ignore case: a local `$ui` is the same variable as the window's `$UI`, and replaces it for the rest
+    of that function. Don't name locals after the app's globals (`$UI`, `$Settings`, `$Window`).
   - A function that returns `, @(list)` must be assigned to a variable before piping it.
   - `$( ... )` inside a double-quoted string miscounts parentheses in quoted text.
   - `byte[] + byte[]` gives `object[]`.

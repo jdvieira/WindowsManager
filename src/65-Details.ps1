@@ -212,7 +212,7 @@ function Request-TaskMove {
     $s = if ($legacy) { Get-AutoSchedule $legacy } else { $null }
     if (-not $s) { return }
     $approval = if ($s.Elevated -and -not $IsAdmin) { ' Windows will ask for administrator approval.' } else { '' }
-    Show-Confirm 'migrate' $null 'Move automatic updates to the new name' "Your automatic updates ($(Format-Schedule $s)) are set up under the old name, $legacy, and still point at the old exe. Moving them keeps the same schedule and settings for $AppName and removes the old task.$approval" 'Move task'
+    Show-Confirm 'migrate' $null 'Move automatic maintenance to the new name' "Your automatic maintenance ($(Format-Schedule $s)) are set up under the old name, $legacy, and still point at the old exe. Moving them keeps the same schedule and settings for $AppName and removes the old task.$approval" 'Move task'
 }
 function Move-LegacyTask {
     $legacy = Get-LegacyTaskName
@@ -224,7 +224,7 @@ function Move-LegacyTask {
     $Window.Cursor = [System.Windows.Input.Cursors]::Wait
     try {
         Invoke-TaskAction $spec
-        Add-LogLine "Automatic updates moved to the task `"$TaskName`" ($(Format-Schedule $s))."
+        Add-LogLine "Automatic maintenance moved to the task `"$TaskName`" ($(Format-Schedule $s))."
         if (Get-AutoTask $legacy) { Add-LogLine "The old task `"$legacy`" could not be removed; delete it in Task Scheduler." }
     }
     catch { $UI.StatusText.Text = "The scheduled task was not moved: $($_.Exception.Message)" }
@@ -233,7 +233,7 @@ function Move-LegacyTask {
 }
 
 # An elevated task that runs the app from a folder other programs can change, or runs an older protected copy, is
-# offered the protected copy once per version (Not now, or the automatic updates panel, can still do it later)
+# offered the protected copy once per version (Not now, or the Automatic maintenance panel, can still do it later)
 function Request-TaskCopy {
     if ($script:Confirm) { return }   # another question is open; ask next time
     $s = Get-AutoSchedule
@@ -242,10 +242,10 @@ function Request-TaskCopy {
     if (-not $need -or $Settings.TaskCopyAsked -eq "$need $AppVersion") { return }
     $approval = if ($IsAdmin) { '' } else { ' Windows will ask for administrator approval.' }
     if ($need -eq 'protect') {
-        Show-Confirm 'taskcopy' $need 'Protect automatic updates' "Your automatic updates ($(Format-Schedule $s)) run $AppName as administrator from $(Split-Path -Parent $s.Execute), a folder other programs can change. A program could swap the app there and get administrator rights without asking you. Protecting it copies $AppName to $TaskCopyDir, which only administrators can change, and the task runs that copy. The schedule and settings stay the same.$approval" 'Protect it'
+        Show-Confirm 'taskcopy' $need 'Protect automatic maintenance' "Your automatic maintenance ($(Format-Schedule $s)) run $AppName as administrator from $(Split-Path -Parent $s.Execute), a folder other programs can change. A program could swap the app there and get administrator rights without asking you. Protecting it copies $AppName to $TaskCopyDir, which only administrators can change, and the task runs that copy. The schedule and settings stay the same.$approval" 'Protect it'
     }
     else {
-        Show-Confirm 'taskcopy' $need 'Update the copy automatic updates use' "Your automatic updates ($(Format-Schedule $s)) run a protected copy of $AppName in $TaskCopyDir. $(if ($v = Get-TaskCopyVersion) { "It is version $v; this is $AppVersion. Updating it copies this version there, so automatic runs work like this one; until then they keep using the older copy." } else { 'The copy is missing, so automatic runs fail. Updating it copies this version there.' })$approval" 'Update it'
+        Show-Confirm 'taskcopy' $need 'Update the copy automatic maintenance uses' "Your automatic maintenance ($(Format-Schedule $s)) run a protected copy of $AppName in $TaskCopyDir. $(if ($v = Get-TaskCopyVersion) { "It is version $v; this is $AppVersion. Updating it copies this version there, so automatic runs work like this one; until then they keep using the older copy." } else { 'The copy is missing, so automatic runs fail. Updating it copies this version there.' })$approval" 'Update it'
     }
     $UI.ConfirmNo.Content = 'Not now'
 }
@@ -255,9 +255,9 @@ function Update-TaskCopy {
     $Window.Cursor = [System.Windows.Input.Cursors]::Wait
     try {
         Invoke-TaskAction (New-RegisterSpec $s)
-        Add-LogLine "Automatic updates ($(Format-Schedule $s)) run a protected copy of $AppName $AppVersion in $TaskCopyDir."
+        Add-LogLine "Automatic maintenance ($(Format-Schedule $s)) runs a protected copy of $AppName $AppVersion in $TaskCopyDir."
     }
-    catch { $UI.StatusText.Text = "Automatic updates were not changed: $($_.Exception.Message)" }
+    catch { $UI.StatusText.Text = "Automatic maintenance was not changed: $($_.Exception.Message)" }
     finally { $Window.Cursor = $null }
     Update-ScheduleSummary
 }

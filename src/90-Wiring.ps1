@@ -288,25 +288,24 @@ $Window.Add_ContentRendered({
         try { if (Test-LegacyTask) { Request-TaskMove } else { Request-TaskCopy } } catch { }
     })
 
-# Automatic updates panel
+# Automatic maintenance panel (each job's buttons are wired where the cards are built, in 70-AutoUpdatesPanel.ps1)
 $UI.BtnSchedule.Add_Click({ if (Test-LegacyTask) { Request-TaskMove } else { Open-SchedulePanel } })
 $UI.SchEnabled.Add_Click({ Update-SchedulePanelState })
 $UI.SchDaily.Add_Click({ Update-SchedulePanelState })
 $UI.SchWeekly.Add_Click({ Update-SchedulePanelState })
-$UI.SchModeInstall.Add_Click({ Update-SchedulePanelState })
-$UI.SchModeNotify.Add_Click({ Update-SchedulePanelState })
+$UI.SchElevated.Add_Click({ Update-SchedulePanelState })
 $UI.SchCancel.Add_Click({ $UI.ScheduleOverlay.Visibility = 'Collapsed' })
 $UI.SchSave.Add_Click({ Save-SchedulePanel })
 $UI.SchRunNow.Add_Click({
         $UI.SchError.Visibility = 'Collapsed'
         try {
             Invoke-TaskAction @{ Op = 'start' }
-            $UI.SchStatus.Text = "Started. It runs in the background; you'll only see a notification if something needs attention. Refresh afterwards to see the new versions."
+            $UI.SchStatus.Text = "Started. It runs in the background and does the jobs that are due; you'll only see a notification if something needs attention. Refresh afterwards to see the results."
         }
         catch { Show-ScheduleError $_.Exception.Message }
     })
 $UI.SchDryRun.Add_Click({
-        try { Start-AutoProcess @('-DryRun'); $UI.SchStatus.Text = "Checking for updates in the background. The notification appears in the corner of the screen in a moment$Ellipsis" }
+        try { Start-AutoProcess @('-DryRun'); $UI.SchStatus.Text = "Test run in the background, with the settings as saved: every job that is on, whether due or not, changing nothing. The notification appears in the corner of the screen in a moment$Ellipsis" }
         catch { Show-ScheduleError $_.Exception.Message }
     })
 # Options panel

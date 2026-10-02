@@ -12,18 +12,19 @@ apps, and keep the PC's drivers current.
     %LOCALAPPDATA%\WindowsManager\Logs.
   - Runs as the interactive user. Installers that need administrator rights ask for approval (UAC) one by one;
     "Restart as administrator" runs the whole session elevated instead.
-  - "Automatic updates" creates a scheduled task that runs this app with -Auto: it updates everything silently and
-    only shows a notification when something fails (optionally also for restarts or after every run), or, in
-    notify-only mode, installs nothing and lists the waiting updates.
+  - "Automatic maintenance" creates a scheduled task that runs this app with -Auto. Each run does the jobs that are on
+    and due (app updates, Windows updates, cleanup, a health check), each either for real ("do it") or by only
+    listing what's waiting ("tell me"), and shows one notification when something failed, is waiting, or (optionally)
+    needs a restart or was done.
   - Keeps apps at their current version (winget pin), installs a chosen version, shows release notes, keeps a history
     of every change, exports and imports app lists (winget's own format) and manages winget's sources.
 
 .PARAMETER Auto
-Unattended run (what the scheduled task starts): no window, silent updates of every app that is not pinned or
-hidden, a result in lastrun.json, and a notification only when needed. Exit code 1 when anything failed.
+Unattended run (what the scheduled task starts): no window; the automatic maintenance jobs that are on and due
+(src\29-AutoJobs.ps1), a result in lastrun.json, and a notification only when needed. Exit code 1 when anything failed.
 
 .PARAMETER DryRun
-With -Auto: checks for updates and shows the notification with what would be updated, without installing anything.
+With -Auto: goes through every job that is on, due or not, changing nothing, and shows the notification it would send.
 
 .PARAMETER TaskOp
 Internal: performs a scheduled-task change (base64 JSON) in an elevated copy of the app.
