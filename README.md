@@ -407,13 +407,14 @@ until you do). It also replaces the old name's notification registration with it
 | `tools\Test-Version.ps1` | Checks a branch's version bump against `origin/main`: a higher `$AppVersion`, a matching first `CHANGELOG.md` section, and (with the GitHub CLI) newer than every release. CI runs it on pull requests |
 | `tools\Get-ReleaseNotes.ps1` | Prints one version's `CHANGELOG.md` section (the release notes) |
 | `tools\New-WingetManifest.ps1` | Writes the winget manifest for a published release |
+| `tools\New-AppIcon.ps1` | Draws the app's icon (the Pulse mark: a window with a heartbeat line) and writes `assets\icon.ico` with every size Windows uses; `-Preview <folder>` also saves each size as a PNG |
 | `.github\workflows\` | `ci.yml` checks and builds every pull request (the exe is attached to the run); `release.yml` publishes a release when a version tag is pushed |
 | `.github\CODEOWNERS` | Names the owner as the reviewer of every file, so a pull request needs the owner's approval to merge |
 | `CHANGELOG.md` | Every change, by version |
 | `TESTING.md` | What to try on real PCs, for the parts that need administrator approval or particular hardware |
 | `%LOCALAPPDATA%\WindowsManager\` | settings.json, lastrun.json, descriptions.json, sizes.json, history.jsonl, health-history.jsonl (a reading a day), health-alerts.json (what was mentioned when), removed-apps.json (built-in apps to offer back), feature-descriptions.json, notification.png, Logs\, Drivers\ (administrator runs' scripts and logs), DriverBackups\, Previous\ (the version before the last update) |
-| `assets\icon.ico` | App and exe icon (embedded in the exe by the build) |
-| `assets\logo.jpg` | Header logo (embedded in the exe by the build) |
+| `assets\icon.ico` | The app's icon: the exe, window, taskbar, header and notifications (embedded in the exe by the build; made by `tools\New-AppIcon.ps1`) |
+| `assets\logo.jpg` | The original V logo, shown in the About window (embedded in the exe by the build) |
 
 ## Building
 

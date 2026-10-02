@@ -137,10 +137,18 @@ function Get-AssetBytes([string]$Embedded, [string]$FileName) {
     }
     return $null
 }
-function Get-AppIcon {
+# The app's icon (assets\icon.ico, drawn by tools\New-AppIcon.ps1). A window's Icon picks its own sizes from it;
+# -Size returns the smallest frame at least that big (the largest when none is), for the header and notifications.
+function Get-AppIcon([int]$Size) {
     try {
         $bytes = Get-AssetBytes $EmbeddedIcon 'icon.ico'
-        if ($bytes) { return [System.Windows.Media.Imaging.BitmapFrame]::Create((New-Object IO.MemoryStream(, $bytes)), 'None', 'OnLoad') }
+        if (-not $bytes) { return $null }
+        $f = [System.Windows.Media.Imaging.BitmapFrame]::Create((New-Object IO.MemoryStream(, $bytes)), 'None', 'OnLoad')
+        if ($Size -le 0 -or -not $f.Decoder) { return $f }
+        $all = @($f.Decoder.Frames | Sort-Object PixelWidth)
+        $fit = @($all | Where-Object { $_.PixelWidth -ge $Size }) | Select-Object -First 1
+        if ($fit) { return $fit }
+        return $all[-1]
     }
     catch { }
     return $null
