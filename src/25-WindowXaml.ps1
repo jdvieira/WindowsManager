@@ -756,7 +756,7 @@ $Xaml = @'
             </Border>
           </StackPanel>
         </RadioButton>
-        <RadioButton x:Name="TabFeatures" GroupName="Section" Style="{StaticResource Tab}" Content="Windows Features" ToolTip="Built-in apps to remove or reinstall, and Windows' optional features (Ctrl+8)"/>
+        <RadioButton x:Name="TabFeatures" GroupName="Section" Style="{StaticResource Tab}" Content="Windows Features" ToolTip="Windows' optional features, to turn on or off (Ctrl+8)"/>
         <RadioButton x:Name="TabCleanup" GroupName="Section" Style="{StaticResource Tab}" Content="Cleanup" ToolTip="Free up space: leftover files, large files and the biggest apps (Ctrl+9)"/>
       </StackPanel>
     </Border>
@@ -1630,14 +1630,7 @@ $Xaml = @'
           <ColumnDefinition Width="*"/>
           <ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
-        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-          <RadioButton x:Name="FtViewApps" GroupName="FtView" Style="{StaticResource Chip}" Margin="0,0,8,0" IsChecked="True">
-            <TextBlock x:Name="FtViewAppsText" Text="Built-in apps"/>
-          </RadioButton>
-          <RadioButton x:Name="FtViewFeatures" GroupName="FtView" Style="{StaticResource Chip}" Margin="0,0,16,0">
-            <TextBlock x:Name="FtViewFeaturesText" Text="Optional features"/>
-          </RadioButton>
-        </StackPanel>
+        <TextBlock x:Name="FtViewFeaturesText" Text="Optional features" Foreground="#BDBDBD" VerticalAlignment="Center" Margin="0,0,16,0"/>
         <Grid Grid.Column="1">
           <TextBox x:Name="FtSearch" Padding="34,7,10,7"/>
           <TextBlock Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="13" Foreground="#8A8A8A" Margin="12,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"/>
@@ -1653,7 +1646,7 @@ $Xaml = @'
           </TextBlock>
         </Grid>
         <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
-          <ToggleButton x:Name="FtOnOnly" Content="On only" Style="{StaticResource Chip}" Margin="0,0,8,0" ToolTip="Only the features that are turned on (or the apps that are installed)"/>
+          <ToggleButton x:Name="FtOnOnly" Content="On only" Style="{StaticResource Chip}" Margin="0,0,8,0" ToolTip="Only the features that are turned on"/>
           <Button x:Name="FtRefresh" ToolTip="Read them again (F5)">
             <StackPanel Orientation="Horizontal">
               <TextBlock Text="&#xE72C;" FontFamily="Segoe MDL2 Assets" FontSize="13" Margin="0,1,8,0" VerticalAlignment="Center"/>
@@ -1676,8 +1669,8 @@ $Xaml = @'
                 <ColumnDefinition Width="120"/>
                 <ColumnDefinition Width="110"/>
               </Grid.ColumnDefinitions>
-              <TextBlock x:Name="FtHeadName" Text="APP" Style="{StaticResource Label}" VerticalAlignment="Center"/>
-              <TextBlock x:Name="FtHeadPub" Grid.Column="1" Text="PUBLISHER" Style="{StaticResource Label}" VerticalAlignment="Center"/>
+              <TextBlock x:Name="FtHeadName" Text="FEATURE" Style="{StaticResource Label}" VerticalAlignment="Center"/>
+              <TextBlock x:Name="FtHeadPub" Grid.Column="1" Text="" Style="{StaticResource Label}" VerticalAlignment="Center"/>
               <TextBlock Grid.Column="2" Text="STATUS" Style="{StaticResource Label}" VerticalAlignment="Center"/>
             </Grid>
           </Border>

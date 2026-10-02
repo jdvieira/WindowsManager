@@ -3,7 +3,7 @@
 A single-exe Windows app for keeping a PC's software current. Through winget, Microsoft's command-line package
 manager, it keeps apps updated (on demand or on a schedule), finds and installs new apps, and uninstalls what you no
 longer need. It also turns startup apps on and off, installs Windows' own updates, keeps drivers current (from Windows
-Update, the PC's vendor, NVIDIA and AMD, with a saved copy to roll back to), removes built-in apps and turns Windows'
+Update, the PC's vendor, NVIDIA and AMD, with a saved copy to roll back to), turns Windows'
 optional features on and off, shows the PC's health (with trends over time, alerts and a shareable report), and cleans
 up leftover files, including what uninstalled apps leave behind. A setup backup puts your apps and options on a new PC.
 
@@ -214,7 +214,6 @@ installs straight away, which may be sooner than IT intended. **Restore point fi
 
 | View | What it does |
 | --- | --- |
-| Built-in apps | The Store apps that came with Windows (or that you added) and that Windows lets you remove: Microsoft News, Clipchamp, Xbox apps, Solitaire and the like, with their publisher and, when the package has one, a description. **Remove** removes one for your account (after asking). Removed apps stay on the list with **Reinstall**, which registers them again from their files; when Windows has cleared those, it opens the app's Microsoft Store page. Parts of Windows itself and frameworks aren't listed |
 | Optional features | Windows' optional features (.NET Framework 3.5, Hyper-V, Windows Sandbox, the Linux subsystem, the TFTP and Telnet clients, and so on), grouped the way Windows' own "Turn Windows features on or off" shows them (Internet Information Services > World Wide Web Services > ...): collapsed to start with, a chevron shows what's under a feature, and a parent says how many of the features under it are on. Filter and **On only** show each match with what it sits under. Each is on or off, with Windows' own description of what it is. **Turn on** / **Turn off** asks for administrator approval and makes a restore point first (with **Restore point first** on); some need a restart, which the row says. History has each change |
 
 Filter by name or description, and **On only** shows only what's installed or turned on. Feature descriptions come
@@ -413,7 +412,7 @@ until you do). It also replaces the old name's notification registration with it
 | `.github\CODEOWNERS` | Names the owner as the reviewer of every file, so a pull request needs the owner's approval to merge |
 | `CHANGELOG.md` | Every change, by version |
 | `TESTING.md` | What to try on real PCs, for the parts that need administrator approval or particular hardware |
-| `%LOCALAPPDATA%\WindowsManager\` | settings.json, lastrun.json, descriptions.json, sizes.json, history.jsonl, health-history.jsonl (a reading a day), health-alerts.json (what was mentioned when), removed-apps.json (built-in apps to offer back), feature-descriptions.json, notification.png, Logs\, Drivers\ (administrator runs' scripts and logs), DriverBackups\, Previous\ (the version before the last update) |
+| `%LOCALAPPDATA%\WindowsManager\` | settings.json, lastrun.json, descriptions.json, sizes.json, history.jsonl, health-history.jsonl (a reading a day), health-alerts.json (what was mentioned when), feature-descriptions.json, notification-pulse.png, Logs\, Drivers\ (administrator runs' scripts and logs), DriverBackups\, Previous\ (the version before the last update) |
 | `assets\icon.ico` | The app's icon: the exe, window, taskbar, header and notifications (embedded in the exe by the build; made by `tools\New-AppIcon.ps1`) |
 | `assets\logo.jpg` | The original V logo, shown in the About window (embedded in the exe by the build) |
 
