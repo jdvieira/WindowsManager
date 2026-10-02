@@ -359,21 +359,25 @@ function Update-HealthTrends {
     }
     $UI.HlTrendsNote.Visibility = 'Collapsed'
     $muted = $Window.FindResource('Muted')
+    # two to a row (HlTrends is a two-column grid); a PC without a battery has no battery line, even if earlier
+    # readings (from before placeholder batteries were ignored) have one
+    $noBattery = $script:HealthInfo -and $script:HealthInfo.Sys -and -not $script:HealthInfo.Battery
     foreach ($m in $TrendMetrics) {
+        if ($m.Key -eq 'Battery' -and $noBattery) { continue }
         $pts = @($hist | Where-Object { $null -ne $_.($m.Key) } | ForEach-Object { @{ Date = $_.Date; Value = [double]$_.($m.Key); Text = ($m.Format -f [double]$_.($m.Key)) } })
         if ($pts.Count -lt 2) { continue }
         $first = $pts[0].Value; $last = $pts[-1].Value; $d = $last - $first
         $row = New-Object System.Windows.Controls.Grid
-        $row.Margin = '0,7,0,7'
-        foreach ($w in 200, 340, 0) { $cd = New-Object System.Windows.Controls.ColumnDefinition; $cd.Width = if ($w) { New-Object System.Windows.GridLength $w } else { New-Object System.Windows.GridLength(1, 'Star') }; $row.ColumnDefinitions.Add($cd) }
+        $row.Margin = '0,7,28,7'
+        foreach ($w in 130, 240, 0) { $cd = New-Object System.Windows.Controls.ColumnDefinition; $cd.Width = if ($w) { New-Object System.Windows.GridLength $w } else { New-Object System.Windows.GridLength(1, 'Star') }; $row.ColumnDefinitions.Add($cd) }
         $lab = New-Object System.Windows.Controls.TextBlock
-        $lab.Text = $m.Label; $lab.Foreground = (New-Object System.Windows.Media.BrushConverter).ConvertFrom('#BDBDBD'); $lab.VerticalAlignment = 'Center'
+        $lab.Text = $m.Label; $lab.Foreground = (New-Object System.Windows.Media.BrushConverter).ConvertFrom('#BDBDBD'); $lab.VerticalAlignment = 'Center'; $lab.TextWrapping = 'Wrap'; $lab.Margin = '0,0,10,0'
         [void]$row.Children.Add($lab)
-        $spark = New-Sparkline $pts
+        $spark = New-Sparkline $pts 236
         [System.Windows.Controls.Grid]::SetColumn($spark, 1)
         [void]$row.Children.Add($spark)
         $val = New-Object System.Windows.Controls.TextBlock
-        $val.VerticalAlignment = 'Center'; $val.Margin = '16,0,0,0'
+        $val.VerticalAlignment = 'Center'; $val.Margin = '14,0,0,0'; $val.TextWrapping = 'Wrap'
         $r1 = New-Object System.Windows.Documents.Run ($m.Format -f $last); $r1.Foreground = [System.Windows.Media.Brushes]::White; $r1.FontWeight = 'SemiBold'
         [void]$val.Inlines.Add($r1)
         $since = New-Object System.Windows.Documents.Run; $since.Foreground = $muted; $since.FontSize = 12.5

@@ -403,6 +403,12 @@ if ($Op -eq 'health') {
             $h.Battery = @{ Charge = [int]$b[0].EstimatedChargeRemaining; Status = [int]$b[0].BatteryStatus; Count = $b.Count
                 Design = [long](($bats | Measure-Object -Property DesignCapacity -Sum).Sum); Full = [long](($bats | Measure-Object -Property FullChargeCapacity -Sum).Sum)
                 Cycles = [int](($bats | Measure-Object -Property CycleCount -Maximum).Maximum); Name = [string](@($bats | ForEach-Object { $_.Id }) -join ', ') }
+            # Some desktops report a placeholder battery (100 mWh of 100 mWh, always full). It isn't one: a laptop
+            # battery holds tens of thousands of mWh. Ignored when it is that small, and on a PC that isn't a laptop
+            # or tablet (PCSystemType 2 mobile, 8 slate) whenever it is under 10 Wh.
+            $design = [long]$h.Battery.Design
+            $portable = $null -ne $cs -and [int]$cs.PCSystemType -in 2, 8
+            if (($design -gt 0 -and $design -lt 1000) -or (-not $portable -and $design -lt 10000)) { $h.Battery = $null }
         }
     }
     catch { }

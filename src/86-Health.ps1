@@ -69,8 +69,13 @@ function Update-HealthView {
     $UI.HlBiosText.Text = "From $($s.BiosMaker)$(if ($s.BiosDate) { ", released $($s.BiosDate)$age" }).`n" +
     $(if ($bu) { "An update is waiting on the Drivers tab: $($bu.Name) $($bu.Version)." } elseif ($checked) { 'The last driver check found no newer BIOS or firmware.' } else { 'Check for updates looks for a newer BIOS and firmware through Windows Update and the vendor''s tool.' })
     $UI.HlBiosCheck.Content = if ($bu) { 'Open Driver Updates' } else { 'Check for updates' }
-    # Battery
+    # Battery: a PC without one (a desktop) has no Battery card, and This PC and BIOS share the top row
     $b = $h.Battery
+    $UI.HlBatCard.Visibility = ConvertTo-Visibility ([bool]$b)
+    $span = if ($b) { 2 } else { 3 }
+    [System.Windows.Controls.Grid]::SetColumnSpan($UI.HlSysCard, $span)
+    [System.Windows.Controls.Grid]::SetColumn($UI.HlBiosCard, $span)
+    [System.Windows.Controls.Grid]::SetColumnSpan($UI.HlBiosCard, $span)
     if (-not $b) {
         $UI.HlBatTitle.Text = 'No battery'; $UI.HlBatText.Text = 'This PC runs on mains power.'
         $UI.HlBatBar.Visibility = 'Collapsed'; $UI.HlBatReport.Visibility = 'Collapsed'
