@@ -2,8 +2,8 @@
 
 All notable changes to Windows Manager (called Windows Software Manager in 2.0, and Windows Package Manager before
 1.0). The version is `$AppVersion` in `src\00-Startup.ps1`, which Build-Exe.ps1 also stamps on the exe. Each
-version's section becomes its release notes, which the app shows under "What's new", so from 2.4.3.1 on it lists only
-changes to the app, not to the repository.
+version's section becomes its release notes, which the app shows under "What's new", so it lists only changes to the
+app, not to the repository.
 
 ## 2.4.3.1 - 2026-10-02
 
@@ -47,14 +47,13 @@ changes to the app, not to the repository.
   administrator, and remembered.
 - Built-in apps show the names and publishers their packages give, where they were a guess before (for example
   *Microsoft News* rather than *Bing News*).
-- `CLAUDE.md`: how to contribute, step by step, for people and for Claude Code.
 
 ## 2.4.0.0 - 2026-10-01
 
 - **Network health.** Device Health's Network card measures the connection: the round trip to the router, latency,
   packet loss and jitter to the internet, and how long a DNS lookup takes, each green, amber or red, and its title
   says Good, Fair or Poor connection. Internet latency is kept in the daily reading and gets a line on **Trends**.
-- Brandon Bolding is credited as a contributor (README and About).
+- About credits Brandon Bolding as a contributor.
 
 ## 2.3.0.0 - 2026-10-01
 
@@ -86,35 +85,17 @@ changes to the app, not to the repository.
 - **One copy at a time.** Opening the app while it's open brings the open window to the front. Automatic runs,
   notification buttons and the log link aren't affected. Closing the window frees it straight away, even while
   background work is finishing.
-- **GitHub Actions.** Every pull request is checked (ASCII only, parses, self-test) and built, with the exe attached
-  to the run; pushing a `v<version>` tag builds and publishes the release with its CHANGELOG notes (a hyphenated tag
-  becomes a pre-release). `tools\Test-Source.ps1` runs the same checks locally.
-- **winget manifest.** `tools\New-WingetManifest.ps1` writes the manifest for a release (package
-  `jdvieira.WindowsManager`, portable, command `windows-manager`) for a pull request to winget-pkgs; it passes
-  `winget validate`.
 - The tabs are a little tighter to fit nine, and the window opens a little wider (1280 x 820).
 - **Fixed:** today's health reading wasn't saved when earlier readings existed.
-- Tested as administrator on real hardware: restore point with System Protection off, saving a driver and forcing it
-  back, an all-users startup app off and on, Windows temporary files cleanup, Dell Command | Update's check, disk wear
-  and temperature, an optional feature on and off, re-registering a built-in app, leftovers, and both outcomes of a
-  version switch.
 
 ## 2.2.0.2 - 2026-10-01
 
 - **Fixed:** after an update, `Windows Manager.exe.old` was left next to the app. The new version tried to delete it
   while the old one was still closing; it now tries again every 2 seconds for a minute.
-- The README has screenshots of Device Health, Installed Software, Drivers, Startup and Cleanup (in `docs/screenshots`;
-  the PC's name, serial number and network details are replaced).
-- The first update from 2.2.0.0 to 2.2.0.1 through GitHub worked end to end (download, checksum, version check,
-  swap, restart, History).
 
 ## 2.2.0.1 - 2026-10-01
 
-- **The release download is labeled "Windows Manager.exe".** GitHub doesn't allow spaces in release file names (it
-  turns them into dots, so the file still downloads as `Windows.Manager.exe`), but each file can have a label, which
-  is what the release page shows. Releases are now uploaded with that label. The in-app updater is unaffected: it
-  always installs under the app's own name.
-- First release published to test the updater end to end: copies on 2.2.0.0 find it and update themselves.
+- No changes to the app.
 
 ## 2.2.0.0 - 2026-10-01
 
@@ -184,10 +165,7 @@ Three new tabs, safer driver changes, and the tools for setting up and supportin
   list) lists the apps with the missing ones ticked, then fills in the options to review and save.
 - **Diagnostics.** A button at the bottom right (and in Options > Logs) saves a zip to the desktop with the app's logs,
   the administrator runs' scripts and logs, winget's logs, settings, history and a summary of the PC.
-- **Source in parts.** The code moved from one 6,000-line script into `src\*.ps1`. `Windows_Software_Manager.ps1` now
-  joins them and runs the result (exactly as the exe runs); Build-Exe.ps1 joins the same parts.
-- `TESTING.md` lists what to try on real PCs. Ctrl+1 to Ctrl+7 switch tabs. History's driver lines read "Driver update"
-  rather than "Dell updates".
+- Ctrl+1 to Ctrl+7 switch tabs. History's driver lines read "Driver update" rather than "Dell updates".
 
 ## 1.1.0.1 - 2026-10-01
 
@@ -204,6 +182,7 @@ Three new tabs, safer driver changes, and the tools for setting up and supportin
   The NVIDIA App and Intel Driver & Support Assistant have no command line or interface another app can drive, so
   the lookup goes to NVIDIA's own driver service. NVIDIA doesn't document that service; if it stops answering, the tab
   says so and the NVIDIA App can still check. Studio drivers aren't offered.
+
 ## 1.0.1.0 - 2026-10-01
 
 - **Managed driver updates.** On a PC whose organization manages driver updates (Windows Update for Business through
@@ -215,6 +194,7 @@ Three new tabs, safer driver changes, and the tools for setting up and supportin
 - **Busy or stalled Dell checks.** A Dell check, install or driver restore isn't started while an earlier dcu-cli.exe
   is still running or Dell Command | Update's window is open (the tab says which). A run that makes no progress for 5
   minutes says so above the list, with **Stop waiting**; the run carries on in the background.
+
 ## 1.0.0.0 - 2026-09-30
 
 Initial release.
