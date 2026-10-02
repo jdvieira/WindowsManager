@@ -65,3 +65,9 @@ foreach ($name in 'TabCleanup', 'CleanupPanel', 'ClTitle', 'ClDriveBar', 'ClDriv
     $UI[$name] = $Window.FindName($name)
     if (-not $UI[$name]) { throw "XAML element '$name' not found." }
 }
+# 2.8: the Extras tab
+foreach ($name in 'TabExtras', 'ExtrasPanel', 'ExText', 'ExRestartExplorer', 'ExRestoreAll', 'ExRestoreAllText', 'ExViewTweaks', 'ExViewTweaksText', 'ExViewTools', 'ExViewToolsText',
+    'ExSearch', 'ExExpandAll', 'ExExpandAllText', 'ExChangedOnly', 'ExRefresh', 'ExHeader', 'ExHeadName', 'ExHeadStatus', 'ExList', 'ExMsgPanel', 'ExMsgTitle', 'ExMsgText') {
+    $UI[$name] = $Window.FindName($name)
+    if (-not $UI[$name]) { throw "XAML element '$name' not found." }
+}

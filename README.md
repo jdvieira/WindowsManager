@@ -5,7 +5,8 @@ manager, it keeps apps updated (on demand or on a schedule), finds and installs 
 longer need. It also turns startup apps on and off, installs Windows' own updates, keeps drivers current (from Windows
 Update, the PC's vendor, NVIDIA and AMD, with a saved copy to roll back to), turns Windows'
 optional features on and off, shows the PC's health (with trends over time, alerts and a shareable report), and cleans
-up leftover files, including what uninstalled apps leave behind. A setup backup puts your apps and options on a new PC.
+up leftover files, including what uninstalled apps leave behind. Extras has Windows tweaks, each one restorable,
+and shortcuts to Windows' hidden tools. A setup backup puts your apps and options on a new PC.
 
 ## Screenshots
 
@@ -44,13 +45,17 @@ to off, tell me, or do it.
 
 ![Automatic maintenance](docs/screenshots/08-automatic-maintenance.png)
 
+**Extras**: Windows tweaks you can undo, by category, and shortcuts to Windows' hidden tools.
+
+![Extras](docs/screenshots/09-extras.png)
+
 ## Using it
 
 Download `Windows Manager.exe` from the [latest release](https://github.com/jdvieira/WindowsManager/releases/latest)
 and run it; there is nothing to install. (To build it yourself, see [Building](#building); it lands in
-`dist\Windows Manager.exe`.) There are nine sections, as tabs under the header (Ctrl+1 to Ctrl+9): Device
+`dist\Windows Manager.exe`.) There are ten sections, as tabs under the header (Ctrl+1 to Ctrl+9, and Ctrl+0): Device
 Health (where the app opens), Software Updates, Discover Software, Installed Software, Startup, Drivers, Windows
-Update, Windows Features and Cleanup. One copy of the app runs at a time: opening it again brings the open window to
+Update, Windows Features, Cleanup and Extras. One copy of the app runs at a time: opening it again brings the open window to
 the front.
 
 ### Device Health
@@ -234,8 +239,22 @@ Filter by name or description, and **On only** shows only what's installed or tu
 with the app (`16-FeatureText`); ones it doesn't know, from newer Windows builds, are read from Windows when the app
 runs as administrator and kept in `feature-descriptions.json`.
 
-### Cleanup
+### Extras
 
+| View | What it does |
+| --- | --- |
+| Tweaks | Windows settings that Settings has no switch for, each **On** or **Off** with **Turn on** / **Turn off**: File Explorer (the classic right-click menu, file name extensions, hidden and protected files, open to This PC, the full path in the title bar, compact view, Home and Gallery in the navigation pane, no "- Shortcut" on new shortcuts), the taskbar and Start (**End task** on the taskbar, icons on the left, never combine buttons, seconds in the clock, the Task view button, no web results in search, no recent files, no tips in Start, Run as different user, Snap layouts on the maximize button), privacy and suggestions (the advertising ID, tailored experiences, tips, suggested content in Settings, lock screen tips, suggested apps, "finish setting up" prompts), the mouse, keyboard and games (mouse acceleration, the Sticky Keys prompt, background game recording, Num Lock at sign-in) and the system (long file paths, Fast Startup, detailed start and shut-down messages, blue screen details). Each shows its registry location. The first time the app changes one, it saves exactly what was there (each value, or that it wasn't there, and any key it had to create) in `tweaks.json`: **Restore** puts it back, and once a tweak is back as it was the saved copy is dropped. Tweaks with a shield are Windows-wide and need one administrator approval (and a restore point first, with **Restore point first** on); the rest change only your account. A row says when it needs **Restart Explorer**, a sign-out or a restart to show |
+| Shortcuts | Windows' hidden tools and folders: God Mode (every Control Panel setting in one folder), the classic User accounts (`netplwiz`, the same as `control userpasswords2`), System Properties (`sysdm.cpl`), Advanced system settings, Environment variables, Performance options, System Protection and System Restore, Credential Manager, Desktop icon settings, Folder Options, Control Panel's classic pages (Programs and Features, Network Connections, Sound, Power Options, Mouse, Internet Options, Region, Date and Time, Windows Tools), the management consoles (Computer Management, Device Manager, Disk Management, Event Viewer, Services, Task Scheduler, Performance Monitor, Certificates, the firewall's advanced rules, Shared Folders, and on Pro and up Local Users and Groups, Group Policy and Local Security Policy), system tools (System Configuration, System Information, Registry Editor, Resource Monitor, Reliability Monitor, DirectX Diagnostic Tool, Windows Memory Diagnostic, Recovery Drive, ODBC Data Sources, Character Map, Remote Desktop Connection) and folders (Startup, Send to, All apps, Fonts, the hosts file's). **Open** opens one; **Add to desktop** puts a shortcut (for God Mode, its folder) on the desktop, and **Remove from desktop** takes away only what the app added. Tools Windows doesn't have on this edition say so |
+
+Both views are grouped in categories, closed to start with: click one to open it, with a count of what's in it on its
+row (how many are on, and how many the app changed). **Expand all** opens every one; filtering, or **Changed by this
+app**, shows each match in its open category.
+
+**Restore all** puts back every tweak the app changed and removes the desktop shortcuts it added (one administrator
+approval for the Windows-wide ones). **Changed by this app** shows only those. **Restart Explorer** restarts File
+Explorer and the taskbar (open File Explorer windows close) so changes to them show. History has every change.
+
+### Cleanup
 | Section | What it does |
 | --- | --- |
 | Drive space | The system drive's free space, and how much the leftover files take. **Disk Cleanup** and **Storage settings** open Windows' own tools |
@@ -413,7 +432,7 @@ until you do). It also replaces the old name's notification registration with it
 
 | File | Purpose |
 | --- | --- |
-| `src\*.ps1` | The app's code, in parts that join in name order: `00-Startup` (parameters, version, one copy at a time), settings, scheduled task, data classes, the background worker and its 2.0 operations, health history and alerts (`28-HealthHistory`), the window's layout, notifications, automatic runs, then one part per tab or panel (`78-Leftovers`, `80-Drivers`, `81-DriverBackup`, `82-Amd`, `83-WindowsUpdate`, `84-Startup`, `86-Health`, `87-HealthCards`, `88-Setup`, `89-Diagnostics`, `91-WinFeatures`, `92-Cleanup`, `93-AppUpdate`, ...), wiring, and `95-Main` |
+| `src\*.ps1` | The app's code, in parts that join in name order: `00-Startup` (parameters, version, one copy at a time), settings, scheduled task, data classes, the background worker and its 2.0 operations, health history and alerts (`28-HealthHistory`), the window's layout, notifications, automatic runs, then one part per tab or panel (`78-Leftovers`, `80-Drivers`, `81-DriverBackup`, `82-Amd`, `83-WindowsUpdate`, `84-Startup`, `86-Health`, `87-HealthCards`, `88-Setup`, `89-Diagnostics`, `91-WinFeatures`, `92-Cleanup`, `93-AppUpdate`, `94-Extras`), wiring, and `95-Main` |
 | `Windows_Manager.ps1` | Runs the app from source: joins `src\*.ps1` into `dist\build\Windows_Manager.dev.ps1` and runs that, with the same arguments, exactly as the exe runs |
 | `Build-Exe.ps1` | Joins the same parts, embeds the assets, and compiles `dist\Windows Manager.exe` with PS2EXE |
 | `CLAUDE.md` | How to contribute, step by step (Claude Code reads it automatically) |

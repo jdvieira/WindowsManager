@@ -5,6 +5,21 @@ All notable changes to Windows Manager (called Windows Software Manager in 2.0, 
 version's section becomes its release notes, which the app shows under "What's new", so it lists only changes to the
 app, not to the repository.
 
+## 2.8.0.0 - 2026-10-02
+
+- **New Extras tab** (Ctrl+0), with Windows tweaks and shortcuts to Windows' hidden tools, each grouped by topic in
+  categories you open and close.
+- **35 tweaks** for settings Windows hides: the classic right-click menu, file name extensions and hidden files, End
+  task on the taskbar, taskbar icons on the left, no web results in Start search, no tips and ads, mouse acceleration
+  off, long file paths, Fast Startup off and more. Each shows whether it's on, and the ones that change all of Windows
+  ask for administrator approval.
+- **Everything can be undone.** The first time a tweak changes, what was there before is saved: **Restore** puts it
+  back exactly, and **Restore all** undoes every change made there. **Changed by this app** shows just those.
+- **52 shortcuts** to tools Windows 11 tucks away: God Mode, the classic user accounts (control userpasswords2),
+  System Properties, Environment variables, Device Manager, Group Policy, Services, Registry Editor and more. **Open**
+  one, or **Add to desktop**; **Remove from desktop** takes away only what the app added.
+- **Restart Explorer** in one click, for changes to File Explorer and the taskbar.
+
 ## 2.7.1.0 - 2026-10-02
 
 - **Device Health fits the page better.** Drives and Temperatures sit side by side, the drive bars stretch to fill

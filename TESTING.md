@@ -56,6 +56,11 @@ Tick each line once it has worked, with the PC and the date.
 | [x] Dell laptop, 2026-10-01 (temp copies) | An update whose new version closes straight away | The old version comes back with a message; History has the failure |
 | [ ] | After an update from 2.3 on, Options > App updates > **Go back to <version>** | The previous version starts; History has *Went back to the previous version* |
 | [ ] | **Get beta versions** with a pre-release published | It's offered, marked as a pre-release |
+| [ ] | Extras > Tweaks: **Turn on** Classic right-click menu, **Restart Explorer**, right-click a file | The full menu shows straight away; **Restore** (and Restart Explorer) brings back Windows 11's menu; History has both |
+| [ ] | Extras > Tweaks: **Turn on** a Windows-wide one (Allow long file paths), then **Restore** | One approval each; Registry Editor shows LongPathsEnabled as it was before |
+| [ ] | Extras: change three tweaks and add two desktop shortcuts (God Mode and Device Manager), then **Restore all** | One approval if a Windows-wide tweak is among them; every tweak is as it was and the shortcuts are gone from the desktop; `tweaks.json` is empty |
+| [ ] | Extras > Shortcuts: **Open** each group's first shortcut, and God Mode | Each opens; on Windows Home, Group Policy says it's not on this PC |
+| [ ] | Extras > Tweaks: **Turn on** Turn off mouse acceleration, sign out and in | Mouse settings shows Enhance pointer precision off; **Restore** and signing out again puts it back |
 
 ## Dell or Alienware
 
