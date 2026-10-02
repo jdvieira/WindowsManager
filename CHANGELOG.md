@@ -3,6 +3,17 @@
 All notable changes to Windows Manager (called Windows Software Manager in 2.0, and Windows Package Manager before
 1.0). The version is `$AppVersion` in `src\00-Startup.ps1`, which Build-Exe.ps1 also stamps on the exe.
 
+## 2.4.2.0 - 2026-10-02
+
+- **Automatic updates run a protected copy.** When automatic updates run elevated (the default), the scheduled task
+  now runs a copy of the app in `C:\Program Files\Windows Manager`, which only administrators can change. Before, it
+  ran the app from wherever it was (such as Downloads), so another program could have swapped the app there and been
+  started as administrator without anyone approving. Saving the schedule makes the copy (with the approval saving
+  already needed). After the app updates itself, it offers to update the copy too; until then automatic runs keep
+  using the older one. A task set up by an earlier version is offered the move once, and the Automatic updates panel
+  says when the copy needs it. Turning automatic updates off removes the copy.
+- Notification buttons keep opening the copy you use, not the protected copy.
+
 ## 2.4.1.0 - 2026-10-01
 
 - **Windows Features describes what everything is.** Each optional feature has Windows' own description under its

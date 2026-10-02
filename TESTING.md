@@ -27,6 +27,10 @@ Tick each line once it has worked, with the PC and the date.
 | [ ] | Cleanup > Large files > **Delete** on a file you don't need | Asks first; the file goes to the Recycle Bin (and can be restored from there) |
 | [ ] | First start after the rename to Windows Manager | Settings, history and saved drivers are still there; the app offers to move the old scheduled task; **Test notification** shows *Windows Manager* as the sender |
 | [x] 2026-10-01 (2.2.0.0 to 2.2.0.1) | After the next release is published, open the older exe | The update prompt shows the new version and its notes; **Update now** restarts on the new version and History has the update; the `.old` file is gone |
+| [ ] | With an elevated schedule made by 2.4.1.0 or earlier, open 2.4.2.0 | It offers **Protect automatic updates**; one approval; `C:\Program Files\Windows Manager\Windows Manager.exe` appears and Task Scheduler's *Windows Manager* task runs it; the panel says it runs a protected copy |
+| [ ] | Automatic updates > **Run now** with the protected copy | The run works as before (History, lastrun.json); the notification's **Open Windows Manager** opens your own copy, not the one in Program Files |
+| [ ] | After the app updates itself, with an elevated schedule | It offers **Update the copy automatic updates use**; one approval; the copy's version (file properties) matches |
+| [ ] | Automatic updates: turn off and **Save** | One approval; the task and `C:\Program Files\Windows Manager` are gone |
 | [ ] | Options > App updates > **Update without asking**, then open an older exe | It updates and restarts by itself, without a prompt |
 | [ ] | Automatic updates > **Test notification** | A Windows notification (not the pop-up) with **Open Windows Manager** and **View log** buttons; both work |
 | [ ] | Turn off notifications for Windows Manager in Settings > System > Notifications, then **Test notification** again | The app's own pop-up appears instead |

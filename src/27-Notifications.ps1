@@ -48,6 +48,8 @@ function Register-ToastApp {
     if (Test-Path -LiteralPath $icon) { Set-ItemProperty -LiteralPath $key -Name IconUri -Value $icon }
     $cmd = if ($IsCompiled) { "`"$ExePath`" -Open `"%1`"" } else { "`"$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe`" -NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File `"$AppScript`" -Open `"%1`"" }
     $p = "HKCU:\Software\Classes\$ToastProtocol"
+    # the automatic updates' protected copy leaves the buttons opening the copy you use
+    if ($AppFile -eq $TaskCopyFile -and (Test-Path -LiteralPath "$p\shell\open\command")) { return }
     New-Item -Path "$p\shell\open\command" -Force | Out-Null
     Set-ItemProperty -LiteralPath $p -Name '(default)' -Value "URL:$AppName"
     Set-ItemProperty -LiteralPath $p -Name 'URL Protocol' -Value ''

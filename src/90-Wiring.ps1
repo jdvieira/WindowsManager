@@ -284,7 +284,7 @@ $Window.Add_ContentRendered({
         # the tab the app opens on (Device Health) reads its details now
         if ($Panels[$script:Section] -and $Panels[$script:Section].Open) { & $Panels[$script:Section].Open }
         Update-View
-        try { if (Test-LegacyTask) { Request-TaskMove } } catch { }
+        try { if (Test-LegacyTask) { Request-TaskMove } else { Request-TaskCopy } } catch { }
     })
 
 # Automatic updates panel

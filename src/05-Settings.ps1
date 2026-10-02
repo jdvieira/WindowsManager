@@ -25,6 +25,7 @@ $DefaultLogDir = Join-Path $DataDir 'Logs'
 #   App updates:    AppUpdateCheck (look for a newer GitHub release on start), AppUpdateAuto (install it without asking),
 #                   AppUpdateSkip (a version the user said Not now to), AppUpdateBeta (also offer pre-releases)
 #   Health:         HealthAlerts (automatic runs check the PC's health and notify about problems)
+#   Task copy:      TaskCopyAsked ('<need> <version>': the protected copy offer the user said Not now to)
 function New-DefaultSettings {
     return @{
         Source = ''; InstallScope = ''; Silent = $true; IncludeUnknown = $false; UninstallPrevious = $false; ScanOnOpen = $true; Excluded = @(); Hidden = @()
@@ -33,6 +34,7 @@ function New-DefaultSettings {
         LogRetentionDays = 30; LogDir = ''; VerboseLogs = $false
         NotifyStyle = 'toast'; WindowsUpdated = @(); WingetUpdates = @(); DriverRestorePoint = $true
         AppUpdateCheck = $true; AppUpdateAuto = $false; AppUpdateSkip = ''; AppUpdateBeta = $false; HealthAlerts = $true
+        TaskCopyAsked = ''
     }
 }
 function ConvertTo-Setting($Default, $Value) {

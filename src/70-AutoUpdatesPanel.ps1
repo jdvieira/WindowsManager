@@ -36,8 +36,12 @@ function Update-ScheduleStatus {
         $state = if ($s.Enabled) { 'Scheduled' } else { 'Disabled in Task Scheduler' }
         $lines += "$state`: $(Format-Schedule $s)$(if ($s.Elevated) { ', elevated' })."
         if ($s.Enabled -and $s.NextRun) { $lines += 'Next run: {0:dddd M/d, h:mm tt}.' -f $s.NextRun }
-        $cmd = Get-AutoCommand
-        if ($s.Execute -and $s.Execute -ne $cmd.Execute) { $lines += "The task runs another copy ($($s.Execute)). Save to point it at this one." }
+        $need = Get-TaskCopyNeed $s
+        $cmd = Get-AutoCommand $s.Elevated
+        if ($need -eq 'protect') { $lines += "It runs $AppName as administrator from a folder other programs can change ($($s.Execute)). Save to have it run a protected copy in $TaskCopyDir instead." }
+        elseif ($need -eq 'update') { $lines += $(if ($v = Get-TaskCopyVersion) { "It runs a protected copy of version $v in $TaskCopyDir. Save to update it to $AppVersion." } else { "Its protected copy in $TaskCopyDir is missing, so automatic runs fail. Save to copy $AppVersion there." }) }
+        elseif ($s.Execute -and $s.Execute -ne $cmd.Execute) { $lines += "The task runs another copy ($($s.Execute)). Save to point it at this one." }
+        elseif ($s.Elevated) { $lines += "It runs a protected copy of $AppName in $TaskCopyDir, which only administrators can change." }
     }
     else { $lines += "No scheduled task yet. Saving creates `"$TaskName`" in Task Scheduler. It runs while you are signed in." }
     $last = Format-LastRun (Get-LastRun)
@@ -94,7 +98,7 @@ function Save-SchedulePanel {
             Add-LogLine "Automatic $(if ($Settings.AutoMode -eq 'notify') { 'update check (notify only)' } else { 'updates' }) scheduled: $(Format-Schedule @{ Frequency = $(if ($weekly) { 'Weekly' } else { 'Daily' }); Days = $days; Time = $time })."
         }
         elseif (Get-AutoTask) {
-            Invoke-TaskAction @{ Op = 'unregister' }
+            Invoke-TaskAction @{ Op = 'unregister'; Copy = (Test-Path -LiteralPath $TaskCopyDir) }
             Add-LogLine 'Automatic updates turned off (scheduled task removed).'
         }
         Update-ScheduleSummary

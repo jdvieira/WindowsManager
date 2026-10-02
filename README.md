@@ -308,15 +308,20 @@ Click **Automatic updates** in the header to schedule unattended updates.
   every app's result instead. The app registers its name and icon for notifications, and a `windowsmanager:`
   link for the buttons, under your user account.
 - **Run elevated** (on by default): the task runs with your highest privileges, so installers never stop to ask for
-  approval. Saving this needs administrator approval once.
+  approval. Saving this needs administrator approval once. An elevated task runs a **protected copy** of the app in
+  `C:\Program Files\Windows Manager`, which only administrators can change, so no other program can swap the app
+  and get administrator rights through the task. Saving copies the app there. After the app updates itself, it offers
+  to update the copy (one approval; until then automatic runs use the older copy), and so does the panel. A task made
+  by an earlier version, which runs the app where it is, is offered the move once. Turning automatic updates off
+  removes the copy.
 - **Run as soon as possible after a missed start**: if the PC was off or asleep, the task runs when it is next available.
 - **Run now** starts the task immediately. **Test notification** runs `-Auto -DryRun`: a real check that shows the
   notification with what would be updated, and installs nothing.
 - Each automatic run is logged in the daily log, and every update it installs (or fails to) goes into History. Its result goes to `%LOCALAPPDATA%\WindowsManager\lastrun.json`,
   which the panel shows as "Last run".
 
-The task points at the exe's current location. If you move the exe, open the panel and **Save** again (the panel
-warns you when the task points somewhere else). Turning **Update apps automatically** off and saving deletes the task.
+A task that isn't elevated points at the exe's current location. If you move the exe, open the panel and **Save**
+again (the panel warns you when the task points somewhere else). Turning **Update apps automatically** off and saving deletes the task.
 
 ## Keeping Windows Manager up to date
 
