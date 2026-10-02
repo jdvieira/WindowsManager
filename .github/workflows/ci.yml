@@ -1,5 +1,8 @@
 # Checks every pull request and push to main: the source joins, is ASCII only and parses, the self-test runs, and
-# the exe builds (uploaded as an artifact to try before merging).
+# the exe builds (uploaded as an artifact to try before merging). On pull requests it also checks the version bump
+# (tools\Test-Version.ps1), so a release can't fail after the merge.
+# Actions are pinned to commit SHAs and ps2exe to one version: a new version of either changes the build only when a
+# pull request updates them here and in release.yml.
 name: CI
 
 on:
@@ -15,17 +18,26 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0   # the version check compares with main
 
       - name: Install ps2exe
         shell: powershell
         run: |
           Set-PSRepository PSGallery -InstallationPolicy Trusted
-          Install-Module ps2exe -Scope CurrentUser -Force
+          Install-Module ps2exe -RequiredVersion 1.0.18 -Scope CurrentUser -Force
 
       - name: Check the source
         shell: powershell
         run: .\tools\Test-Source.ps1
+
+      - name: Check the version bump
+        if: github.event_name == 'pull_request'
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .\tools\Test-Version.ps1 -Base origin/${{ github.base_ref }}
 
       - name: Self-test
         shell: powershell
@@ -45,7 +57,7 @@ jobs:
           "sha256: " + (-join ($h | ForEach-Object { $_.ToString('x2') }))
           "version: " + (Get-Item 'dist\Windows Manager.exe').VersionInfo.FileVersion
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: Windows Manager
           path: dist/Windows Manager.exe

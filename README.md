@@ -388,6 +388,7 @@ until you do). It also replaces the old name's notification registration with it
 | `Build-Exe.ps1` | Joins the same parts, embeds the assets, and compiles `dist\Windows Manager.exe` with PS2EXE |
 | `CLAUDE.md` | How to contribute, step by step (Claude Code reads it automatically) |
 | `tools\Test-Source.ps1` | Checks the source as the build reads it (ASCII only, parses, no test driver left), and with `-SelfTest` runs the self-test |
+| `tools\Test-Version.ps1` | Checks a branch's version bump against `origin/main`: a higher `$AppVersion`, a matching first `CHANGELOG.md` section, and (with the GitHub CLI) newer than every release. CI runs it on pull requests |
 | `tools\Get-ReleaseNotes.ps1` | Prints one version's `CHANGELOG.md` section (the release notes) |
 | `tools\New-WingetManifest.ps1` | Writes the winget manifest for a published release |
 | `.github\workflows\` | `ci.yml` checks and builds every pull request (the exe is attached to the run); `release.yml` publishes a release when a version tag is pushed |

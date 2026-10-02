@@ -76,6 +76,7 @@ Check open pull requests first (`gh pr list`), so two people don't take the same
 
 ```powershell
 .\tools\Test-Source.ps1 -SelfTest                                   # ASCII, parses, self-test: must pass
+.\tools\Test-Version.ps1                                            # version bump and CHANGELOG.md match (after git fetch)
 powershell -STA -File .\Windows_Manager.ps1                         # run the app from source and try the change
 powershell -STA -File .\Windows_Manager.ps1 -SelfTest -Screenshot .\ui.png   # renders every section to PNGs
 .\Build-Exe.ps1                                                     # make sure the exe builds
