@@ -142,6 +142,13 @@ the person making the change answers these questions separately, every time:
    to the repository only (`CLAUDE.md`, `README.md`, `TESTING.md`, `CHANGELOG.md`, workflows, `tools\`,
    `.gitignore`) is never released on its own, so the question isn't asked: it merges without a version bump.
 
+**A release updates the README's screenshots.** The pull request that bumps `$AppVersion` also retakes every
+screenshot in `README.md` (`docs/screenshots/0<n>-<screen>.png`) from that branch's build, so the README shows the
+version being released (its number is in the header) and every screen as it now looks; a new tab or panel gets its own
+screenshot and caption, and a caption that no longer matches is rewritten. Take them like pull request screenshots
+(step 4): the real app, `$env:COMPUTERNAME = 'MY-PC'`, and nothing private (serial numbers, network names and
+addresses, user names and IDs replaced), and check each one before committing.
+
 ```powershell
 git add -A
 git status                       # only the files you meant to change
@@ -188,6 +195,8 @@ such as `v2.5.0.0-beta1`.
   approved: an approval covers one change. Ask them as prompts with **Yes** and **No** buttons (the AskUserQuestion
   tool, all of them in one prompt), not as text in a reply. Don't push, open a pull request or bump the version until
   the person has answered. For a repository-only change, ask only whether to publish.
+- **README screenshots:** when the owner says yes to a release, retake the README's screenshots on the same branch
+  before publishing (step 5), and say in the pull request that they were.
 - **Release notes:** a version's `CHANGELOG.md` section lists only changes to the app (house rules, step 3). If the
   owner asks to correct a published release's notes, rewrite them from its `CHANGELOG.md` section
   (`tools\Get-ReleaseNotes.ps1`) with `gh release edit <tag> --notes-file`, writing the file as UTF-8 without a
