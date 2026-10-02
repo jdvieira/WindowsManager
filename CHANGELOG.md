@@ -5,6 +5,16 @@ All notable changes to Windows Manager (called Windows Software Manager in 2.0, 
 version's section becomes its release notes, which the app shows under "What's new", so it lists only changes to the
 app, not to the repository.
 
+## 2.7.1.0 - 2026-10-02
+
+- **Device Health fits the page better.** Drives and Temperatures sit side by side, the drive bars stretch to fill
+  their card, and Trends shows two lines to a row, so there's much less empty space and less to scroll.
+- **No battery card on desktops.** Some desktops report a placeholder battery that's always full; it no longer shows
+  as a Battery card or a Battery health trend. Without a battery, This PC and BIOS share the top row. Laptops and
+  tablets are unchanged.
+- **Windows Features is just the optional features.** The Built-in apps list showed the same apps as Installed
+  Software, which lists and uninstalls them, so it's gone.
+
 ## 2.7.0.1 - 2026-10-02
 
 - **Optional features' arrows work.** Clicking an arrow showed the features under it only on the next click, and
