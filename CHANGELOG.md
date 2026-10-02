@@ -5,6 +5,23 @@ All notable changes to Windows Manager (called Windows Software Manager in 2.0, 
 version's section becomes its release notes, which the app shows under "What's new", so it lists only changes to the
 app, not to the repository.
 
+## 2.5.0.0 - 2026-10-02
+
+- **Automatic maintenance.** Automatic updates did one thing, updating apps. Automatic maintenance (the header
+  button) runs four jobs on one schedule: **app updates**, **Windows updates** (security, cumulative, .NET and
+  Defender updates; optional and feature updates only if you choose), **cleanup** (the Cleanup tab's items you tick)
+  and the **health check**. Each job is **Off**, **Tell me** (nothing changes; you're told what's waiting) or
+  **Do it**, and runs every time, weekly or monthly. Your earlier choice for app updates carries over; Windows
+  updates and cleanup start off.
+- Installing Windows updates and cleaning Windows' own folders need **Run elevated**; the panel says so, and without
+  it they're listed or left out. Nothing ever restarts by itself: you're told when a restart is needed (on by
+  default for new settings).
+- One notification for the whole run, only when something failed, is waiting for you or needs a restart (or after
+  every run that changed something, if you turn that on). Cleanup only tells you once 1 GB or more can be freed.
+- **Test run** (was Test notification) goes through every job that's on, changing nothing, and shows what it would do.
+- Automatic Windows updates and cleanups go into History, marked as automatic, and the panel shows what each job did
+  last time.
+
 ## 2.4.3.1 - 2026-10-02
 
 - **"What's new" in the update prompt no longer starts with odd characters.** Release notes are published without
