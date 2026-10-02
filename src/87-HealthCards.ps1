@@ -178,8 +178,10 @@ $UI.HlUpdOpen.Add_Click({
     })
 
 # ---- Trends: one sparkline per reading, from health-history.jsonl ------------------------------------------------
-# Each is a single series: a 2px line in the accent colour, a marker on the latest reading, a tooltip on every point,
-# and the latest value with its change in plain text beside it (text never takes the line's colour).
+# Each is a single series: a 2px line in the accent colour over a faint wash of it, a hairline baseline, and a marker
+# on the latest reading. Hovering anywhere on it snaps a crosshair to the nearest day, with that day's value. Beside
+# it, the latest value and its change (an arrow, green when the change is good news and red when it isn't); text
+# never takes the line's colour.
 $TrendMetrics = @(
     @{ Key = 'Battery'; Label = 'Battery health'; Unit = '%'; Format = '{0:0}%'; Good = 'up' }
     @{ Key = 'SysFreeGB'; Label = "Free space on $env:SystemDrive"; Unit = 'GB'; Format = '{0:0.0} GB'; Good = 'up' }
@@ -190,38 +192,85 @@ $TrendMetrics = @(
     @{ Key = 'LatencyMs'; Label = 'Internet latency'; Unit = 'ms'; Format = '{0:0} ms'; Good = 'down' }
 )
 
-function New-Sparkline($Points, [double]$Width = 320, [double]$Height = 34) {
+function New-Sparkline($Points, [double]$Width = 330, [double]$Height = 40) {
+    $bc = New-Object System.Windows.Media.BrushConverter
+    $accent = $Window.FindResource('Highlight').Color
+    $card = $bc.ConvertFrom('#232323')
     $c = New-Object System.Windows.Controls.Canvas
-    $c.Width = $Width; $c.Height = $Height; $c.Background = [System.Windows.Media.Brushes]::Transparent
+    $c.Width = $Width; $c.Height = $Height; $c.Background = [System.Windows.Media.Brushes]::Transparent; $c.ClipToBounds = $false
     $vals = @($Points | ForEach-Object { [double]$_.Value })
     $min = ($vals | Measure-Object -Minimum).Minimum; $max = ($vals | Measure-Object -Maximum).Maximum
     $span = $max - $min
     $t0 = ([datetime]$Points[0].Date).Ticks; $t1 = ([datetime]$Points[-1].Date).Ticks
-    $pad = 5
+    $pad = 5; $base = $Height - 0.5
     $line = New-Object System.Windows.Shapes.Polyline
     $line.Stroke = $Window.FindResource('Highlight'); $line.StrokeThickness = 2
     $line.StrokeLineJoin = 'Round'; $line.StrokeStartLineCap = 'Round'; $line.StrokeEndLineCap = 'Round'
-    $xy = foreach ($p in $Points) {
-        $x = if ($t1 -gt $t0) { $pad + ($Width - 2 * $pad) * (([datetime]$p.Date).Ticks - $t0) / ($t1 - $t0) } else { $Width / 2 }
-        $y = if ($span -gt 0) { $pad + ($Height - 2 * $pad) * (1 - ([double]$p.Value - $min) / $span) } else { $Height / 2 }
-        $line.Points.Add((New-Object System.Windows.Point($x, $y)))
-        @{ X = $x; Y = $y; P = $p }
-    }
+    $xy = @(foreach ($p in $Points) {
+            $x = if ($t1 -gt $t0) { $pad + ($Width - 2 * $pad) * (([datetime]$p.Date).Ticks - $t0) / ($t1 - $t0) } else { $Width / 2 }
+            $y = if ($span -gt 0) { $pad + ($Height - 2 * $pad - 4) * (1 - ([double]$p.Value - $min) / $span) } else { $Height / 2 }
+            $line.Points.Add((New-Object System.Windows.Point($x, $y)))
+            @{ X = $x; Y = $y; P = $p }
+        })
+    # a faint wash of the line's colour under it, fading to nothing at the baseline
+    $area = New-Object System.Windows.Shapes.Polygon
+    foreach ($pt in $line.Points) { $area.Points.Add($pt) }
+    $area.Points.Add((New-Object System.Windows.Point($xy[-1].X, $base))); $area.Points.Add((New-Object System.Windows.Point($xy[0].X, $base)))
+    $wash = New-Object System.Windows.Media.LinearGradientBrush
+    $wash.StartPoint = '0,0'; $wash.EndPoint = '0,1'
+    $wash.GradientStops.Add((New-Object System.Windows.Media.GradientStop ([System.Windows.Media.Color]::FromArgb(40, $accent.R, $accent.G, $accent.B)), 0))
+    $wash.GradientStops.Add((New-Object System.Windows.Media.GradientStop ([System.Windows.Media.Color]::FromArgb(0, $accent.R, $accent.G, $accent.B)), 1))
+    $area.Fill = $wash
+    [void]$c.Children.Add($area)
+    # the baseline: a hairline one step off the card
+    $axis = New-Object System.Windows.Shapes.Line
+    $axis.X1 = 0; $axis.X2 = $Width; $axis.Y1 = $base; $axis.Y2 = $base; $axis.Stroke = $bc.ConvertFrom('#333333'); $axis.StrokeThickness = 1
+    [void]$c.Children.Add($axis)
     [void]$c.Children.Add($line)
     # the latest reading, with a ring of the card's colour so it stands off the line
-    $last = @($xy)[-1]
+    $last = $xy[-1]
     $dot = New-Object System.Windows.Shapes.Ellipse
-    $dot.Width = 9; $dot.Height = 9; $dot.Fill = $Window.FindResource('Highlight'); $dot.Stroke = (New-Object System.Windows.Media.BrushConverter).ConvertFrom('#232323'); $dot.StrokeThickness = 2
-    [System.Windows.Controls.Canvas]::SetLeft($dot, $last.X - 4.5); [System.Windows.Controls.Canvas]::SetTop($dot, $last.Y - 4.5)
+    $dot.Width = 10; $dot.Height = 10; $dot.Fill = $Window.FindResource('Highlight'); $dot.Stroke = $card; $dot.StrokeThickness = 2
+    [System.Windows.Controls.Canvas]::SetLeft($dot, $last.X - 5); [System.Windows.Controls.Canvas]::SetTop($dot, $last.Y - 5)
     [void]$c.Children.Add($dot)
-    # hover targets, bigger than the line, one per reading
-    foreach ($q in $xy) {
-        $hit = New-Object System.Windows.Shapes.Ellipse
-        $hit.Width = 14; $hit.Height = 14; $hit.Fill = [System.Windows.Media.Brushes]::Transparent
-        $hit.ToolTip = "$(([datetime]$q.P.Date).ToString('MMM d, yyyy')): $($q.P.Text)"
-        [System.Windows.Controls.Canvas]::SetLeft($hit, $q.X - 7); [System.Windows.Controls.Canvas]::SetTop($hit, $q.Y - 7)
-        [void]$c.Children.Add($hit)
-    }
+    # Hover: a crosshair snaps to the nearest day, with a dot on the line and that day's value (value first, then
+    # the date). The whole chart is the target, so nobody has to aim at a 2px line.
+    $cross = New-Object System.Windows.Shapes.Line
+    $cross.Y1 = 0; $cross.Y2 = $base; $cross.Stroke = $bc.ConvertFrom('#5A5A5A'); $cross.StrokeThickness = 1; $cross.Visibility = 'Hidden'
+    [void]$c.Children.Add($cross)
+    $hdot = New-Object System.Windows.Shapes.Ellipse
+    $hdot.Width = 10; $hdot.Height = 10; $hdot.Fill = $Window.FindResource('Highlight'); $hdot.Stroke = $card; $hdot.StrokeThickness = 2; $hdot.Visibility = 'Hidden'
+    [void]$c.Children.Add($hdot)
+    $tipValue = New-Object System.Windows.Documents.Run; $tipValue.FontWeight = 'SemiBold'
+    $tipDate = New-Object System.Windows.Documents.Run; $tipDate.Foreground = $Window.FindResource('Muted')
+    $tipText = New-Object System.Windows.Controls.TextBlock
+    [void]$tipText.Inlines.Add($tipValue); [void]$tipText.Inlines.Add($tipDate)
+    $tip = New-Object System.Windows.Controls.ToolTip
+    $tip.Content = $tipText; $tip.PlacementTarget = $c; $tip.Placement = 'Relative'
+    $hit = New-Object System.Windows.Shapes.Rectangle
+    $hit.Width = $Width; $hit.Height = $Height + 8; $hit.Fill = [System.Windows.Media.Brushes]::Transparent
+    [System.Windows.Controls.Canvas]::SetTop($hit, -4)
+    $hit.Tag = @{ XY = $xy; Cross = $cross; Dot = $hdot; Tip = $tip; Value = $tipValue; Date = $tipDate; Width = $Width }
+    $hit.Add_MouseMove({
+            param($s, $e)
+            $t = $s.Tag
+            $mx = $e.GetPosition($s).X
+            $q = $t.XY | Sort-Object { [Math]::Abs($_.X - $mx) } | Select-Object -First 1
+            $t.Cross.X1 = $q.X; $t.Cross.X2 = $q.X; $t.Cross.Visibility = 'Visible'
+            [System.Windows.Controls.Canvas]::SetLeft($t.Dot, $q.X - 5); [System.Windows.Controls.Canvas]::SetTop($t.Dot, $q.Y - 5); $t.Dot.Visibility = 'Visible'
+            $t.Value.Text = [string]$q.P.Text
+            $t.Date.Text = '  ' + ([datetime]$q.P.Date).ToString('MMM d, yyyy')
+            # beside the crosshair, flipping to its left near the right edge
+            $t.Tip.HorizontalOffset = if ($q.X -gt $t.Width - 150) { $q.X - 150 } else { $q.X + 12 }
+            $t.Tip.VerticalOffset = -30
+            $t.Tip.IsOpen = $true
+        })
+    $hit.Add_MouseLeave({
+            param($s, $e)
+            $t = $s.Tag
+            $t.Cross.Visibility = 'Hidden'; $t.Dot.Visibility = 'Hidden'; $t.Tip.IsOpen = $false
+        })
+    [void]$c.Children.Add($hit)
     return $c
 }
 
@@ -242,7 +291,7 @@ function Update-HealthTrends {
         if ($pts.Count -lt 2) { continue }
         $first = $pts[0].Value; $last = $pts[-1].Value; $d = $last - $first
         $row = New-Object System.Windows.Controls.Grid
-        $row.Margin = '0,6,0,6'
+        $row.Margin = '0,7,0,7'
         foreach ($w in 200, 340, 0) { $cd = New-Object System.Windows.Controls.ColumnDefinition; $cd.Width = if ($w) { New-Object System.Windows.GridLength $w } else { New-Object System.Windows.GridLength(1, 'Star') }; $row.ColumnDefinitions.Add($cd) }
         $lab = New-Object System.Windows.Controls.TextBlock
         $lab.Text = $m.Label; $lab.Foreground = (New-Object System.Windows.Media.BrushConverter).ConvertFrom('#BDBDBD'); $lab.VerticalAlignment = 'Center'
@@ -252,10 +301,19 @@ function Update-HealthTrends {
         [void]$row.Children.Add($spark)
         $val = New-Object System.Windows.Controls.TextBlock
         $val.VerticalAlignment = 'Center'; $val.Margin = '16,0,0,0'
-        $r1 = New-Object System.Windows.Documents.Run ($m.Format -f $last); $r1.Foreground = [System.Windows.Media.Brushes]::White
-        $change = if ([Math]::Abs($d) -lt 0.05) { 'no change' } else { "$(if ($d -gt 0) { 'up' } else { 'down' }) $(($m.Format -f [Math]::Abs($d)) -replace ' of 10$', '') since $(([datetime]$pts[0].Date).ToString('MMM d'))" }
-        $r2 = New-Object System.Windows.Documents.Run "   $change"; $r2.Foreground = $muted; $r2.FontSize = 12.5
-        [void]$val.Inlines.Add($r1); [void]$val.Inlines.Add($r2)
+        $r1 = New-Object System.Windows.Documents.Run ($m.Format -f $last); $r1.Foreground = [System.Windows.Media.Brushes]::White; $r1.FontWeight = 'SemiBold'
+        [void]$val.Inlines.Add($r1)
+        $since = New-Object System.Windows.Documents.Run; $since.Foreground = $muted; $since.FontSize = 12.5
+        if ([Math]::Abs($d) -lt 0.05) { $since.Text = '   no change' }
+        else {
+            # the arrow says which way, green or red says whether that's good news: never colour alone
+            $good = ($d -gt 0) -eq ($m.Good -eq 'up')
+            $r2 = New-Object System.Windows.Documents.Run ("   $([char]$(if ($d -gt 0) { 0x25B2 } else { 0x25BC })) $(($m.Format -f [Math]::Abs($d)) -replace ' of 10$', '')")
+            $r2.Foreground = $Window.FindResource($(if ($good) { 'Good' } else { 'Bad' })); $r2.FontSize = 12.5
+            [void]$val.Inlines.Add($r2)
+            $since.Text = " since $(([datetime]$pts[0].Date).ToString('MMM d'))"
+        }
+        [void]$val.Inlines.Add($since)
         [System.Windows.Controls.Grid]::SetColumn($val, 2)
         [void]$row.Children.Add($val)
         [void]$UI.HlTrends.Children.Add($row)
