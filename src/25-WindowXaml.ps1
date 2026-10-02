@@ -1463,10 +1463,13 @@ $Xaml = @'
           <ProgressBar x:Name="HlBusy" DockPanel.Dock="Left" Style="{StaticResource Bar}" Width="90" IsIndeterminate="True" Margin="0,0,12,0" VerticalAlignment="Center" Visibility="Collapsed"/>
           <TextBlock x:Name="HlSummary" Foreground="{StaticResource Muted}" VerticalAlignment="Center" TextWrapping="Wrap"/>
         </DockPanel>
-        <Grid>
-          <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-          <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-          <Border Grid.Row="0" Grid.Column="0" Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16" Margin="0,0,12,12">
+        <!-- Six columns: three cards a row, each two columns wide. Without a battery the top row is two cards, three
+             columns each (Update-HealthView). Every card keeps a 12 px gap right and below; the grid's -12 px right
+             margin takes back the last one. -->
+        <Grid Margin="0,0,-12,0">
+          <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+          <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+          <Border x:Name="HlSysCard" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16" Margin="0,0,12,12">
             <StackPanel>
               <TextBlock Text="THIS PC" Style="{StaticResource Label}"/>
               <TextBlock x:Name="HlSysTitle" FontSize="16" FontWeight="SemiBold" Foreground="White" Margin="0,10,0,0" TextTrimming="CharacterEllipsis"/>
@@ -1474,7 +1477,7 @@ $Xaml = @'
               <TextBlock x:Name="HlSysNote" Foreground="{StaticResource Warn}" FontSize="12.5" Margin="0,6,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
             </StackPanel>
           </Border>
-          <Border Grid.Row="0" Grid.Column="1" Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16" Margin="0,0,12,12">
+          <Border x:Name="HlBiosCard" Grid.Row="0" Grid.Column="2" Grid.ColumnSpan="2" Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16" Margin="0,0,12,12">
             <StackPanel>
               <TextBlock Text="BIOS AND FIRMWARE" Style="{StaticResource Label}"/>
               <TextBlock x:Name="HlBiosTitle" FontSize="16" FontWeight="SemiBold" Foreground="White" Margin="0,10,0,0" TextTrimming="CharacterEllipsis"/>
@@ -1482,7 +1485,7 @@ $Xaml = @'
               <Button x:Name="HlBiosCheck" Style="{StaticResource Ghost}" Content="Check for updates" HorizontalAlignment="Left" Margin="0,10,0,0" ToolTip="Opens the Drivers tab and checks Windows Update and the vendor's tool, which also offer BIOS and firmware updates"/>
             </StackPanel>
           </Border>
-          <Border Grid.Row="0" Grid.Column="2" Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16" Margin="0,0,0,12">
+          <Border x:Name="HlBatCard" Grid.Row="0" Grid.Column="4" Grid.ColumnSpan="2" Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16" Margin="0,0,12,12">
             <StackPanel>
               <TextBlock Text="BATTERY" Style="{StaticResource Label}"/>
               <TextBlock x:Name="HlBatTitle" FontSize="16" FontWeight="SemiBold" Foreground="White" Margin="0,10,0,0" TextTrimming="CharacterEllipsis"/>
@@ -1491,7 +1494,7 @@ $Xaml = @'
               <Button x:Name="HlBatReport" Style="{StaticResource Ghost}" Content="Battery report" HorizontalAlignment="Left" Margin="0,10,0,0" ToolTip="Windows' detailed battery report (powercfg /batteryreport): capacity history, recent use and life estimates" Visibility="Collapsed"/>
             </StackPanel>
           </Border>
-          <Border Grid.Row="1" Grid.Column="0" Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16" Margin="0,0,12,12">
+          <Border Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16" Margin="0,0,12,12">
             <StackPanel>
               <TextBlock Text="SECURITY" Style="{StaticResource Label}"/>
               <TextBlock x:Name="HlSecTitle" FontSize="16" FontWeight="SemiBold" Foreground="White" Margin="0,10,0,0" TextTrimming="CharacterEllipsis"/>
@@ -1499,7 +1502,7 @@ $Xaml = @'
               <Button x:Name="HlSecOpen" Style="{StaticResource Ghost}" Content="Windows Security" HorizontalAlignment="Left" Margin="0,10,0,0" ToolTip="Open Windows Security"/>
             </StackPanel>
           </Border>
-          <Border Grid.Row="1" Grid.Column="1" Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16" Margin="0,0,12,12">
+          <Border Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="2" Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16" Margin="0,0,12,12">
             <StackPanel>
               <TextBlock Text="PERFORMANCE" Style="{StaticResource Label}"/>
               <TextBlock x:Name="HlPerfTitle" FontSize="16" FontWeight="SemiBold" Foreground="White" Margin="0,10,0,0" TextTrimming="CharacterEllipsis"/>
@@ -1508,7 +1511,7 @@ $Xaml = @'
               <Button x:Name="HlPerfOpen" Style="{StaticResource Ghost}" Content="Task Manager" HorizontalAlignment="Left" Margin="0,10,0,0" ToolTip="Open Task Manager to see what is using the processor and memory"/>
             </StackPanel>
           </Border>
-          <Border Grid.Row="1" Grid.Column="2" Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16" Margin="0,0,0,12">
+          <Border Grid.Row="1" Grid.Column="4" Grid.ColumnSpan="2" Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16" Margin="0,0,12,12">
             <StackPanel>
               <TextBlock Text="RELIABILITY" Style="{StaticResource Label}"/>
               <TextBlock x:Name="HlRelTitle" FontSize="16" FontWeight="SemiBold" Foreground="White" Margin="0,10,0,0" TextTrimming="CharacterEllipsis"/>
@@ -1516,7 +1519,7 @@ $Xaml = @'
               <Button x:Name="HlRelOpen" Style="{StaticResource Ghost}" Content="Reliability history" HorizontalAlignment="Left" Margin="0,10,0,0" ToolTip="Windows' Reliability Monitor: every crash, failed update and problem, day by day"/>
             </StackPanel>
           </Border>
-          <Border Grid.Row="2" Grid.Column="0" Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16" Margin="0,0,12,12">
+          <Border Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16" Margin="0,0,12,12">
             <StackPanel>
               <TextBlock Text="UPDATES" Style="{StaticResource Label}"/>
               <TextBlock x:Name="HlUpdTitle" FontSize="16" FontWeight="SemiBold" Foreground="White" Margin="0,10,0,0" TextTrimming="CharacterEllipsis"/>
@@ -1524,7 +1527,7 @@ $Xaml = @'
               <Button x:Name="HlUpdOpen" Style="{StaticResource Ghost}" Content="See updates" HorizontalAlignment="Left" Margin="0,10,0,0" ToolTip="Open the tab with the updates"/>
             </StackPanel>
           </Border>
-          <Border Grid.Row="2" Grid.Column="1" Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16" Margin="0,0,12,12">
+          <Border Grid.Row="2" Grid.Column="2" Grid.ColumnSpan="2" Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16" Margin="0,0,12,12">
             <StackPanel>
               <TextBlock Text="NETWORK" Style="{StaticResource Label}"/>
               <TextBlock x:Name="HlNetTitle" FontSize="16" FontWeight="SemiBold" Foreground="White" Margin="0,10,0,0" TextTrimming="CharacterEllipsis"/>
@@ -1532,7 +1535,7 @@ $Xaml = @'
               <Button x:Name="HlNetOpen" Style="{StaticResource Ghost}" Content="Network settings" HorizontalAlignment="Left" Margin="0,10,0,0" ToolTip="Open Settings > Network and internet"/>
             </StackPanel>
           </Border>
-          <Border Grid.Row="2" Grid.Column="2" Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16" Margin="0,0,0,12">
+          <Border Grid.Row="2" Grid.Column="4" Grid.ColumnSpan="2" Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16" Margin="0,0,12,12">
             <StackPanel>
               <TextBlock Text="CLEANUP" Style="{StaticResource Label}"/>
               <TextBlock x:Name="HlCleanSumTitle" FontSize="16" FontWeight="SemiBold" Foreground="White" Margin="0,10,0,0" TextTrimming="CharacterEllipsis"/>
@@ -1540,18 +1543,19 @@ $Xaml = @'
               <Button x:Name="HlCleanOpen" Style="{StaticResource Ghost}" Content="Open Cleanup" HorizontalAlignment="Left" Margin="0,10,0,0" ToolTip="Free up space: leftover files, large files and the biggest apps"/>
             </StackPanel>
           </Border>
-        </Grid>
-          <Border Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16" Margin="0,0,0,0">
+          <!-- Drives and Temperatures side by side, half the width each -->
+          <Border Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3" Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16" Margin="0,0,12,12">
             <StackPanel>
               <TextBlock Text="DRIVES" Style="{StaticResource Label}"/>
               <ItemsControl x:Name="HlVolumes" Margin="0,10,0,0">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
-                    <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
-                      <TextBlock Text="{Binding Name}" Foreground="#F2F2F2" Width="280" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                      <ProgressBar x:Name="VolBar" Style="{StaticResource Bar}" Width="300" Height="8" Value="{Binding UsedPct, Mode=OneWay}" VerticalAlignment="Center"/>
-                      <TextBlock Text="{Binding Detail}" Foreground="#9A9A9A" FontSize="12.5" Margin="16,0,0,0" VerticalAlignment="Center"/>
-                    </StackPanel>
+                    <Grid Margin="0,5,0,5">
+                      <Grid.ColumnDefinitions><ColumnDefinition Width="130"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                      <TextBlock Text="{Binding Name}" Foreground="#F2F2F2" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
+                      <ProgressBar x:Name="VolBar" Grid.Column="1" Style="{StaticResource Bar}" Height="8" Value="{Binding UsedPct, Mode=OneWay}" VerticalAlignment="Center"/>
+                      <TextBlock Grid.Column="2" Text="{Binding Detail}" Foreground="#9A9A9A" FontSize="12.5" Margin="16,0,0,0" VerticalAlignment="Center"/>
+                    </Grid>
                     <DataTemplate.Triggers>
                       <DataTrigger Binding="{Binding Level}" Value="warn"><Setter TargetName="VolBar" Property="Foreground" Value="{StaticResource Warn}"/></DataTrigger>
                       <DataTrigger Binding="{Binding Level}" Value="bad"><Setter TargetName="VolBar" Property="Foreground" Value="{StaticResource Bad}"/></DataTrigger>
@@ -1562,11 +1566,12 @@ $Xaml = @'
               <ItemsControl x:Name="HlDisks" Margin="0,6,0,0">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
-                    <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
-                      <TextBlock Text="{Binding Name}" Foreground="#F2F2F2" Width="280" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
-                      <TextBlock Text="{Binding Detail}" Foreground="#9A9A9A" FontSize="12.5" Width="300" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Detail}"/>
-                      <TextBlock x:Name="DiskHealth" Text="{Binding Health}" Foreground="{StaticResource Good}" FontSize="12.5" Margin="16,0,0,0" VerticalAlignment="Center"/>
-                    </StackPanel>
+                    <Grid Margin="0,5,0,5">
+                      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                      <TextBlock Text="{Binding Name}" Foreground="#F2F2F2" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
+                      <TextBlock Grid.Column="1" Text="{Binding Detail}" Foreground="#9A9A9A" FontSize="12.5" Margin="16,0,0,0" MaxWidth="260" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Detail}"/>
+                      <TextBlock x:Name="DiskHealth" Grid.Column="2" Text="{Binding Health}" Foreground="{StaticResource Good}" FontSize="12.5" Margin="16,0,0,0" VerticalAlignment="Center"/>
+                    </Grid>
                     <DataTemplate.Triggers>
                       <DataTrigger Binding="{Binding Level}" Value="warn"><Setter TargetName="DiskHealth" Property="Foreground" Value="{StaticResource Warn}"/></DataTrigger>
                       <DataTrigger Binding="{Binding Level}" Value="bad"><Setter TargetName="DiskHealth" Property="Foreground" Value="{StaticResource Bad}"/></DataTrigger>
@@ -1577,15 +1582,15 @@ $Xaml = @'
               </ItemsControl>
             </StackPanel>
           </Border>
-          <Border Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16" Margin="0,12,0,0">
+          <Border Grid.Row="3" Grid.Column="3" Grid.ColumnSpan="3" Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16" Margin="0,0,12,12">
             <StackPanel>
               <TextBlock Text="TEMPERATURES" Style="{StaticResource Label}"/>
               <TextBlock x:Name="HlTempNote" Foreground="{StaticResource Muted}" FontSize="12.5" Margin="0,6,0,0" TextWrapping="Wrap"/>
               <ItemsControl x:Name="HlTempGroups" Margin="0,2,0,0">
-                <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="2" VerticalAlignment="Top"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
-                    <StackPanel Width="300" Margin="0,10,36,0">
+                    <StackPanel Margin="0,10,24,0">
                       <TextBlock Text="{Binding Name}" Foreground="#F2F2F2" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
                       <ItemsControl ItemsSource="{Binding Items}" Margin="0,4,0,0" ItemTemplate="{StaticResource CheckRow}"/>
                     </StackPanel>
@@ -1595,11 +1600,12 @@ $Xaml = @'
               <Button x:Name="HlTempGet" Style="{StaticResource Ghost}" HorizontalAlignment="Left" Margin="0,12,0,0" Visibility="Collapsed"/>
             </StackPanel>
           </Border>
-          <Border Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16" Margin="0,12,0,0">
+        </Grid>
+          <Border Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16" Margin="0">
             <StackPanel>
               <TextBlock x:Name="HlTrendsLabel" Text="TRENDS" Style="{StaticResource Label}"/>
               <TextBlock x:Name="HlTrendsNote" Foreground="{StaticResource Muted}" FontSize="12.5" Margin="0,6,0,0" TextWrapping="Wrap"/>
-              <StackPanel x:Name="HlTrends" Margin="0,6,0,0"/>
+              <UniformGrid x:Name="HlTrends" Columns="2" Margin="0,6,0,0"/>
             </StackPanel>
           </Border>
       </StackPanel>
