@@ -157,6 +157,9 @@ such as `v2.5.0.0-beta1`.
 
 - Before anything else in a session: `git fetch --prune` and make sure the branch you work on starts from the latest
   `origin/main`. Don't reset, stash or discard anyone's local changes; ask.
+- **Open issues:** when you start a change, check `gh issue list --state open` for issues it addresses and say which
+  (or that none do). Put `Closes #<number>` in the pull request for each one it fixes, so publishing it closes them;
+  use `Refs #<number>` for a partial fix, which leaves the issue open. After the merge, check they closed.
 - **After every change, ask the two questions in step 5 (publish it? make a release with it?) as two separate
   questions**, even when the answer seems obvious, and even if an earlier change was approved: an approval covers
   one change. Ask them as prompts with **Yes** and **No** buttons (the AskUserQuestion tool, both questions in one
