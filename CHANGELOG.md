@@ -3,6 +3,13 @@
 All notable changes to Windows Manager (called Windows Software Manager in 2.0, and Windows Package Manager before
 1.0). The version is `$AppVersion` in `src\00-Startup.ps1`, which Build-Exe.ps1 also stamps on the exe.
 
+## 2.4.3.1 - 2026-10-02
+
+- **"What's new" in the update prompt no longer starts with odd characters.** Release notes are published without
+  the hidden marker that caused them, the app reads them as UTF-8, and notes of earlier releases show cleanly too.
+- `CLAUDE.md`: setting up a new PC, the two questions asked before publishing (publish? release?), how `main` is
+  protected and how pull requests are merged.
+
 ## 2.4.3.0 - 2026-10-02
 
 - **Nicer trend charts on Device Health.** Each line has a soft fill under it and a faint baseline. Hover anywhere on
