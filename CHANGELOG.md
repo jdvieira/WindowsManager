@@ -5,6 +5,12 @@ All notable changes to Windows Manager (called Windows Software Manager in 2.0, 
 version's section becomes its release notes, which the app shows under "What's new", so it lists only changes to the
 app, not to the repository.
 
+## 2.7.0.1 - 2026-10-02
+
+- **Optional features' arrows work.** Clicking an arrow showed the features under it only on the next click, and
+  clicking another feature's arrow could hide or show the wrong ones; now each click opens or closes that feature
+  straight away. The whole arrow square takes the click, not just the arrow's lines.
+
 ## 2.7.0.0 - 2026-10-02
 
 - **Optional features are a tree**, grouped the way Windows' own "Turn Windows features on or off" shows them:

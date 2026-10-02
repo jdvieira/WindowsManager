@@ -49,6 +49,8 @@ function Get-FeatureDescendants($f) {
 function Update-FeatureList {
     $script:FtShown.Clear()
     $filtering = $UI.FtOnOnly.IsChecked -or $UI.FtSearch.Text.Trim()
+    # the chevrons first: which features show depends on them
+    if (-not $filtering) { foreach ($f in $script:FtByKey.Values) { if ($f.HasChildren) { $f.IsExpanded = [bool]$script:FtExpanded[$f.Key] } } }
     foreach ($f in $script:FtByKey.Values) {
         if ($filtering) {
             if (-not (Test-FeatureMatch $f)) { continue }
@@ -59,7 +61,6 @@ function Update-FeatureList {
     }
     # while filtering, a parent that's showing for a match is shown open
     if ($filtering) { foreach ($f in $script:FtByKey.Values) { if ($f.HasChildren) { $f.IsExpanded = @($script:FtChildren[$f.Key] | Where-Object { $_ -and $script:FtShown.Contains($_.Key) }).Count -gt 0 } } }
-    else { foreach ($f in $script:FtByKey.Values) { if ($f.HasChildren) { $f.IsExpanded = [bool]$script:FtExpanded[$f.Key] } } }
     $FeatureView.Refresh()
 }
 function Set-FeatureExpanded([string]$Key, [bool]$Open) {

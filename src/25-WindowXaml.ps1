@@ -1695,7 +1695,10 @@ $Xaml = @'
                   <DockPanel VerticalAlignment="Center" Margin="0,9,14,9">
                     <Border x:Name="FtIndent" DockPanel.Dock="Left" Width="{Binding IndentWidth}"/>
                     <Button x:Name="FtToggle" DockPanel.Dock="Left" Tag="fttoggle" Style="{StaticResource HeaderButton}" Width="26" Height="20" VerticalAlignment="Top" Margin="0,0,4,0" ToolTip="Show or hide the features under it">
-                      <TextBlock x:Name="FtChevron" Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                      <!-- the whole square takes the click, not just the arrow's strokes -->
+                      <Border Width="26" Height="20" Background="Transparent">
+                        <TextBlock x:Name="FtChevron" Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                      </Border>
                     </Button>
                     <StackPanel>
                       <TextBlock Text="{Binding Name}" Foreground="#F2F2F2" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
