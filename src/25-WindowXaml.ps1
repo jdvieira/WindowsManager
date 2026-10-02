@@ -758,6 +758,7 @@ $Xaml = @'
         </RadioButton>
         <RadioButton x:Name="TabFeatures" GroupName="Section" Style="{StaticResource Tab}" Content="Windows Features" ToolTip="Windows' optional features, to turn on or off (Ctrl+8)"/>
         <RadioButton x:Name="TabCleanup" GroupName="Section" Style="{StaticResource Tab}" Content="Cleanup" ToolTip="Free up space: leftover files, large files and the biggest apps (Ctrl+9)"/>
+        <RadioButton x:Name="TabExtras" GroupName="Section" Style="{StaticResource Tab}" Content="Extras" ToolTip="Windows tweaks you can undo, and shortcuts to Windows' hidden tools (Ctrl+0)"/>
       </StackPanel>
     </Border>
     <Grid x:Name="SectionToolbar" Margin="32,16,32,14">
@@ -1731,6 +1732,155 @@ $Xaml = @'
             <ProgressBar x:Name="FtMsgBar" Style="{StaticResource Bar}" Width="240" IsIndeterminate="True" Margin="0,0,0,20"/>
             <TextBlock x:Name="FtMsgTitle" FontSize="17" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"/>
             <TextBlock x:Name="FtMsgText" Foreground="{StaticResource Muted}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,6,0,0"/>
+          </StackPanel>
+        </Grid>
+      </Border>
+    </Grid>
+
+    <!-- Extras: tweaks (each restorable) and shortcuts to Windows' hidden tools -->
+    <Grid x:Name="ExtrasPanel" Grid.Row="2" Margin="32,16,32,18" Visibility="Collapsed">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="*"/>
+      </Grid.RowDefinitions>
+      <Border Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+            <Button x:Name="ExRestartExplorer" Style="{StaticResource Ghost}" Content="Restart Explorer" ToolTip="Restart File Explorer and the taskbar, so changes to them show (open File Explorer windows close)"/>
+            <Button x:Name="ExRestoreAll" Margin="8,0,0,0" ToolTip="Put back everything this app changed here: each tweak as it was before, and the desktop shortcuts it added">
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="&#xE777;" FontFamily="Segoe MDL2 Assets" FontSize="13" Margin="0,1,8,0" VerticalAlignment="Center"/>
+                <TextBlock x:Name="ExRestoreAllText" Text="Restore all"/>
+              </StackPanel>
+            </Button>
+          </StackPanel>
+          <Border Width="44" Height="44" CornerRadius="10" Background="#17414C" Margin="0,0,14,0" VerticalAlignment="Center">
+            <TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="20" Foreground="{StaticResource Highlight}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <StackPanel VerticalAlignment="Center">
+            <TextBlock FontSize="16" FontWeight="SemiBold" Foreground="White" Text="Extras"/>
+            <TextBlock x:Name="ExText" Foreground="#BDBDBD" FontSize="12.5" Margin="0,4,0,0" TextWrapping="Wrap"/>
+          </StackPanel>
+        </DockPanel>
+      </Border>
+      <Grid Grid.Row="1" Margin="0,14,0,12">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto"/>
+          <ColumnDefinition Width="260"/>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <StackPanel Orientation="Horizontal" Margin="0,0,16,0">
+          <RadioButton x:Name="ExViewTweaks" GroupName="ExView" Style="{StaticResource Chip}" Margin="0,0,8,0" IsChecked="True">
+            <TextBlock x:Name="ExViewTweaksText" Text="Tweaks"/>
+          </RadioButton>
+          <RadioButton x:Name="ExViewTools" GroupName="ExView" Style="{StaticResource Chip}" Margin="0">
+            <TextBlock x:Name="ExViewToolsText" Text="Shortcuts"/>
+          </RadioButton>
+        </StackPanel>
+        <Grid Grid.Column="1">
+          <TextBox x:Name="ExSearch" Padding="34,7,10,7"/>
+          <TextBlock Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="13" Foreground="#8A8A8A" Margin="12,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"/>
+          <TextBlock Text="Filter" Foreground="#7A7A7A" Margin="36,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False">
+            <TextBlock.Style>
+              <Style TargetType="TextBlock">
+                <Setter Property="Visibility" Value="Collapsed"/>
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding Text, ElementName=ExSearch}" Value=""><Setter Property="Visibility" Value="Visible"/></DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </TextBlock.Style>
+          </TextBlock>
+        </Grid>
+        <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+          <Button x:Name="ExExpandAll" Style="{StaticResource Ghost}" Margin="0,0,8,0" ToolTip="Open or close every category"><TextBlock x:Name="ExExpandAllText" Text="Expand all"/></Button>
+          <ToggleButton x:Name="ExChangedOnly" Content="Changed by this app" Style="{StaticResource Chip}" Margin="0,0,8,0" ToolTip="Only what this app changed (and can restore)"/>
+          <Button x:Name="ExRefresh" ToolTip="Read them again (F5)">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="&#xE72C;" FontFamily="Segoe MDL2 Assets" FontSize="13" Margin="0,1,8,0" VerticalAlignment="Center"/>
+              <TextBlock Text="Refresh"/>
+            </StackPanel>
+          </Button>
+        </StackPanel>
+      </Grid>
+      <Border Grid.Row="2" Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+          </Grid.RowDefinitions>
+          <Border x:Name="ExHeader" BorderBrush="#2E2E2E" BorderThickness="0,0,0,1">
+            <Grid Height="40" Margin="20,0,26,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="170"/>
+                <ColumnDefinition Width="290"/>
+              </Grid.ColumnDefinitions>
+              <TextBlock x:Name="ExHeadName" Text="TWEAK" Style="{StaticResource Label}" VerticalAlignment="Center"/>
+              <TextBlock x:Name="ExHeadStatus" Grid.Column="1" Text="STATUS" Style="{StaticResource Label}" VerticalAlignment="Center"/>
+            </Grid>
+          </Border>
+          <ListBox x:Name="ExList" Grid.Row="1" Background="Transparent" BorderThickness="0" ItemContainerStyle="{StaticResource Row}" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                   VirtualizingPanel.ScrollUnit="Pixel" Focusable="False">
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <Grid>
+                <!-- a category: the whole row opens or closes it, like a feature's chevron on Windows Features -->
+                <Button x:Name="ExGroupRow" Tag="exgroup" Focusable="False" Visibility="Collapsed" Cursor="Hand" ToolTip="Show or hide what's in it">
+                  <Button.Template>
+                    <ControlTemplate TargetType="Button"><ContentPresenter/></ControlTemplate>
+                  </Button.Template>
+                  <Border Background="Transparent" Padding="20,12,16,12">
+                    <DockPanel>
+                      <TextBlock x:Name="ExChevron" Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="11" Foreground="#BDBDBD" Width="26" VerticalAlignment="Center"/>
+                      <TextBlock Text="{Binding HeaderNote}" DockPanel.Dock="Right" Foreground="#8A8A8A" FontSize="12.5" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                      <TextBlock Text="{Binding Name}" Foreground="{StaticResource Highlight}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    </DockPanel>
+                  </Border>
+                </Button>
+                <Grid x:Name="ExItemRow" MinHeight="56" Margin="46,0,16,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="170"/>
+                    <ColumnDefinition Width="290"/>
+                  </Grid.ColumnDefinitions>
+                  <StackPanel VerticalAlignment="Center" Margin="0,9,14,9">
+                    <StackPanel Orientation="Horizontal">
+                      <TextBlock Text="{Binding Name}" Foreground="#F2F2F2" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
+                      <TextBlock Text="&#xEA18;" FontFamily="Segoe MDL2 Assets" FontSize="11" Foreground="#9A9A9A" Margin="8,2,0,0" VerticalAlignment="Center" Background="Transparent"
+                                 Visibility="{Binding NeedsAdmin, Converter={StaticResource B2V}}" ToolTip="Needs administrator approval"/>
+                    </StackPanel>
+                    <TextBlock Text="{Binding Description}" Foreground="#A8A8A8" FontSize="12.5" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                    <TextBlock Text="{Binding SubText}" Foreground="#8A8A8A" FontSize="12" FontFamily="Consolas" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" ToolTip="{Binding SubText}"/>
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,10,0">
+                    <TextBlock x:Name="ExStatus" Text="{Binding StatusText}" Foreground="{StaticResource Good}" FontSize="12.5" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="ExSaved" Text="{Binding SavedNote}" Foreground="#8A8A8A" FontSize="12" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
+                    <ProgressBar x:Name="ExBar" Style="{StaticResource Bar}" IsIndeterminate="True" Margin="0,6,10,0" Visibility="Collapsed"/>
+                  </StackPanel>
+                  <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Button Content="{Binding Action2Text}" Tag="exaction2" Style="{StaticResource RowButton}" IsEnabled="{Binding CanAction2}" Margin="0,0,8,0"/>
+                    <Button Content="{Binding ActionText}" Tag="exaction" Style="{StaticResource RowButton}" IsEnabled="{Binding CanChange}"/>
+                  </StackPanel>
+                </Grid>
+                </Grid>
+                <DataTemplate.Triggers>
+                  <DataTrigger Binding="{Binding IsHeader}" Value="True"><Setter TargetName="ExGroupRow" Property="Visibility" Value="Visible"/><Setter TargetName="ExItemRow" Property="Visibility" Value="Collapsed"/></DataTrigger>
+                  <DataTrigger Binding="{Binding IsExpanded}" Value="True"><Setter TargetName="ExChevron" Property="Text" Value="&#xE70D;"/></DataTrigger>
+                  <DataTrigger Binding="{Binding On}" Value="False"><Setter TargetName="ExStatus" Property="Foreground" Value="#8A8A8A"/></DataTrigger>
+                  <DataTrigger Binding="{Binding HasSavedNote}" Value="False"><Setter TargetName="ExSaved" Property="Visibility" Value="Collapsed"/></DataTrigger>
+                  <DataTrigger Binding="{Binding State}" Value="running"><Setter TargetName="ExBar" Property="Visibility" Value="Visible"/><Setter TargetName="ExStatus" Property="Foreground" Value="White"/></DataTrigger>
+                  <DataTrigger Binding="{Binding State}" Value="ok"><Setter TargetName="ExStatus" Property="Foreground" Value="{StaticResource Good}"/></DataTrigger>
+                  <DataTrigger Binding="{Binding State}" Value="error"><Setter TargetName="ExStatus" Property="Foreground" Value="{StaticResource Bad}"/></DataTrigger>
+                  <DataTrigger Binding="{Binding State}" Value="reboot"><Setter TargetName="ExStatus" Property="Foreground" Value="{StaticResource Warn}"/></DataTrigger>
+                </DataTemplate.Triggers>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <StackPanel x:Name="ExMsgPanel" Grid.RowSpan="2" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="560" Visibility="Collapsed">
+            <TextBlock x:Name="ExMsgTitle" FontSize="17" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"/>
+            <TextBlock x:Name="ExMsgText" Foreground="{StaticResource Muted}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,6,0,0"/>
           </StackPanel>
         </Grid>
       </Border>

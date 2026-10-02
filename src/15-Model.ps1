@@ -374,6 +374,57 @@ namespace WingetUM {
         public bool HasTreeNote { get { return treeNote.Length > 0; } }
     }
 
+    // A row of the Extras tab: a tweak (a Windows setting, turned on or off and restorable) or a tool (a hidden
+    // Windows tool or folder: opened, or added to the desktop)
+    public class ExtraItem : INotifyPropertyChanged {
+        public event PropertyChangedEventHandler PropertyChanged;
+        private void Changed(params string[] names) {
+            PropertyChangedEventHandler h = PropertyChanged;
+            if (h == null) return;
+            foreach (string n in names) h(this, new PropertyChangedEventArgs(n));
+        }
+        private bool on, saved, available = true;
+        private string state = "", detail = "";
+        // tweak | tool, or a category's header row: tweakgroup | toolgroup
+        public string Kind { get; set; }
+        public string Id { get; set; }
+        public string Group { get; set; }
+        public string SortKey { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public string SubText { get; set; }
+        public bool NeedsAdmin { get; set; }
+        public bool IsTweak { get { return Kind == "tweak"; } }
+        public bool IsTool { get { return Kind == "tool"; } }
+        public bool IsHeader { get { return Kind == "tweakgroup" || Kind == "toolgroup"; } }
+        // a header: whether its category shows what's in it, and what's in it ("10 tweaks, 3 on")
+        private bool expanded;
+        public bool IsExpanded { get { return expanded; } set { expanded = value; Changed("IsExpanded"); } }
+        private string headerNote = "";
+        public string HeaderNote { get { return headerNote; } set { headerNote = value ?? ""; Changed("HeaderNote"); } }
+        public bool Available { get { return available; } set { available = value; Changed("Available", "CanChange", "CanAction2", "StatusText"); } }
+        // a tweak: turned on; a tool: on the desktop
+        public bool On { get { return on; } set { on = value; Changed("On", "StatusText", "ActionText", "Action2Text", "CanAction2"); } }
+        // a tweak: what was there before this app changed it is saved; a tool: this app put it on the desktop
+        public bool Saved { get { return saved; } set { saved = value; Changed("Saved", "SavedNote", "HasSavedNote", "CanAction2"); } }
+        public string State { get { return state; } set { state = value ?? ""; Changed("State", "IsBusy", "CanChange", "CanAction2", "StatusText"); } }
+        public string Detail { get { return detail; } set { detail = value ?? ""; Changed("Detail", "StatusText"); } }
+        public bool IsBusy { get { return state == "running"; } }
+        public bool CanChange { get { return !IsBusy && available; } }
+        public bool CanAction2 { get { return !IsBusy && (IsTweak ? saved : available && (!on || saved)); } }
+        public string StatusText {
+            get {
+                if (!string.IsNullOrEmpty(state) && !string.IsNullOrEmpty(detail)) return detail;
+                if (IsTweak) return !available ? "Not available" : (on ? "On" : "Off");
+                return !available ? "Not on this PC" : (on ? "On the desktop" : "");
+            }
+        }
+        public string SavedNote { get { return !saved ? "" : (IsTweak ? "Changed by this app" : "Added by this app"); } }
+        public bool HasSavedNote { get { return saved; } }
+        public string ActionText { get { return IsTweak ? (on ? "Turn off" : "Turn on") : "Open"; } }
+        public string Action2Text { get { return IsTweak ? "Restore" : (on ? "Remove from desktop" : "Add to desktop"); } }
+    }
+
     // One line of the History panel (history.jsonl)
     public class HistoryEntry {
         public System.DateTime Time { get; set; }
@@ -403,6 +454,9 @@ namespace WingetUM {
                     case "drvinstall": return "Reinstalled all drivers:";
                     case "drvreinstall": return "Reinstalled driver:";
                     case "drvremove": return "Removed driver:";
+                    case "tweakon": return "Turned on:";
+                    case "tweakoff": return "Turned off:";
+                    case "tweakrestore": return "Restored:";
                     default: return "Updated";
                 }
             }
@@ -418,6 +472,7 @@ namespace WingetUM {
                     case "winupdate": return ((char)0xE895).ToString();
                     case "startupoff": case "startupon": return ((char)0xE7E8).ToString();
                     case "cleanup": return ((char)0xE74D).ToString();
+                    case "tweakon": case "tweakoff": case "tweakrestore": return ((char)0xE713).ToString();
                     default: return ((char)0xE777).ToString();
                 }
             }
