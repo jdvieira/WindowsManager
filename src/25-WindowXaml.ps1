@@ -2002,8 +2002,12 @@ $Xaml = @'
               <TextBlock Text="CONTRIBUTORS" Style="{StaticResource Label}"/>
               <TextBlock Text="Brandon Bolding" FontSize="15" Foreground="White" Margin="0,4,0,10"/>
               <TextBlock Text="CONTACT" Style="{StaticResource Label}"/>
-              <TextBlock Margin="0,4,0,0" FontSize="14">
+              <TextBlock Margin="0,4,0,10" FontSize="14">
                 <Hyperlink x:Name="AboutMail" NavigateUri="mailto:jdvieira@icloud.com" Foreground="{StaticResource Highlight}">jdvieira@icloud.com</Hyperlink>
+              </TextBlock>
+              <TextBlock Text="GITHUB" Style="{StaticResource Label}"/>
+              <TextBlock Margin="0,4,0,0" FontSize="14">
+                <Hyperlink x:Name="AboutRepo" NavigateUri="https://github.com/jdvieira/WindowsManager" Foreground="{StaticResource Highlight}" ToolTip="Opens the repository on GitHub in your browser">https://github.com/jdvieira/WindowsManager</Hyperlink>
               </TextBlock>
             </StackPanel>
           </Border>

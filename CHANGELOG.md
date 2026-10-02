@@ -11,6 +11,7 @@ All notable changes to Windows Manager (called Windows Software Manager in 2.0, 
   could have changed the script before you approved it, and your approval would then have run its code. Now the
   approved step checks that the script is exactly what the app wrote, and runs only that; a changed script doesn't
   run, and the log says so. The scripts and logs are still kept there to read afterwards.
+- **About** (the **i** button) links to the source code on GitHub, under the contact email.
 
 ## 2.4.2.0 - 2026-10-02
 
