@@ -3,6 +3,13 @@
 All notable changes to Windows Manager (called Windows Software Manager in 2.0, and Windows Package Manager before
 1.0). The version is `$AppVersion` in `src\00-Startup.ps1`, which Build-Exe.ps1 also stamps on the exe.
 
+## 2.4.3.0 - 2026-10-02
+
+- **Nicer trend charts on Device Health.** Each line has a soft fill under it and a faint baseline. Hover anywhere on
+  a chart: a guide line snaps to the nearest day and shows that day's value and date, so there's no need to aim at
+  the line. Beside each chart, the latest value is in bold and the change since the first reading has an arrow, in
+  green when it's good news (more free space, fewer crashes) and red when it isn't.
+
 ## 2.4.2.1 - 2026-10-02
 
 - **Administrator steps run only what the app wrote.** Before each step that needs administrator approval (driver
