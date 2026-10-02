@@ -22,8 +22,26 @@ Approving the pull request approves the release, so keep each one focused, teste
 
 - Windows 10 or 11 with **Windows PowerShell 5.1** (the app targets 5.1, not PowerShell 7).
 - **git** and the **GitHub CLI** (`gh auth login`).
-- The **ps2exe** module, to build the exe: `Install-Module ps2exe -Scope CurrentUser`.
+- The **ps2exe** module **1.0.18**, the version CI and releases build with (pinned in both workflows).
 - **winget** (App Installer), for the self-test.
+
+### Setting up a new PC
+
+```powershell
+winget install --id Git.Git -e --source winget
+winget install --id GitHub.cli -e --source winget
+# close and reopen VS Code (or the terminal) so git and gh are on PATH, then:
+gh auth login                                        # GitHub.com, HTTPS, log in with a web browser
+git config --global user.name "<your name>"
+git config --global user.email "<your email>"
+Install-PackageProvider NuGet -MinimumVersion 2.8.5.201 -Scope CurrentUser -Force   # Windows PowerShell 5.1's PowerShellGet needs it first
+Install-Module ps2exe -RequiredVersion 1.0.18 -Scope CurrentUser -Force
+git clone https://github.com/jdvieira/WindowsManager.git
+```
+
+Keep the clone out of OneDrive if you can: OneDrive syncs `.git` and `dist\` and can lock files during a build.
+Run VS Code normally, not as administrator: run elevated, everything it starts (the app, its administrator steps)
+skips the approval prompt, so you can't see what asks for administrator rights.
 
 ## Step by step
 
@@ -58,8 +76,9 @@ Check open pull requests first (`gh pr list`), so two people don't take the same
 
 - **ASCII only** in `src\` (the build refuses anything else: Windows PowerShell 5.1 reads files without a BOM as
   ANSI). Use `[char]0x2026` and the like for special characters.
-- **Bump `$AppVersion`** in `src\00-Startup.ps1` for every change to the app, and add a **`CHANGELOG.md`** section
-  with the same number at the top (`## <version> - <yyyy-mm-dd>`). Its text becomes the release notes users see.
+- **Bump `$AppVersion`** in `src\00-Startup.ps1` when the change is to be released (the owner decides, see step 5),
+  and add a **`CHANGELOG.md`** section with the same number at the top (`## <version> - <yyyy-mm-dd>`). An app
+  change merged without a bump reaches users with the next release; give it a line in that release's section. Its text becomes the release notes users see.
   Versions are `major.minor.patch.build`: a new feature bumps the second or third number (2.4.0.0 to 2.5.0.0 or
   2.4.1.0), a small fix the last (2.4.1.0 to 2.4.1.1). Changes that don't touch the app (docs, workflows) don't bump it.
 - **Update the docs** the change affects: `README.md` (what each tab does), `TESTING.md` (real-PC checks for things
@@ -93,6 +112,13 @@ Write in the pull request what you tested and how.
 
 ### 5. Commit, push and open the pull request
 
+Every change reaches `main` through its own pull request; nothing is pushed to `main` directly. Before publishing,
+the person making the change answers two separate questions, every time:
+
+1. **Publish these changes?** Push the branch, open the pull request, and (for the owner) merge it once CI passes.
+2. **Make a release with it?** Bump `$AppVersion` and add its `CHANGELOG.md` section, so that merging publishes a
+   version every copy of the app is offered. Without it, the change merges and waits for the next release.
+
 ```powershell
 git add -A
 git status                       # only the files you meant to change
@@ -111,6 +137,19 @@ branch (`git fetch; git merge origin/main`), and if someone else released your v
 next one. Once merged, a version bump publishes the release automatically; check the **Actions** tab for the
 *Release* run. After that, `git switch main; git pull --ff-only` and delete your branch.
 
+How `main` is protected (the **Main-2** ruleset): pull requests only, merge commits only, the CI **build** check must
+pass, and one approval from a **code owner** (`.github/CODEOWNERS`: the owner). New commits after an approval need
+a new one. Contributors can't merge their own pull requests and can't approve each other's. GitHub never lets
+anyone approve their own pull request, so the owner merges his own through the bypass the ruleset gives
+administrators, once CI passes:
+
+```powershell
+gh pr merge <number> --merge --admin --match-head-commit <the commit CI tested>
+```
+
+Don't loosen these rules (fewer approvals, no code owner review, no CI check) to make a merge easier. The owner has
+decided they stay.
+
 Betas (pre-releases, offered only to copies with **Get beta versions** on) are published by the owner with a tag
 such as `v2.5.0.0-beta1`.
 
@@ -118,9 +157,25 @@ such as `v2.5.0.0-beta1`.
 
 - Before anything else in a session: `git fetch --prune` and make sure the branch you work on starts from the latest
   `origin/main`. Don't reset, stash or discard anyone's local changes; ask.
-- Ask the person you're working with before pushing, opening a pull request, or anything else that publishes.
-- Never approve or merge pull requests, push to `main`, create tags or releases, change repository settings, or
-  touch secrets: those are the owner's.
+- **After every change, ask the two questions in step 5 (publish it? make a release with it?) as two separate
+  questions**, even when the answer seems obvious, and even if an earlier change was approved: an approval covers
+  one change. Ask them as prompts with **Yes** and **No** buttons (the AskUserQuestion tool, both questions in one
+  prompt), not as text in a reply. Don't push, open a pull request or bump the version until the person has answered.
+- **Merging:** only when working with the owner (`jdvieira`) and he has said to publish, and only once CI passes
+  on the commit you merge: the `gh pr merge ... --admin --match-head-commit` command in step 6. Then watch the
+  *Release* run (`gh run watch`) and report the release, or that none was made. On a contributor's behalf, never
+  merge or approve: that's the owner's review.
+- Claude Code's auto mode refuses a merge that skips a required review unless a permission rule allows it. The
+  owner's settings allow `Bash(gh pr merge:*)`: run the merge as a plain `gh pr merge ...` in the Bash tool (not
+  PowerShell, not `gh` by its full path), or the rule doesn't match. If it's refused, don't look for another way
+  around it; ask the owner to merge it.
+- Never push to `main`, create tags or releases by hand, change repository settings or rulesets, or touch secrets:
+  those are the owner's.
+- **Decided, so don't suggest them:** publishing to winget (`winget-pkgs`) is off; signing the exe is on hold until
+  the owner sets up a signing account (the plan then: sign in `release.yml`, and have the updater refuse an exe not
+  signed by that certificate).
+- If `gh` or `git` isn't found right after installing it, the session started before the install; restart VS Code
+  rather than calling them by their full paths.
 - Edit files without changing their line endings or encoding (keep each file's BOM and CRLF or LF as they are).
   Don't write a file in the same command that reads it.
 - Windows PowerShell 5.1 pitfalls seen here:
@@ -133,3 +188,10 @@ such as `v2.5.0.0-beta1`.
   - In WPF, `Window.Hide()` on a window shown with `ShowDialog()` ends `ShowDialog`.
   - GitHub runs PowerShell workflow steps with `$ErrorActionPreference = 'Stop'`, so a native command's stderr
     becomes an error: set `'Continue'` and check `$LASTEXITCODE`.
+  - `Set-Content -Encoding UTF8` and `Out-File -Encoding UTF8` write a byte-order mark. For a file another tool
+    reads (release notes, JSON), write UTF-8 without one: `[IO.File]::WriteAllText($path, $text, (New-Object Text.UTF8Encoding($false)))`.
+  - `Net.WebClient` reads text as the ANSI code page: set `$wc.Encoding = [Text.Encoding]::UTF8` for UTF-8 sources.
+  - Keep workflow `run:` scripts ASCII; Windows PowerShell can misread anything else in them.
+  - `git commit -F -` reads standard input, not the next argument: write the message to a file and pass its path.
+  - Quotes inside `gh ... --jq '...'` arguments get mangled when passed to a native command; pipe the JSON to
+    `ConvertFrom-Json` instead.

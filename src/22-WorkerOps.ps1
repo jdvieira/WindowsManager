@@ -109,6 +109,7 @@ if ($Op -eq 'appupdate') {
     try {
         [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
         $wc = New-Object Net.WebClient
+        $wc.Encoding = [Text.Encoding]::UTF8   # GitHub sends UTF-8; WebClient would read it as the ANSI code page
         $wc.Headers['User-Agent'] = 'WindowsManager-Updater'
         $wc.Headers['Accept'] = 'application/vnd.github+json'
         if ($Arg.Beta) {

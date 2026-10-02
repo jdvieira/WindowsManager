@@ -117,8 +117,9 @@ function Request-AppUpdate {
     if (-not $r) { return }
     $when = ''; try { $when = ', released {0:MMM d}' -f [datetime]$r.Published } catch { }
     $kind = if ($r.Prerelease) { ' (a pre-release, for testing)' } else { '' }
-    # release notes are Markdown with wrapped lines: plain text, one paragraph or bullet per line
-    $notes = (([string]$r.Notes) -replace "`r", '' -replace '\*\*|`', '' -replace '(?m)^#+\s*', '' -replace '\n(?![ \t]*(- |\n|$))[ \t]*', ' ').Trim()
+    # release notes are Markdown with wrapped lines: plain text, one paragraph or bullet per line. Releases up to
+    # 2.4.3.0 start with a byte-order mark, which isn't whitespace to Trim.
+    $notes = (([string]$r.Notes).TrimStart([char]0xFEFF) -replace "`r", '' -replace '\*\*|`', '' -replace '(?m)^#+\s*', '' -replace '\n(?![ \t]*(- |\n|$))[ \t]*', ' ').Trim()
     if ($notes.Length -gt 900) { $notes = $notes.Substring(0, 900).TrimEnd() + $Ellipsis }
     if (-not $IsCompiled) {
         Show-Confirm 'appupdatesrc' $null "Windows Manager $($r.Version) is available" "Version $($r.Version)$kind is on GitHub$when (this is $AppVersion). This copy runs from its source files, so it can't replace itself: pull the new version with git, or download the exe from the release page.$(if ($notes) { "`n`nWhat's new:`n$notes" })" 'Open the release page'
