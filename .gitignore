@@ -1,2 +1,4 @@
 dist/
 *.log
+# Claude Code's settings and permissions are each person's own, not the project's
+.claude/
