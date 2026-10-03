@@ -1515,6 +1515,26 @@ $Xaml = @'
               <TextBlock x:Name="HlPerfTitle" FontSize="16" FontWeight="SemiBold" Foreground="White" Margin="0,10,0,0" TextTrimming="CharacterEllipsis"/>
               <ProgressBar x:Name="HlMemBar" Style="{StaticResource Bar}" Height="6" Margin="0,10,0,0"/>
               <ItemsControl x:Name="HlPerfItems" Margin="0,8,0,0" ItemTemplate="{StaticResource CheckRow}"/>
+              <!-- the apps using the most memory: name, a bar against the biggest, and how much -->
+              <StackPanel x:Name="HlTopMemPanel" Margin="0,14,0,0" Visibility="Collapsed">
+                <TextBlock Text="USING THE MOST MEMORY" Style="{StaticResource Label}"/>
+                <ItemsControl x:Name="HlTopMem" Margin="0,6,0,0">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Grid Margin="0,3,0,3" Background="Transparent">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="90"/>
+                          <ColumnDefinition Width="62"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{Binding Name}" Foreground="#E0E0E0" FontSize="12.5" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" ToolTip="{Binding Name}"/>
+                        <ProgressBar Grid.Column="1" Style="{StaticResource Bar}" Height="4" Maximum="100" Value="{Binding UsedPct}" Margin="10,0,10,0" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="2" Text="{Binding Detail}" Foreground="#BDBDBD" FontSize="12.5" TextAlignment="Right" VerticalAlignment="Center"/>
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
               <Button x:Name="HlPerfOpen" Style="{StaticResource Ghost}" Content="Task Manager" HorizontalAlignment="Left" Margin="0,10,0,0" ToolTip="Open Task Manager to see what is using the processor and memory"/>
             </StackPanel>
           </Border>

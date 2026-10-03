@@ -549,7 +549,27 @@ if ($Op -eq 'health') {
     try { $si = @(Get-CimInstance Win32_ReliabilityStabilityMetrics -ErrorAction Stop | Sort-Object TimeGenerated -Descending) | Select-Object -First 1; if ($si) { $rel.Index = [double]$si.SystemStabilityIndex } } catch { }
     $since = (Get-Date).AddDays(-30)
     try { $rel.Shutdowns = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; Id = 41; StartTime = $since } -ErrorAction SilentlyContinue).Count } catch { }
-    try { $rel.BlueScreens = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; Id = 1001; ProviderName = 'Microsoft-Windows-WER-SystemErrorReporting'; StartTime = $since } -ErrorAction SilentlyContinue).Count } catch { }
+    try {
+        $bsod = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; Id = 1001; ProviderName = 'Microsoft-Windows-WER-SystemErrorReporting'; StartTime = $since } -ErrorAction SilentlyContinue)
+        $rel.BlueScreens = $bsod.Count
+        # the newest one's time and stop code ("The bugcheck was: 0x0000009f (...)")
+        if ($bsod.Count) {
+            $m = [regex]::Match([string]$bsod[0].Message, '0x[0-9a-fA-F]{8}')
+            $rel.LastBsod = @{ Time = $bsod[0].TimeCreated; Code = $(if ($m.Success) { $m.Value.ToLowerInvariant() } else { '' }) }
+        }
+    }
+    catch { }
+    # hardware errors Windows recorded (WHEA: processor, memory, PCIe), fatal ones among them; disk errors (bad blocks,
+    # failed reads, file system corruption); apps that stopped responding; failed Windows Update installs
+    try {
+        $whea = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-WHEA-Logger'; StartTime = $since } -ErrorAction SilentlyContinue)
+        $rel.Hardware = $whea.Count
+        $rel.HardwareFatal = @($whea | Where-Object { $_.Level -in 1, 2 }).Count
+    }
+    catch { }
+    try { $rel.DiskErrors = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; Id = 7, 51, 55, 153; StartTime = $since } -ErrorAction SilentlyContinue | Where-Object { $_.ProviderName -match '^(disk|Ntfs|Microsoft-Windows-Ntfs)$' }).Count } catch { }
+    try { $rel.Hangs = @(Get-WinEvent -FilterHashtable @{ LogName = 'Application'; Id = 1002; ProviderName = 'Application Hang'; StartTime = (Get-Date).AddDays(-7) } -ErrorAction SilentlyContinue).Count } catch { }
+    try { $rel.UpdateFails = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; Id = 20; ProviderName = 'Microsoft-Windows-WindowsUpdateClient'; StartTime = $since } -ErrorAction SilentlyContinue).Count } catch { }
     try {
         $crash = @(Get-WinEvent -FilterHashtable @{ LogName = 'Application'; Id = 1000; ProviderName = 'Application Error'; StartTime = (Get-Date).AddDays(-7) } -ErrorAction SilentlyContinue)
         $rel.Crashes = $crash.Count

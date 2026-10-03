@@ -5,6 +5,17 @@ All notable changes to Windows Manager (called Windows Software Manager in 2.0, 
 version's section becomes its release notes, which the app shows under "What's new", so it lists only changes to the
 app, not to the repository.
 
+## 2.9.1.0 - 2026-10-03
+
+- **Reliability says more.** Device Health's Reliability card adds the last blue screen's date and why it happened in
+  plain words, hardware errors and disk errors from the last 30 days, apps that stopped responding, and failed
+  Windows updates.
+- **App crashes show a color**: amber with any in the last 7 days, red with 10 or more.
+- **The apps using the most memory** have their own list in the Performance card, each with its name, a bar and how
+  much it uses, instead of lines without a label.
+- **Network colors**: the network and address are green while connected (red when the router gave no address), and
+  link speed is green at 1 Gbps, amber at 100 Mbps and red below that (lower thresholds on Wi-Fi).
+
 ## 2.9.0.0 - 2026-10-02
 
 - **Fix my PC**, on Device Health: one button that checks app and Windows updates, leftover files, security,
