@@ -5,6 +5,23 @@ All notable changes to Windows Manager (called Windows Software Manager in 2.0, 
 version's section becomes its release notes, which the app shows under "What's new", so it lists only changes to the
 app, not to the repository.
 
+## 2.9.0.0 - 2026-10-02
+
+- **Fix my PC**, on Device Health: one button that checks app and Windows updates, leftover files, security,
+  reliability and startup apps, and lists what would make the PC run better. The safe fixes are ticked (updates,
+  Defender's virus definitions and a quick scan, the firewall and real-time protection back on, leftover files); a
+  Windows repair, optimizing drives and startup apps are there if you want them; and what it can't do itself (a
+  waiting restart, driver updates, a nearly full drive) points to where it can be done. One click does the ticked
+  ones, with one administrator approval and a restore point first. It never restarts the PC by itself.
+- **15 more tweaks on Extras**, all restorable: hide Widgets and the Copilot button, search as an icon, more pins in
+  Start, drive letters first, no OneDrive and Microsoft 365 offers in File Explorer, no recent files in Home, activity
+  history and Recall snapshots off, only required diagnostic data, and turning off hibernation.
+- **A new Speed category**: no startup delay for sign-in apps, Edge not running in the background, hardware-accelerated
+  GPU scheduling, and the High performance power plan (brought back where Windows 11 hides it).
+- **More to clean up**: browser caches, graphics shader caches, Windows' own Disk Cleanup items (including the
+  previous Windows installation), the component store, and old driver versions Windows keeps after updates. All are
+  off by default; drivers in use are never removed.
+
 ## 2.8.0.0 - 2026-10-02
 
 - **New Extras tab** (Ctrl+0), with Windows tweaks and shortcuts to Windows' hidden tools, each grouped by topic in

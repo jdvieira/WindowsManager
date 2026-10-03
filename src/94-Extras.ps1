@@ -41,6 +41,11 @@ function New-TweakValue([string]$Path, [string]$Name, [string]$Kind, $On, $Off) 
 $ExAdv = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
 $ExCdm = 'HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager'
 $ExClassic = 'HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}'
+# how much the hibernation file takes here, for its tweak's text
+$ExHiberText = ''
+try { $hf = Join-Path $env:SystemDrive 'hiberfil.sys'; if (Test-Path -LiteralPath $hf) { $ExHiberText = ' (' + (Format-Size (Get-Item -LiteralPath $hf -Force).Length) + ' here)' } } catch { }
+# Some tweaks are commands rather than registry values (Cmd): Read says the state now, On and Off are the states the
+# tweak sets, Code sets one (__STATE__), Test says whether this PC has it at all, Show is what the row shows
 $ExtraTweaks = @(
     @{ Id = 'classicmenu'; Group = 'File Explorer'; Name = 'Classic right-click menu'; After = 'explorer'; OffKey = $ExClassic
         Text = "The full right-click menu, as in Windows 10, without picking Show more options first."
@@ -72,6 +77,15 @@ $ExtraTweaks = @(
     @{ Id = 'shortcutname'; Group = 'File Explorer'; Name = 'No "- Shortcut" on new shortcuts'; After = 'explorer'
         Text = 'New shortcuts are named like what they open, without " - Shortcut" at the end.'
         Values = @((New-TweakValue 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\NamingTemplates' 'ShortcutNameTemplate' 'String' '%s.lnk' $null)) }
+    @{ Id = 'driveletters'; Group = 'File Explorer'; Name = 'Drive letters before drive names'; After = 'explorer'
+        Text = 'This PC shows "(C:) Windows" instead of "Windows (C:)", so drives sort and read by letter.'
+        Values = @((New-TweakValue 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer' 'ShowDriveLettersFirst' 'DWord' 4 $null)) }
+    @{ Id = 'nosyncads'; Group = 'File Explorer'; Name = 'No OneDrive and Microsoft 365 offers'; After = 'explorer'
+        Text = "File Explorer doesn't show offers and tips from OneDrive and Microsoft 365 at the top of folders."
+        Values = @((New-TweakValue $ExAdv 'ShowSyncProviderNotifications' 'DWord' 0 1)) }
+    @{ Id = 'nohomerecent'; Group = 'File Explorer'; Name = 'No recent and frequent files in Home'; After = 'explorer'
+        Text = "Home (and Quick access) doesn't list the files and folders you used recently or often."
+        Values = @((New-TweakValue 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer' 'ShowRecent' 'DWord' 0 1), (New-TweakValue 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer' 'ShowFrequent' 'DWord' 0 1)) }
 
     @{ Id = 'endtask'; Group = 'Taskbar and Start'; Name = 'End task on the taskbar'; After = ''
         Text = "Right-click an app on the taskbar to close it, even when it's not responding."
@@ -103,6 +117,18 @@ $ExtraTweaks = @(
     @{ Id = 'nosnapflyout'; Group = 'Taskbar and Start'; Name = 'No Snap layouts on the maximize button'; After = ''
         Text = "Pointing at a window's maximize button doesn't pop up the Snap layouts. Windows key + Z still shows them."
         Values = @((New-TweakValue $ExAdv 'EnableSnapAssistFlyout' 'DWord' 0 1)) }
+    @{ Id = 'nowidgets'; Group = 'Taskbar and Start'; Name = 'Hide Widgets'; After = 'explorer'
+        Text = "Removes the Widgets button and its news feed from the taskbar. Windows' own switch for it is locked on newer versions, so this uses a Windows-wide setting."
+        Values = @((New-TweakValue 'HKLM\SOFTWARE\Policies\Microsoft\Dsh' 'AllowNewsAndInterests' 'DWord' 0 $null)) }
+    @{ Id = 'nocopilotbutton'; Group = 'Taskbar and Start'; Name = 'Hide the Copilot button'; After = 'explorer'
+        Text = 'Removes the Copilot button from the taskbar, where Windows has one. The Copilot app still works.'
+        Values = @((New-TweakValue $ExAdv 'ShowCopilotButton' 'DWord' 0 1)) }
+    @{ Id = 'searchicon'; Group = 'Taskbar and Start'; Name = 'Search as an icon on the taskbar'; After = ''
+        Text = 'The taskbar shows a search icon instead of the wide search box, leaving more room for apps.'
+        Values = @((New-TweakValue 'HKCU\Software\Microsoft\Windows\CurrentVersion\Search' 'SearchboxTaskbarMode' 'DWord' 1 2)) }
+    @{ Id = 'morepins'; Group = 'Taskbar and Start'; Name = 'More pins in Start'; After = ''
+        Text = 'Start shows more pinned apps and a smaller Recommended section.'
+        Values = @((New-TweakValue $ExAdv 'Start_Layout' 'DWord' 1 0)) }
 
     @{ Id = 'noadid'; Group = 'Privacy and suggestions'; Name = 'Turn off the advertising ID'; After = ''
         Text = "Apps can't use your advertising ID to show you personalized ads."
@@ -125,6 +151,15 @@ $ExtraTweaks = @(
     @{ Id = 'nofinishsetup'; Group = 'Privacy and suggestions'; Name = 'No "finish setting up your PC" prompts'; After = ''
         Text = "Windows stops asking you to finish setting up the PC with Microsoft's services after updates."
         Values = @((New-TweakValue 'HKCU\Software\Microsoft\Windows\CurrentVersion\UserProfileEngagement' 'ScoobeSystemSettingEnabled' 'DWord' 0 1)) }
+    @{ Id = 'noactivity'; Group = 'Privacy and suggestions'; Name = 'Turn off activity history'; After = ''
+        Text = "Windows doesn't keep a history of the apps, files and sites you used on this PC, or send it to Microsoft."
+        Values = @((New-TweakValue 'HKLM\SOFTWARE\Policies\Microsoft\Windows\System' 'PublishUserActivities' 'DWord' 0 $null), (New-TweakValue 'HKLM\SOFTWARE\Policies\Microsoft\Windows\System' 'UploadUserActivities' 'DWord' 0 $null)) }
+    @{ Id = 'norecall'; Group = 'Privacy and suggestions'; Name = 'Turn off Recall snapshots'; After = 'signout'
+        Text = "On Copilot+ PCs, Recall doesn't save snapshots of your screen. Other PCs don't have Recall, so nothing changes there."
+        Values = @((New-TweakValue 'HKCU\Software\Policies\Microsoft\Windows\WindowsAI' 'DisableAIDataAnalysis' 'DWord' 1 $null)) }
+    @{ Id = 'mintelemetry'; Group = 'Privacy and suggestions'; Name = 'Send only required diagnostic data'; After = ''
+        Text = "Windows sends Microsoft only the diagnostic data it needs to stay secure and up to date. Settings then says some settings are managed by your organization; that's this."
+        Values = @((New-TweakValue 'HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection' 'AllowTelemetry' 'DWord' 1 $null)) }
 
     @{ Id = 'nomouseaccel'; Group = 'Mouse, keyboard and games'; Name = 'Turn off mouse acceleration'; After = 'signout'
         Text = 'The pointer moves the same distance however fast you move the mouse (Enhance pointer precision off).'
@@ -139,6 +174,22 @@ $ExtraTweaks = @(
         Text = 'Num Lock is on when Windows starts, so a PIN or password with numbers types right.'
         Values = @((New-TweakValue 'HKU\.DEFAULT\Control Panel\Keyboard' 'InitialKeyboardIndicators' 'String' '2' '0')) }
 
+    @{ Id = 'nostartupdelay'; Group = 'Speed'; Name = 'No delay for startup apps'; After = 'signout'
+        Text = 'Windows waits about 10 seconds after you sign in before it starts your startup apps. This starts them straight away.'
+        Values = @((New-TweakValue 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Serialize' 'StartupDelayInMSec' 'DWord' 0 $null)) }
+    @{ Id = 'noedgebackground'; Group = 'Speed'; Name = "Edge doesn't run in the background"; After = ''
+        Text = "Edge doesn't start with Windows (startup boost) or keep running after you close it, which saves memory. Edge's settings then say they're managed by your organization; that's this."
+        Values = @((New-TweakValue 'HKLM\SOFTWARE\Policies\Microsoft\Edge' 'StartupBoostEnabled' 'DWord' 0 $null), (New-TweakValue 'HKLM\SOFTWARE\Policies\Microsoft\Edge' 'BackgroundModeEnabled' 'DWord' 0 $null)) }
+    @{ Id = 'gpusched'; Group = 'Speed'; Name = 'Hardware-accelerated GPU scheduling'; After = 'restart'
+        Text = 'The graphics card schedules its own work, which can lower lag in games. Needs a recent graphics card and driver.'
+        Values = @((New-TweakValue 'HKLM\SYSTEM\CurrentControlSet\Control\GraphicsDrivers' 'HwSchMode' 'DWord' 2 1)) }
+    @{ Id = 'highperf'; Group = 'Speed'; Name = 'High performance power plan'; After = ''; Admin = $true
+        Text = "The processor stays ready at full speed instead of saving power. Uses more power; turning it off goes back to Balanced. Windows 11 hides this plan, so it's added back first; some laptops can't use it at all."
+        Cmd = @{ Show = 'powercfg /setactive'; On = '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c'; Off = '381b4222-f694-41f0-9685-ff5bb260df2e'
+            Read = { $m = [regex]::Match([string](& powercfg.exe /getactivescheme), '[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}'); if ($m.Success) { $m.Value.ToLowerInvariant() } else { '' } }
+            # a hidden built-in plan comes back under its own ID (duplicatescheme with the same ID twice)
+            Code = 'if ([string](& powercfg.exe /list) -notmatch ''__STATE__'') { $null = & powercfg.exe /duplicatescheme __STATE__ __STATE__ 2>&1; if ($LASTEXITCODE) { throw "This PC doesn''t have that power plan" } }; & powercfg.exe /setactive __STATE__; if ($LASTEXITCODE) { throw ("powercfg stopped with code " + $LASTEXITCODE) }' } }
+
     @{ Id = 'longpaths'; Group = 'System'; Name = 'Allow long file paths'; After = ''
         Text = 'Apps that support it can use paths longer than 260 characters, such as deep folders from developer tools.'
         Values = @((New-TweakValue 'HKLM\SYSTEM\CurrentControlSet\Control\FileSystem' 'LongPathsEnabled' 'DWord' 1 0)) }
@@ -151,6 +202,11 @@ $ExtraTweaks = @(
     @{ Id = 'bsoddetails'; Group = 'System'; Name = 'Details on blue screens'; After = 'restart'
         Text = 'A blue screen also shows the technical details of the error, to look up what caused it.'
         Values = @((New-TweakValue 'HKLM\SYSTEM\CurrentControlSet\Control\CrashControl' 'DisplayParameters' 'DWord' 1 $null)) }
+    @{ Id = 'nohibernate'; Group = 'System'; Name = 'Turn off hibernation'; After = ''; Admin = $true
+        Text = "Deletes hiberfil.sys, which takes space equal to a good share of the PC's memory$ExHiberText. Also turns off Hibernate and Fast Startup."
+        Cmd = @{ Show = 'powercfg /hibernate'; On = 'off'; Off = 'on'
+            Read = { if ([int](Get-ItemProperty -LiteralPath 'HKLM:\SYSTEM\CurrentControlSet\Control\Power' -Name HibernateEnabled -ErrorAction SilentlyContinue).HibernateEnabled) { 'on' } else { 'off' } }
+            Code = '& powercfg.exe /hibernate __STATE__; if ($LASTEXITCODE) { throw ("powercfg stopped with code " + $LASTEXITCODE) }' } }
 )
 
 # =====================================================================================================================
@@ -229,6 +285,8 @@ $ExtraTools = @(
 function Invoke-RegOps {
     param($Ops)
     foreach ($o in @($Ops)) {
+        # a command tweak's command (powercfg)
+        if ($o.Do -eq 'cmd') { & ([scriptblock]::Create([string]$o.Code)); continue }
         $path = [string]$o.Path
         $i = $path.IndexOf('\')
         $hive = switch ($path.Substring(0, $i)) { 'HKLM' { 'LocalMachine' } 'HKU' { 'Users' } default { 'CurrentUser' } }
@@ -315,15 +373,24 @@ function Save-ExtrasStore {
 }
 function Get-ExtraTweak([string]$Id) { return $ExtraTweaks | Where-Object { $_.Id -eq $Id } | Select-Object -First 1 }
 function Get-ExtraTool([string]$Id) { return $ExtraTools | Where-Object { $_.Id -eq $Id } | Select-Object -First 1 }
-function Test-TweakAdmin($T) { return @($T.Values | Where-Object { $_.Path -notlike 'HKCU\*' }).Count -gt 0 }
+function Test-TweakAdmin($T) {
+    if ($T.Cmd) { return [bool]$T.Admin }
+    return @($T.Values | Where-Object { $_.Path -notlike 'HKCU\*' }).Count -gt 0
+}
+# A command tweak's state now ('' when it can't be read), and the change that sets one
+function Get-TweakState($T) { try { return [string](& $T.Cmd.Read) } catch { return '' } }
+function Get-TweakCmdOp($T, [string]$State) { return @{ Do = 'cmd'; Code = $T.Cmd.Code.Replace('__STATE__', $State) } }
 
-# Before the first change: every value the tweak touches, as it is, and the keys turning it on would create
+# Before the first change: every value the tweak touches, as it is, and the keys turning it on would create (for a
+# command tweak, its state and the command that sets it back)
 function New-TweakBackup($T) {
+    if ($T.Cmd) { $s = Get-TweakState $T; return @{ Time = (Get-Date).ToString('o'); Id = $T.Id; State = $s; Code = $(if ($s) { (Get-TweakCmdOp $T $s).Code } else { '' }); Values = @(); Created = @() } }
     $vals = @(foreach ($v in $T.Values) { Get-RegValue $v.Path $v.Name })
     $created = @($T.Values | ForEach-Object { $_.Path } | Select-Object -Unique | ForEach-Object { Get-MissingRegRoot $_ } | Where-Object { $_ } | Select-Object -Unique)
     return @{ Time = (Get-Date).ToString('o'); Values = $vals; Created = $created }
 }
 function Get-TweakOps($T, [bool]$On) {
+    if ($T.Cmd) { return , @(Get-TweakCmdOp $T $(if ($On) { $T.Cmd.On } else { $T.Cmd.Off })) }
     $ops = @(foreach ($v in $T.Values) {
             $d = if ($On) { $v.On } else { $v.Off }
             if ($null -eq $d) { @{ Do = 'del'; Path = $v.Path; Name = $v.Name } } else { @{ Do = 'set'; Path = $v.Path; Name = $v.Name; Kind = $v.Kind; Data = $d } }
@@ -333,6 +400,7 @@ function Get-TweakOps($T, [bool]$On) {
 }
 # Back as it was: the keys it created go (with what's in them), the values that were there come back, the rest go
 function Get-RestoreOps($Backup) {
+    if ($Backup.Code) { return , @(@{ Do = 'cmd'; Code = [string]$Backup.Code }) }
     $ops = @(foreach ($c in @($Backup.Created)) { if ($c) { @{ Do = 'delkey'; Path = [string]$c } } })
     foreach ($v in @($Backup.Values)) {
         if (-not $v) { continue }
@@ -343,6 +411,7 @@ function Get-RestoreOps($Backup) {
 }
 # Is everything as it was before this app changed it? (then there's nothing to restore)
 function Test-TweakAsSaved($Backup) {
+    if ($Backup.Id) { $t = Get-ExtraTweak ([string]$Backup.Id); if ($t -and $t.Cmd) { return (Get-TweakState $t) -eq [string]$Backup.State } }
     foreach ($c in @($Backup.Created)) { if ($c -and (Test-RegKey ([string]$c))) { return $false } }
     foreach ($v in @($Backup.Values)) {
         if (-not $v) { continue }
@@ -353,6 +422,7 @@ function Test-TweakAsSaved($Backup) {
     return $true
 }
 function Test-TweakOn($T) {
+    if ($T.Cmd) { return (Get-TweakState $T) -eq $T.Cmd.On }
     foreach ($v in $T.Values) { if (-not (Test-RegSame (Get-RegValue $v.Path $v.Name) $v.On)) { return $false } }
     return $true
 }
@@ -406,7 +476,11 @@ function Initialize-Extras {
     foreach ($t in $ExtraTweaks) {
         $x = New-Object WingetUM.ExtraItem
         $x.Kind = 'tweak'; $x.Id = $t.Id; $x.Group = $t.Group; $x.Name = $t.Name; $x.Description = $t.Text; $x.SortKey = & $sortKey 'tweak' $t.Group
-        $x.SubText = @($t.Values | ForEach-Object { if ($_.Name) { $_.Path + ': ' + $_.Name } else { $_.Path } } | Select-Object -Unique) -join '; '
+        if ($t.Cmd) {
+            $x.SubText = $t.Cmd.Show
+            if ($t.Cmd.Test) { $x.Available = try { [bool](& $t.Cmd.Test) } catch { $false } }
+        }
+        else { $x.SubText = @($t.Values | ForEach-Object { if ($_.Name) { $_.Path + ': ' + $_.Name } else { $_.Path } } | Select-Object -Unique) -join '; ' }
         $x.NeedsAdmin = Test-TweakAdmin $t
         $ExtraItems.Add($x)
     }
