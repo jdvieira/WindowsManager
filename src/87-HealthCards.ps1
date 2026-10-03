@@ -8,6 +8,45 @@ function New-Check([string]$Label, [string]$Value, [string]$Level = 'ok', [strin
     $c.Label = $Label; $c.Value = $Value; $c.Level = $Level; $c.Tip = $(if ($Tip) { $Tip } else { "$Label`: $Value" })
     return $c
 }
+# A blue screen's stop code in plain words (the common ones): Windows' own name, a few words for the card, and a sentence
+$StopCodes = @{
+    0x0A = 'IRQL_NOT_LESS_OR_EQUAL|driver memory error|a driver used memory it shouldn''t have'
+    0x1A = 'MEMORY_MANAGEMENT|memory error|memory management failed, often faulty memory'
+    0x1E = 'KMODE_EXCEPTION_NOT_HANDLED|driver error|a driver hit an error it didn''t handle'
+    0x19 = 'BAD_POOL_HEADER|damaged memory|Windows found damaged data in memory'
+    0x3B = 'SYSTEM_SERVICE_EXCEPTION|system service error|a system service or driver hit an error'
+    0x50 = 'PAGE_FAULT_IN_NONPAGED_AREA|memory error|missing memory, from a driver or faulty memory'
+    0x7A = 'KERNEL_DATA_INPAGE_ERROR|drive read error|Windows couldn''t read from the drive'
+    0x7E = 'SYSTEM_THREAD_EXCEPTION_NOT_HANDLED|driver error|a driver hit an error it didn''t handle'
+    0x7F = 'UNEXPECTED_KERNEL_MODE_TRAP|processor error|the processor hit an error (hardware or overclocking)'
+    0x9F = 'DRIVER_POWER_STATE_FAILURE|driver sleep or wake error|a driver didn''t respond to sleep or wake'
+    0xC2 = 'BAD_POOL_CALLER|driver memory error|a driver damaged memory'
+    0xD1 = 'DRIVER_IRQL_NOT_LESS_OR_EQUAL|driver memory error|a driver used memory it shouldn''t have'
+    0xEF = 'CRITICAL_PROCESS_DIED|Windows process stopped|a critical Windows process stopped'
+    0xF4 = 'CRITICAL_OBJECT_TERMINATION|Windows process stopped|a critical process stopped, often the system drive'
+    0x101 = 'CLOCK_WATCHDOG_TIMEOUT|processor stopped responding|a processor core stopped responding (hardware or overclocking)'
+    0x116 = 'VIDEO_TDR_FAILURE|graphics driver stopped|the graphics driver stopped responding'
+    0x119 = 'VIDEO_SCHEDULER_INTERNAL_ERROR|graphics error|the graphics driver or card hit an error'
+    0x124 = 'WHEA_UNCORRECTABLE_ERROR|hardware error|a hardware error (processor, memory or overheating)'
+    0x133 = 'DPC_WATCHDOG_VIOLATION|driver took too long|a driver took too long, often storage or graphics'
+    0x139 = 'KERNEL_SECURITY_CHECK_FAILURE|damaged data|Windows found damaged data, from a driver or faulty memory'
+    0x154 = 'UNEXPECTED_STORE_EXCEPTION|storage error|a storage error, from the drive or its driver'
+    0x20001 = 'HYPERVISOR_ERROR|virtualization error|virtualization (Hyper-V) hit an error'
+}
+function Get-StopCodeText([string]$Code) {
+    $n = try { [Convert]::ToUInt32($Code, 16) } catch { $null }
+    if ($null -ne $n -and $StopCodes.ContainsKey([int]$n)) { $p = $StopCodes[[int]$n].Split('|'); return @{ Name = $p[0]; Short = $p[1]; Text = $p[2] } }
+    $s = if ($Code) { "stop code $Code" } else { 'reason not recorded' }; return @{ Name = ''; Short = $s; Text = $s }
+}
+# A link speed ("1 Gbps", "866.7 Mbps") as a dot: wired 1 Gbps and up green, 100 Mbps amber, slower red; Wi-Fi's
+# speeds run lower, so 200 Mbps and up is green there and under 50 Mbps red
+function Get-LinkSpeedLevel([string]$Speed, [bool]$Wireless) {
+    $m = [regex]::Match($Speed, '([\d.,]+)\s*([KMG])bps', 'IgnoreCase')
+    if (-not $m.Success) { return 'info' }
+    $mbps = [double]($m.Groups[1].Value -replace ',', '.') * $(switch ($m.Groups[2].Value.ToUpperInvariant()) { 'G' { 1000 } 'K' { 0.001 } default { 1 } })
+    if ($Wireless) { if ($mbps -ge 200) { return 'ok' } elseif ($mbps -ge 50) { return 'warn' } else { return 'bad' } }
+    if ($mbps -ge 1000) { return 'ok' } elseif ($mbps -ge 100) { return 'warn' } else { return 'bad' }
+}
 function Format-Days([int]$Days) { if ($Days -le 0) { 'today' } elseif ($Days -eq 1) { 'yesterday' } else { "$Days days ago" } }
 function Format-Ms($Ms) { if ($Ms -lt 1) { 'under 1 ms' } else { '{0:0} ms' -f $Ms } }
 
@@ -126,13 +165,17 @@ function Update-HealthCards($h) {
         $UI.HlMemBar.Foreground = if ($used -ge 90) { $Window.FindResource('Bad') } elseif ($used -ge 80) { $Window.FindResource('Warn') } else { $Window.FindResource('BarGradient') }
         $perf.Add((New-Check 'Memory' "$(Format-Size $p.MemFree) free of $(Format-Size $p.MemTotal)" $(if ($used -ge 90) { 'bad' } elseif ($used -ge 80) { 'warn' } else { 'ok' })))
         if ($null -ne $p.Cpu) { $perf.Add((New-Check 'Processor' "$($p.Cpu)% busy right now" $(if ($p.Cpu -ge 85) { 'warn' } else { 'ok' }))) }
-        $n = 0
-        foreach ($t in @($p.Top)) { $n++; $perf.Add((New-Check $(if ($n -eq 1) { 'Most memory' } else { '' }) "$($t.Name)  $(Format-Size $t.Bytes)" 'info')) }
         $perf.Add((New-Check 'Programs running' "$($p.Processes) processes" 'info'))
         if ($script:StartupState -eq 'ready') { $on = @($StartupItems | Where-Object { $_.Enabled }).Count; $perf.Add((New-Check 'Start with Windows' "$on apps" $(if ($on -gt 20) { 'warn' } else { 'info' }) 'Fewer startup apps make sign-in quicker: see the Startup tab')) }
     }
     else { $UI.HlPerfTitle.Text = $Ellipsis; $UI.HlMemBar.Value = 0 }
     $UI.HlPerfItems.ItemsSource = $perf.ToArray()
+    # the apps using the most memory, in their own section: each bar is against the biggest of them
+    $top = @($p.Top | Where-Object { $_ -and $_.Bytes -gt 0 })
+    # (the worker's entries are hashtables, which Measure-Object -Property can't read)
+    $most = [double]0; foreach ($t in $top) { if ([double]$t.Bytes -gt $most) { $most = [double]$t.Bytes } }
+    $UI.HlTopMem.ItemsSource = @(foreach ($t in $top) { $v = New-Object WingetUM.HealthVolume; $v.Name = [string]$t.Name; $v.Detail = Format-Size $t.Bytes; $v.UsedPct = 100.0 * $t.Bytes / $most; $v.Level = 'info'; $v })
+    $UI.HlTopMemPanel.Visibility = ConvertTo-Visibility ([bool]$top.Count)
     $issues += @($perf | Where-Object { $_.Level -in 'warn', 'bad' }).Count
 
     # ---- Reliability
@@ -141,10 +184,20 @@ function Update-HealthCards($h) {
     if ($r) {
         if ($null -ne $r.Shutdowns) { $rel.Add((New-Check 'Unexpected shutdowns' "$($r.Shutdowns) in 30 days" $(if ($r.Shutdowns) { 'warn' } else { 'ok' }) 'Times Windows stopped without shutting down properly (power loss, a hang, a forced power-off)')) }
         if ($null -ne $r.BlueScreens) { $rel.Add((New-Check 'Blue screens' "$($r.BlueScreens) in 30 days" $(if ($r.BlueScreens) { 'bad' } else { 'ok' }))) }
+        if ($r.LastBsod) {
+            $why = Get-StopCodeText ([string]$r.LastBsod.Code)
+            $when = ([datetime]$r.LastBsod.Time).ToString('MMM d')
+            $rel.Add((New-Check 'Last blue screen' "$when, $($why.Short)" $(if (((Get-Date) - [datetime]$r.LastBsod.Time).TotalDays -le 7) { 'bad' } else { 'warn' }) "Last blue screen: $(([datetime]$r.LastBsod.Time).ToString('g')). $($why.Text) (stop code $($r.LastBsod.Code)$(if ($why.Name) { ', ' + $why.Name }))"))
+        }
+        $hwText = if (-not $r.Hardware) { 'None in 30 days' } elseif ($r.HardwareFatal) { [string]$r.Hardware + ' in 30 days, ' + $r.HardwareFatal + ' serious' } else { [string]$r.Hardware + ' in 30 days' }
+        if ($null -ne $r.Hardware) { $rel.Add((New-Check 'Hardware errors' $hwText $(if ($r.HardwareFatal -or $r.Hardware -ge 10) { 'bad' } elseif ($r.Hardware) { 'warn' } else { 'ok' }) 'Errors the processor, memory or other hardware reported to Windows (WHEA). With blue screens, they often point at the hardware, its BIOS settings or overclocking')) }
+        if ($null -ne $r.DiskErrors) { $rel.Add((New-Check 'Disk errors' $(if ($r.DiskErrors) { "$($r.DiskErrors) in 30 days" } else { 'None in 30 days' }) $(if ($r.DiskErrors) { 'bad' } else { 'ok' }) 'Bad blocks, failed reads and file system errors Windows logged. Any at all: back up, and check the drive')) }
         if ($null -ne $r.Crashes) {
-            $rel.Add((New-Check 'App crashes' "$($r.Crashes) in 7 days" $(if ($r.Crashes -ge 10) { 'warn' } elseif ($r.Crashes) { 'info' } else { 'ok' })))
+            $rel.Add((New-Check 'App crashes' "$($r.Crashes) in 7 days" $(if ($r.Crashes -ge 10) { 'bad' } elseif ($r.Crashes) { 'warn' } else { 'ok' }) 'Apps that stopped working in the last 7 days: amber with any, red with 10 or more'))
             if (@($r.CrashApps).Count) { $rel.Add((New-Check 'Crashed most' (@($r.CrashApps) -join ', ') 'info')) }
         }
+        if ($null -ne $r.Hangs) { $rel.Add((New-Check 'Apps not responding' "$($r.Hangs) in 7 days" $(if ($r.Hangs -ge 5) { 'warn' } else { 'ok' }) 'Apps Windows had to close because they stopped responding: amber from 5')) }
+        if ($null -ne $r.UpdateFails) { $rel.Add((New-Check 'Failed updates' $(if ($r.UpdateFails) { "$($r.UpdateFails) in 30 days" } else { 'None in 30 days' }) $(if ($r.UpdateFails) { 'warn' } else { 'ok' }) 'Windows updates that failed to install. Fix my PC or the Windows Update tab can try them again')) }
         if ($null -ne $r.Devices) { $rel.Add((New-Check 'Device problems' $(if ($r.Devices) { "$($r.Devices) device$(if ($r.Devices -ne 1) { 's' })" } else { 'None' }) $(if ($r.Devices) { 'warn' } else { 'ok' }) 'Devices Windows reports a problem for: see Drivers > Devices')) }
         $UI.HlRelTitle.Text = if ($null -ne $r.Index) { "Stability {0:0.0} of 10" -f $r.Index } else { 'Reliability' }
     }
@@ -187,12 +240,17 @@ function Update-HealthCards($h) {
         foreach ($a in $nets) {
             $kind = if ($a.Wireless) { 'Wi-Fi' } else { 'Wired' }
             $net.Add((New-Check $kind "$($a.Description)" $(if ($a.Internet) { 'ok' } else { 'warn' }) "$($a.Name): $($a.Description)"))
-            if ($a.Ssid) { $net.Add((New-Check 'Network' $a.Ssid 'info')) } elseif ($a.Network) { $net.Add((New-Check 'Network' $a.Network 'info')) }
+            # a connected adapter's network and address are green; an address the router never gave (169.254.x.x) is red
+            if ($a.Ssid) { $net.Add((New-Check 'Network' $a.Ssid 'ok')) } elseif ($a.Network) { $net.Add((New-Check 'Network' $a.Network 'ok')) }
             if ($null -ne $a.Signal) { $net.Add((New-Check 'Signal' "$($a.Signal)%" $(if ($a.Signal -lt 40) { 'warn' } else { 'ok' }))) }
-            if ($a.Speed) { $net.Add((New-Check 'Link speed' $a.Speed 'info')) }
-            if ($a.Ip) { $net.Add((New-Check 'Address' $a.Ip 'info')) }
+            if ($a.Speed) { $net.Add((New-Check 'Link speed' $a.Speed (Get-LinkSpeedLevel $a.Speed ([bool]$a.Wireless)) $(if ($a.Wireless) { 'Wi-Fi link speed: green from 200 Mbps, amber from 50 Mbps' } else { 'Wired link speed: green at 1 Gbps or more, amber at 100 Mbps, red at 10 Mbps' }))) }
+            if ($a.Ip) {
+                $apipa = $a.Ip -like '169.254.*'
+                $net.Add((New-Check 'Address' $(if ($apipa) { "$($a.Ip) (none from the router)" } else { $a.Ip }) $(if ($apipa) { 'bad' } else { 'ok' }) $(if ($apipa) { "The router didn't give this PC an address, so it can't reach the network: restart the router or check the cable" } else { '' })))
+            }
         }
         if (-not $main.Internet) { $issues++ }
+        $issues += @($net | Where-Object { $_.Label -in 'Link speed', 'Address' -and $_.Level -in 'warn', 'bad' }).Count
         $quality = Get-NetQualityChecks $h.Quality ([bool]$main.Internet)
         foreach ($c in $quality) { $net.Add($c) }
         $issues += @($quality | Where-Object { $_.Level -in 'warn', 'bad' }).Count
@@ -433,7 +491,10 @@ th{color:#666;font-weight:600;border-top:0}td:last-child{text-align:right}.wide 
 "@)
     [void]$sb.Append('<div class="grid">')
     foreach ($c in @(@('Security', 'HlSecItems', 'HlSecTitle'), @('Performance', 'HlPerfItems', 'HlPerfTitle'), @('Reliability', 'HlRelItems', 'HlRelTitle'), @('Updates', 'HlUpdItems', 'HlUpdTitle'), @('Network', 'HlNetItems', 'HlNetTitle'))) {
-        [void]$sb.Append((& $checks $c[0] $UI[$c[1]].ItemsSource $UI[$c[2]].Text))
+        $cardItems = @($UI[$c[1]].ItemsSource)
+        # the report lists the apps using the most memory with Performance's lines
+        if ($c[0] -eq 'Performance') { $cardItems += @($UI.HlTopMem.ItemsSource | ForEach-Object { New-Check $_.Name "$($_.Detail) of memory" 'info' }) }
+        [void]$sb.Append((& $checks $c[0] $cardItems $UI[$c[2]].Text))
     }
     [void]$sb.Append('</div><br>')
     $vols = foreach ($v in @($UI.HlVolumes.ItemsSource)) { "<tr><td>$(& $e $v.Name)</td><td>$(& $e $v.Detail) ({0:0}% used)</td></tr>" -f $v.UsedPct }
