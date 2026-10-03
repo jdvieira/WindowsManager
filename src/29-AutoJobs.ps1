@@ -123,9 +123,21 @@ function Get-DownloadsFolder {
 
 # What Clean up offers (the Cleanup tab and automatic runs). Admin items need administrator rights; Special ones
 # need more than deleting (Windows Update's service stops while its download folder empties; Delivery Optimization
-# has its own cmdlet).
+# has its own cmdlet; Disk Cleanup, the component store and old drivers have Windows' own tools). NoAuto ones take
+# too long for automatic maintenance, which doesn't offer them.
 function Get-CleanCatalog {
     $sd = $env:SystemDrive; $win = $env:SystemRoot; $pd = $env:ProgramData; $lad = $env:LOCALAPPDATA
+    # each profile's cache folders in Chromium browsers (Edge, Chrome, Brave), and Firefox's
+    $browser = New-Object System.Collections.Generic.List[string]
+    foreach ($root in @('Microsoft\Edge\User Data', 'Google\Chrome\User Data', 'BraveSoftware\Brave-Browser\User Data')) {
+        $r = Join-Path $lad $root
+        if (-not (Test-Path -LiteralPath $r)) { continue }
+        foreach ($prof in @(Get-ChildItem -LiteralPath $r -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq 'Default' -or $_.Name -like 'Profile *' })) {
+            foreach ($sub in 'Cache', 'Code Cache', 'GPUCache') { $browser.Add((Join-Path $prof.FullName $sub)) }
+        }
+    }
+    $ff = Join-Path $lad 'Mozilla\Firefox\Profiles'
+    if (Test-Path -LiteralPath $ff) { foreach ($prof in @(Get-ChildItem -LiteralPath $ff -Directory -ErrorAction SilentlyContinue)) { $browser.Add((Join-Path $prof.FullName 'cache2')) } }
     return @(
         @{ Key = 'temp'; Name = 'Temporary files'; About = 'Files in your temporary folder older than two days, left behind by apps and installers.'; Paths = @($env:TEMP); OlderDays = 2; Skip = @('WinGet'); On = $true }
         @{ Key = 'winget'; Name = 'winget downloads'; About = "Installers winget downloaded; they aren't needed once the app is installed."; Paths = @((Join-Path $env:TEMP 'WinGet')); On = $true }
@@ -143,6 +155,11 @@ function Get-CleanCatalog {
         @{ Key = 'dell'; Name = 'Dell Command | Update downloads'; About = 'Updates Dell Command | Update downloaded and has finished with.'; Paths = @((Join-Path $pd 'Dell\UpdateService\Downloads')); Admin = $true; On = $true }
         @{ Key = 'nvidia'; Name = 'NVIDIA installer files'; About = "What NVIDIA's driver installers unpacked to $sd\NVIDIA."; Paths = @((Join-Path $sd 'NVIDIA')); Admin = $true; On = $true }
         @{ Key = 'amd'; Name = 'AMD installer files'; About = "What AMD's driver installers unpacked to $sd\AMD."; Paths = @((Join-Path $sd 'AMD')); Admin = $true; On = $true }
+        @{ Key = 'browser'; Name = 'Browser caches'; About = "Web pages and images Edge, Chrome, Brave and Firefox keep to load sites faster. Close the browsers first: files they're using are left alone. Sites load a little slower the first time after."; Paths = $browser.ToArray(); On = $false }
+        @{ Key = 'shaders'; Name = 'Graphics shader caches'; About = 'What NVIDIA, AMD, Intel and DirectX keep so games start faster. Games rebuild them, so the first start of each can stutter.'; Paths = @((Join-Path $lad 'NVIDIA\DXCache'), (Join-Path $lad 'NVIDIA\GLCache'), (Join-Path $lad 'AMD\DxCache'), (Join-Path $lad 'AMD\GLCache'), (Join-Path $lad 'Intel\ShaderCache'), (Join-Path $lad 'D3DSCache')); On = $false }
+        @{ Key = 'diskcleanup'; Name = "Windows' own cleanup (Disk Cleanup)"; About = "Disk Cleanup's system items: the previous Windows installation (Windows.old; going back to it is no longer possible), update leftovers, Windows installation files, old driver packages, thumbnails and the DirectX shader cache. Can take several minutes."; Admin = $true; Special = 'cleanmgr'; On = $false; Always = $true; NoAuto = $true }
+        @{ Key = 'components'; Name = 'Windows component store'; About = "Older copies of Windows' own files that updates replaced (DISM's component cleanup). Installed updates can still be uninstalled. Takes several minutes."; Admin = $true; Special = 'dism'; On = $false; Always = $true; NoAuto = $true }
+        @{ Key = 'olddrivers'; Name = 'Old driver versions'; About = "Older versions of drivers Windows keeps after an update (each NVIDIA driver is about 1 GB). Drivers in use are never removed. Device Manager can't roll back to a removed version; this app's saved drivers still can."; Admin = $true; Special = 'olddrivers'; On = $false; Always = $true; NoAuto = $true }
     )
 }
 
@@ -260,7 +277,7 @@ function Invoke-AutoWindows($R) {
 # Items in Windows' folders need administrator rights; a task that isn't elevated leaves them out. "Tell me" only
 # notifies once at least $AutoCleanNotifyBytes can be freed.
 function Get-AutoCleanItems {
-    $cat = Get-CleanCatalog
+    $cat = @(Get-CleanCatalog | Where-Object { -not $_.NoAuto })
     $keys = @($Settings.AutoCleanItems)
     if (-not $keys.Count) { $keys = @($cat | Where-Object { $_.On } | ForEach-Object { $_.Key }) }
     return @($cat | Where-Object { $keys -contains $_.Key })

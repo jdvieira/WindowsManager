@@ -201,6 +201,42 @@ function Start-CleanMine($Mine) {
     $items = @($Mine | ForEach-Object { $c = $CleanCatalog[$_.Key]; @{ Key = $c.Key; Paths = @($c.Paths); OlderDays = [int]$c.OlderDays; Skip = @($c.Skip); Recycle = [bool]$c.Recycle } })
     $script:Cleaner = Start-Tracked 'clean' @{ Items = $items } { $script:Cleaner = $null; Complete-CleanPart }
 }
+# Disk Cleanup, the component store and old drivers, in the administrator script: each sets $freed (from the system
+# drive's free space before and after) and $failed
+$CleanSpecials = @{
+    cleanmgr   = @'
+$sysDrive = New-Object IO.DriveInfo $env:SystemDrive; $before = $sysDrive.AvailableFreeSpace
+# Disk Cleanup's own items, ticked under a run number of their own (77) and unticked again afterwards
+$vc = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches'
+$names = @('Previous Installations', 'Update Cleanup', 'Windows ESD installation files', 'Device Driver Packages', 'Thumbnail Cache', 'D3D Shader Cache', 'Temporary Setup Files', 'Windows Upgrade Log Files', 'Setup Log Files') | Where-Object { Test-Path -LiteralPath (Join-Path $vc $_) }
+foreach ($n in $names) { Set-ItemProperty -LiteralPath (Join-Path $vc $n) -Name StateFlags0077 -Value 2 -Type DWord }
+try { $p = Start-Process -FilePath "$env:SystemRoot\System32\cleanmgr.exe" -ArgumentList '/sagerun:77' -WindowStyle Hidden -PassThru; $p.WaitForExit() }
+catch { $failed++; Say ('Disk Cleanup: ' + $_.Exception.Message) }
+finally { foreach ($n in $names) { Remove-ItemProperty -LiteralPath (Join-Path $vc $n) -Name StateFlags0077 -ErrorAction SilentlyContinue } }
+$sysDrive = New-Object IO.DriveInfo $env:SystemDrive; $freed = [Math]::Max([long]0, $sysDrive.AvailableFreeSpace - $before)
+'@
+    dism       = @'
+$sysDrive = New-Object IO.DriveInfo $env:SystemDrive; $before = $sysDrive.AvailableFreeSpace
+& "$env:SystemRoot\System32\Dism.exe" /Online /Cleanup-Image /StartComponentCleanup /NoRestart | Out-Null
+if ($LASTEXITCODE -ne 0) { $failed++; Say ('DISM stopped with code ' + $LASTEXITCODE) }
+$sysDrive = New-Object IO.DriveInfo $env:SystemDrive; $freed = [Math]::Max([long]0, $sysDrive.AvailableFreeSpace - $before)
+'@
+    olddrivers = @'
+$sysDrive = New-Object IO.DriveInfo $env:SystemDrive; $before = $sysDrive.AvailableFreeSpace
+# the same driver (its .inf name, vendor and class) in more than one version: all but the newest go, unless a device
+# uses it (pnputil refuses those without /force, which isn't used)
+$all = @(Get-WindowsDriver -Online -ErrorAction Stop)
+foreach ($g in @($all | Group-Object { ([IO.Path]::GetFileName([string]$_.OriginalFileName)) + '|' + $_.ProviderName + '|' + $_.ClassName } | Where-Object { $_.Count -gt 1 })) {
+    $sorted = @($g.Group | Sort-Object @{ Expression = { try { [version]$_.Version } catch { [version]'0.0' } } }, Date -Descending)
+    foreach ($d in @($sorted | Select-Object -Skip 1)) {
+        $null = & "$env:SystemRoot\System32\pnputil.exe" /delete-driver $d.Driver 2>&1
+        if ($LASTEXITCODE -eq 0) { Say ('Removed ' + $d.ProviderName + ' ' + $d.ClassName + ' driver ' + $d.Version + ' (' + $d.Driver + ')') }
+        else { Say ('Kept ' + $d.ProviderName + ' ' + $d.Version + ' (' + $d.Driver + '): a device uses it') }
+    }
+}
+$sysDrive = New-Object IO.DriveInfo $env:SystemDrive; $freed = [Math]::Max([long]0, $sysDrive.AvailableFreeSpace - $before)
+'@
+}
 # The administrator script's part for these items: each says RESULT|clean|key|freed|failed|name
 function Get-CleanAdminBody($Admin) {
         $q = { param($s) "'" + ([string]$s -replace "'", "''") + "'" }
@@ -211,6 +247,7 @@ function Get-CleanAdminBody($Admin) {
             $body += "Say 'Cleaning up: $($c.Name -replace "'", "''")$Ellipsis'`r`n`$freed = [long]0; `$failed = 0`r`n"
             switch ($c.Special) {
                 'wu' { $body += "Stop-Service -Name wuauserv, bits -Force -ErrorAction SilentlyContinue`r`nforeach (`$p in @($paths)) { `$r = Remove-CleanPath `$p 0 @(); `$freed += `$r.Freed; `$failed += `$r.Failed }`r`nStart-Service -Name bits, wuauserv -ErrorAction SilentlyContinue`r`n" }
+                { $_ -in 'cleanmgr', 'dism', 'olddrivers' } { $body += $CleanSpecials[$c.Special] + "`r`n" }
                 'do' { $body += "try { `$before = [long](Get-DeliveryOptimizationStatus -ErrorAction SilentlyContinue | Measure-Object -Property FileSizeInCache -Sum).Sum; Delete-DeliveryOptimizationCache -Force -ErrorAction Stop; `$freed = `$before } catch { `$failed++; Say ('Delivery Optimization: ' + `$_.Exception.Message) }`r`n" }
                 default { $body += "foreach (`$p in @($paths)) { `$r = Remove-CleanPath `$p $([int]$c.OlderDays) @($((@($c.Skip) | ForEach-Object { & $q $_ }) -join ', ')); `$freed += `$r.Freed; `$failed += `$r.Failed }`r`n" }
             }

@@ -60,6 +60,13 @@ Tick each line once it has worked, with the PC and the date.
 | [ ] | **Fix my PC**: decline the administrator approval | The items with a shield say approval was declined; app updates and your own leftover files still go ahead |
 | [ ] | **Fix my PC** with Repair Windows files and Optimize drives ticked | DISM then SFC run (10 to 20 minutes) and each drive is optimized; the log has the codes; the row points to CBS.log |
 | [ ] | **Fix my PC** > Don't start an app when you sign in | The Startup tab shows it Off; signing out and in, it doesn't start |
+| [ ] | Cleanup > **Windows' own cleanup** (Disk Cleanup) | One approval; it runs for a few minutes without a window; the row says what it freed; `StateFlags0077` values are gone from `HKLM\...\Explorer\VolumeCaches` afterwards |
+| [ ] | Cleanup > **Windows component store** | DISM's component cleanup finishes (several minutes); installed updates are still listed under Settings > Windows Update > Update history > Uninstall updates |
+| [ ] | Cleanup > **Old driver versions** on a PC with an older NVIDIA driver in the driver store | The log lists Removed and Kept lines; Device Manager still shows every device working; Drivers > Devices shows the same driver versions |
+| [ ] | Cleanup > **Browser caches** with the browsers closed | Freed shown; the browsers open normally and stay signed in |
+| [ ] | Extras > Speed > **High performance power plan**: Turn on, then **Restore** | One approval each; Control Panel > Power Options shows High performance, then the plan you had before |
+| [ ] | Extras > System > **Turn off hibernation** on a PC where it's on, then **Restore** | hiberfil.sys goes, then comes back; Fast Startup follows |
+| [ ] | Extras > Taskbar and Start > **Hide Widgets**, **Restart Explorer** | The Widgets button is gone; **Restore** brings it back |
 | [ ] | Extras > Tweaks: **Turn on** Classic right-click menu, **Restart Explorer**, right-click a file | The full menu shows straight away; **Restore** (and Restart Explorer) brings back Windows 11's menu; History has both |
 | [ ] | Extras > Tweaks: **Turn on** a Windows-wide one (Allow long file paths), then **Restore** | One approval each; Registry Editor shows LongPathsEnabled as it was before |
 | [ ] | Extras: change three tweaks and add two desktop shortcuts (God Mode and Device Manager), then **Restore all** | One approval if a Windows-wide tweak is among them; every tweak is as it was and the shortcuts are gone from the desktop; `tweaks.json` is empty |

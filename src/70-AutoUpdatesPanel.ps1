@@ -101,7 +101,7 @@ function New-JobCards {
             'clean' {
                 $wrap = New-Object System.Windows.Controls.WrapPanel
                 $wrap.Margin = '-8,0,0,6'
-                foreach ($c in Get-CleanCatalog) {
+                foreach ($c in @(Get-CleanCatalog | Where-Object { -not $_.NoAuto })) {
                     $cb = New-Object System.Windows.Controls.CheckBox
                     $cb.Style = $Window.FindResource('CheckItem'); $cb.Width = 270; $cb.Tag = $c.Key; $cb.ToolTip = $c.About
                     $content = New-Object System.Windows.Controls.StackPanel
