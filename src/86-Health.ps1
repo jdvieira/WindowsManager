@@ -189,14 +189,23 @@ function Start-Clean {
     foreach ($i in $sel) { $i.State = 'running'; $i.Detail = if ($i.NeedsAdmin -and -not $IsAdmin) { 'Waiting for approval' + $Ellipsis } else { 'Cleaning' + $Ellipsis } }
     Add-LogLine ''
     Add-LogLine "---- Cleaning up ($($sel.Count) items) ----"
-    if ($mine.Count) {
-        $items = @($mine | ForEach-Object { $c = $CleanCatalog[$_.Key]; @{ Key = $c.Key; Paths = @($c.Paths); OlderDays = [int]$c.OlderDays; Skip = @($c.Skip); Recycle = [bool]$c.Recycle } })
-        $script:Cleaner = Start-Tracked 'clean' @{ Items = $items } { $script:Cleaner = $null; Complete-CleanPart }
-    }
+    if ($mine.Count) { Start-CleanMine $mine }
     if ($admin.Count) {
+        $body = (Get-CleanAdminBody $admin) + "exit 0"
+        if ($script:Elev) { foreach ($i in $admin) { $i.State = 'error'; $i.Detail = "Wait for $($script:ElevTitle) to finish, then clean up again" } }
+        else { Start-Elevated 'clean' "Cleaning up $($admin.Count) Windows item$(if ($admin.Count -ne 1) { 's' })" $body @() @{ Count = $admin.Count } }
+    }
+    Update-View
+}
+function Start-CleanMine($Mine) {
+    $items = @($Mine | ForEach-Object { $c = $CleanCatalog[$_.Key]; @{ Key = $c.Key; Paths = @($c.Paths); OlderDays = [int]$c.OlderDays; Skip = @($c.Skip); Recycle = [bool]$c.Recycle } })
+    $script:Cleaner = Start-Tracked 'clean' @{ Items = $items } { $script:Cleaner = $null; Complete-CleanPart }
+}
+# The administrator script's part for these items: each says RESULT|clean|key|freed|failed|name
+function Get-CleanAdminBody($Admin) {
         $q = { param($s) "'" + ([string]$s -replace "'", "''") + "'" }
         $body = $CleanFunctions + "`r`n"
-        foreach ($i in $admin) {
+        foreach ($i in $Admin) {
             $c = $CleanCatalog[$i.Key]
             $paths = (@($c.Paths) | ForEach-Object { & $q $_ }) -join ', '
             $body += "Say 'Cleaning up: $($c.Name -replace "'", "''")$Ellipsis'`r`n`$freed = [long]0; `$failed = 0`r`n"
@@ -207,11 +216,7 @@ function Start-Clean {
             }
             $body += "Say ('RESULT|clean|$($c.Key)|' + `$freed + '|' + `$failed + '|$($c.Name -replace "'", "''")')`r`n"
         }
-        $body += "exit 0"
-        if ($script:Elev) { foreach ($i in $admin) { $i.State = 'error'; $i.Detail = "Wait for $($script:ElevTitle) to finish, then clean up again" } }
-        else { Start-Elevated 'clean' "Cleaning up $($admin.Count) Windows item$(if ($admin.Count -ne 1) { 's' })" $body @() @{ Count = $admin.Count } }
-    }
-    Update-View
+        return $body
 }
 
 # One item's result, from the worker or the administrator run

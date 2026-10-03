@@ -56,6 +56,10 @@ Tick each line once it has worked, with the PC and the date.
 | [x] Dell laptop, 2026-10-01 (temp copies) | An update whose new version closes straight away | The old version comes back with a message; History has the failure |
 | [ ] | After an update from 2.3 on, Options > App updates > **Go back to <version>** | The previous version starts; History has *Went back to the previous version* |
 | [ ] | **Get beta versions** with a pre-release published | It's offered, marked as a pre-release |
+| [ ] | Device Health > **Fix my PC** with an app update and a Windows update waiting, the Recommended items ticked, **Fix** | One administrator approval; a restore point line in the log; the Windows update installs, then the apps update, then leftover files are cleaned; each item says how it went; History has *Fix my PC* |
+| [ ] | **Fix my PC**: decline the administrator approval | The items with a shield say approval was declined; app updates and your own leftover files still go ahead |
+| [ ] | **Fix my PC** with Repair Windows files and Optimize drives ticked | DISM then SFC run (10 to 20 minutes) and each drive is optimized; the log has the codes; the row points to CBS.log |
+| [ ] | **Fix my PC** > Don't start an app when you sign in | The Startup tab shows it Off; signing out and in, it doesn't start |
 | [ ] | Extras > Tweaks: **Turn on** Classic right-click menu, **Restart Explorer**, right-click a file | The full menu shows straight away; **Restore** (and Restart Explorer) brings back Windows 11's menu; History has both |
 | [ ] | Extras > Tweaks: **Turn on** a Windows-wide one (Allow long file paths), then **Restore** | One approval each; Registry Editor shows LongPathsEnabled as it was before |
 | [ ] | Extras: change three tweaks and add two desktop shortcuts (God Mode and Device Manager), then **Restore all** | One approval if a Windows-wide tweak is among them; every tweak is as it was and the shortcuts are gone from the desktop; `tweaks.json` is empty |

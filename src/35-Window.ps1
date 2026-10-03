@@ -71,3 +71,8 @@ foreach ($name in 'TabExtras', 'ExtrasPanel', 'ExText', 'ExRestartExplorer', 'Ex
     $UI[$name] = $Window.FindName($name)
     if (-not $UI[$name]) { throw "XAML element '$name' not found." }
 }
+# 2.9: Fix my PC
+foreach ($name in 'HlFix', 'FixOverlay', 'FixText', 'FixBar', 'FixList', 'FixClose', 'FixGo', 'FixGoText', 'FixNote') {
+    $UI[$name] = $Window.FindName($name)
+    if (-not $UI[$name]) { throw "XAML element '$name' not found." }
+}

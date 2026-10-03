@@ -165,6 +165,7 @@ $Window.Add_KeyDown({
             $UI[$tabs[[int]$Matches[2]]].IsChecked = $true; $e.Handled = $true
         }
         elseif ($e.Key -eq 'Escape' -and $UI.ConfirmOverlay.Visibility -eq 'Visible') { Complete-Confirm $false; $e.Handled = $true }
+        elseif ($e.Key -eq 'Escape' -and $UI.FixOverlay.Visibility -eq 'Visible') { $UI.FixOverlay.Visibility = 'Collapsed'; if ($script:FixPhase -in 'ready', 'done') { $script:FixPhase = 'none' }; $e.Handled = $true }
         elseif ($e.Key -eq 'Escape' -and $UI.PickOverlay.Visibility -eq 'Visible') { $UI.PickOverlay.Visibility = 'Collapsed'; $e.Handled = $true }
         elseif ($e.Key -eq 'Escape' -and $UI.VersionOverlay.Visibility -eq 'Visible') { $UI.VersionOverlay.Visibility = 'Collapsed'; $e.Handled = $true }
         elseif ($e.Key -eq 'Escape' -and $UI.NotesOverlay.Visibility -eq 'Visible') { $UI.NotesOverlay.Visibility = 'Collapsed'; $e.Handled = $true }

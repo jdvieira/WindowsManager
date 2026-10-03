@@ -81,6 +81,20 @@ each card's lines have a green, amber, red or grey dot.
 **Save report** writes the whole page as one HTML file on the desktop and opens it: every card, the drives, waiting
 updates, startup apps and installed software, to keep or send to someone helping with the PC.
 
+**Fix my PC** checks everything the other tabs read (app and Windows updates, leftover files, Device Health's security
+and reliability, startup apps) and lists what would make the PC run better:
+
+| Section | What's in it |
+| --- | --- |
+| Recommended (ticked) | App updates through winget (hidden and pinned apps left alone); Windows' security and cumulative updates (no feature updates, nothing restarts by itself); Defender's virus definitions when they're a day or more old, a quick scan when the last was a week or more ago, and real-time protection back on (skipped when another antivirus is in charge); the firewall back on; and the leftover files Cleanup ticks by default (never the Recycle Bin, your downloads or saved drivers) |
+| Optional (unticked) | Repair Windows files (DISM, then SFC; 10 to 20 minutes; it says when blue screens or low stability make it worth it), optimize drives, and not starting each of your startup apps when you sign in |
+| Worth a look | What it can't do itself, with a button to where it can be done: a waiting restart, a new version of Windows, driver updates, devices with a problem, a nearly full drive, a drive reporting a problem, Secure Boot off, Windows not activated |
+
+**Fix N items** does the ticked ones: everything with a shield in one administrator approval (a restore point first,
+with **Restore point first** on), then app updates, your own leftover files and startup apps, the way their tabs do
+them. Each item says how it went; the window can be closed while it works. It never restarts the PC, turns off
+services or changes settings for speed. History has a *Fix my PC* line and each update and cleanup.
+
 Automatic runs also check the PC's health (Options > Automatic runs > **Check the PC's health and tell me about problems**, on by
 default) and send a Windows notification when something needs attention: antivirus or real-time protection off, old
 virus definitions, a firewall off, a drive under 10% free, a disk reporting a problem, a battery under 60% of its
@@ -432,7 +446,7 @@ until you do). It also replaces the old name's notification registration with it
 
 | File | Purpose |
 | --- | --- |
-| `src\*.ps1` | The app's code, in parts that join in name order: `00-Startup` (parameters, version, one copy at a time), settings, scheduled task, data classes, the background worker and its 2.0 operations, health history and alerts (`28-HealthHistory`), the window's layout, notifications, automatic runs, then one part per tab or panel (`78-Leftovers`, `80-Drivers`, `81-DriverBackup`, `82-Amd`, `83-WindowsUpdate`, `84-Startup`, `86-Health`, `87-HealthCards`, `88-Setup`, `89-Diagnostics`, `91-WinFeatures`, `92-Cleanup`, `93-AppUpdate`, `94-Extras`), wiring, and `95-Main` |
+| `src\*.ps1` | The app's code, in parts that join in name order: `00-Startup` (parameters, version, one copy at a time), settings, scheduled task, data classes, the background worker and its 2.0 operations, health history and alerts (`28-HealthHistory`), the window's layout, notifications, automatic runs, then one part per tab or panel (`78-Leftovers`, `80-Drivers`, `81-DriverBackup`, `82-Amd`, `83-WindowsUpdate`, `84-Startup`, `86-Health`, `87-HealthCards`, `88-Setup`, `89-Diagnostics`, `91-WinFeatures`, `92-Cleanup`, `93-AppUpdate`, `94-Extras`, `94-FixMyPC`), wiring, and `95-Main` |
 | `Windows_Manager.ps1` | Runs the app from source: joins `src\*.ps1` into `dist\build\Windows_Manager.dev.ps1` and runs that, with the same arguments, exactly as the exe runs |
 | `Build-Exe.ps1` | Joins the same parts, embeds the assets, and compiles `dist\Windows Manager.exe` with PS2EXE |
 | `CLAUDE.md` | How to contribute, step by step (Claude Code reads it automatically) |

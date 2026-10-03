@@ -160,7 +160,8 @@ $ConfirmHandlers.winapply = { param($Payload) Start-WinApply $Payload.Updates }
 
 # One update at a time, so the log says what is downloading or installing; each update's result is a
 # RESULT|win|id|code|title line (Windows Update's result codes: 2 installed, 3 with errors, 4 failed, 5 cancelled)
-function Start-WinApply($Updates) {
+# The install script, without its exit: it leaves $fail (updates that didn't install) and $reboot for what follows it
+function Get-WinApplyBody($Updates) {
     $ids = (@($Updates) | ForEach-Object { "'" + ($_.Id -replace "'", "''") + "'" }) -join ', '
     $body = @"
 `$fail = 0; `$reboot = `$false
@@ -190,19 +191,27 @@ foreach (`$u in `$todo) {
 }
 if (`$total -lt `$ids.Count) { `$fail += `$ids.Count - `$total; Say 'Some updates are no longer offered by Windows Update.' }
 if (`$reboot) { Say 'Windows says a restart is needed to finish.' }
-if (`$fail) { Say "`$(`$fail) update(s) did not install."; exit 1 } elseif (`$reboot) { exit 3010 } else { Say 'All done.'; exit 0 }
 "@
+    return $body
+}
+function Start-WinApply($Updates) {
+    $body = (Get-WinApplyBody $Updates) + "`r`nif (`$fail) { Say `"`$(`$fail) update(s) did not install.`"; exit 1 } elseif (`$reboot) { exit 3010 } else { Say 'All done.'; exit 0 }"
     $n = @($Updates).Count
     Start-Elevated 'winupdate' "Installing $n Windows update$(if ($n -ne 1) { 's' })" $body @() @{ Count = $n } -RestorePoint -RestoreText 'Before Windows updates' -StallMinutes 60
 }
-$ElevHandlers.winupdate = {
-    param($Ev, $why, $code, $last, $tag)
+# Each update's result from an administrator run's log, into History; returns the result lines
+function Add-WinResultHistory([string]$Log) {
     $codes = @{ 2 = 'Installed'; 3 = 'Installed, with errors'; 4 = 'Failed'; 5 = 'Cancelled' }
-    $lines = if ($tag.Log -and (Test-Path -LiteralPath $tag.Log)) { @(Get-Content -LiteralPath $tag.Log -Encoding UTF8 | Where-Object { $_ -like 'RESULT|win|*' }) } else { @() }
+    $lines = if ($Log -and (Test-Path -LiteralPath $Log)) { @(Get-Content -LiteralPath $Log -Encoding UTF8 | Where-Object { $_ -like 'RESULT|win|*' }) } else { @() }
     foreach ($l in $lines) {
         $f = $l.Split('|', 5); $rc = [int]$f[3]
         Add-History 'winupdate' $f[4] 'Windows Update' '' '' $(if ($rc -in 2, 3) { 'ok' } else { 'error' }) $(if ($codes.ContainsKey($rc)) { $codes[$rc] } else { "Result $rc" })
     }
+    return , $lines
+}
+$ElevHandlers.winupdate = {
+    param($Ev, $why, $code, $last, $tag)
+    $lines = Add-WinResultHistory $tag.Log
     $text = if ($why) { $why } elseif ($code -eq 0) { 'Installed' } elseif ($code -eq 3010) { 'Installed. Restart to finish' } else { "Some didn't install$(if ($last) { ": $last" })" }
     if (-not $lines.Count -and -not $why) { Add-History 'winupdate' "$($tag.Count) Windows update$(if ($tag.Count -ne 1) { 's' })" 'Windows Update' '' '' $(if ($code -in 0, 3010) { 'ok' } else { 'error' }) $text }
     $script:LastSummary = "Windows updates: $text"

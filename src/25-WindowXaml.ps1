@@ -1448,6 +1448,12 @@ $Xaml = @'
       <StackPanel>
         <DockPanel Margin="0,0,0,12">
           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+          <Button x:Name="HlFix" Style="{StaticResource Primary}" ToolTip="Check this PC for what can make it run better (updates, leftover files, security), and fix what you choose with one click">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="&#xE90F;" FontFamily="Segoe MDL2 Assets" FontSize="13" Margin="0,1,8,0" VerticalAlignment="Center"/>
+              <TextBlock Text="Fix my PC"/>
+            </StackPanel>
+          </Button>
           <Button x:Name="HlReport" ToolTip="Save Device Health, installed software, startup apps and waiting updates as a web page, to keep or send to someone helping">
             <StackPanel Orientation="Horizontal">
               <TextBlock Text="&#xE74E;" FontFamily="Segoe MDL2 Assets" FontSize="13" Margin="0,1,8,0" VerticalAlignment="Center"/>
@@ -2653,6 +2659,85 @@ $Xaml = @'
             <Button x:Name="PickCancel" Content="Cancel"/>
             <Button x:Name="PickOk" Style="{StaticResource Primary}" Margin="0" MinWidth="110"/>
           </StackPanel>
+        </Grid>
+      </Border>
+    </Grid>
+
+    <!-- Fix my PC: what can make the PC run better, ticked where it's safe, done with one click -->
+    <Grid x:Name="FixOverlay" Grid.RowSpan="5" Background="#B8000000" Visibility="Collapsed">
+      <Border Width="720" MaxHeight="720" Margin="36" Background="#252525" BorderBrush="#3A3A3A" BorderThickness="1" CornerRadius="12">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+          </Grid.RowDefinitions>
+          <StackPanel Margin="30,26,30,14">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="&#xE90F;" FontFamily="Segoe MDL2 Assets" FontSize="20" Foreground="{StaticResource Highlight}" Margin="0,2,12,0" VerticalAlignment="Center"/>
+              <TextBlock Text="Fix my PC" FontSize="20" FontWeight="Bold" Foreground="White"/>
+            </StackPanel>
+            <TextBlock x:Name="FixText" Foreground="{StaticResource Muted}" Margin="0,8,0,0" TextWrapping="Wrap" LineHeight="19"/>
+            <ProgressBar x:Name="FixBar" Style="{StaticResource Bar}" IsIndeterminate="True" Margin="0,14,0,0" Visibility="Collapsed"/>
+          </StackPanel>
+          <Border Grid.Row="1" Margin="30,0,30,0" Background="#1C1C1C" CornerRadius="8">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="14,4,14,10">
+              <ItemsControl x:Name="FixList">
+                <ItemsControl.GroupStyle>
+                  <GroupStyle>
+                    <GroupStyle.HeaderTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding Name}" Style="{StaticResource Label}" Foreground="{StaticResource Highlight}" Margin="0,14,0,4"/>
+                      </DataTemplate>
+                    </GroupStyle.HeaderTemplate>
+                  </GroupStyle>
+                </ItemsControl.GroupStyle>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Grid Margin="0,6,0,6">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="34"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                      </Grid.ColumnDefinitions>
+                      <CheckBox Style="{StaticResource Check}" IsChecked="{Binding Included, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanCheck}"
+                                Visibility="{Binding CanChoose, Converter={StaticResource B2V}}" VerticalAlignment="Top" Margin="0,1,0,0"/>
+                      <TextBlock x:Name="FixDot" Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="#9A9A9A" VerticalAlignment="Top" Margin="2,2,0,0" Visibility="Collapsed"/>
+                      <StackPanel Grid.Column="1" Margin="0,0,12,0">
+                        <StackPanel Orientation="Horizontal">
+                          <TextBlock Text="{Binding Name}" Foreground="#F2F2F2" TextWrapping="Wrap"/>
+                          <TextBlock Text="&#xEA18;" FontFamily="Segoe MDL2 Assets" FontSize="11" Foreground="#9A9A9A" Margin="8,3,0,0" Background="Transparent"
+                                     Visibility="{Binding NeedsAdmin, Converter={StaticResource B2V}}" ToolTip="Part of the one administrator approval"/>
+                        </StackPanel>
+                        <TextBlock Text="{Binding Detail}" Foreground="#A8A8A8" FontSize="12.5" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                        <TextBlock x:Name="FixStatus" Text="{Binding StatusText}" Foreground="{StaticResource Good}" FontSize="12.5" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                        <ProgressBar x:Name="FixRowBar" Style="{StaticResource Bar}" IsIndeterminate="True" Margin="0,6,40,0" Visibility="Collapsed"/>
+                      </StackPanel>
+                      <Button Grid.Column="2" Content="{Binding ActionText}" Tag="fixopen" Style="{StaticResource RowButton}" VerticalAlignment="Top"
+                              Visibility="{Binding HasAction, Converter={StaticResource B2V}}"/>
+                    </Grid>
+                    <DataTemplate.Triggers>
+                      <DataTrigger Binding="{Binding CanChoose}" Value="False"><Setter TargetName="FixDot" Property="Visibility" Value="Visible"/></DataTrigger>
+                      <DataTrigger Binding="{Binding StatusText}" Value=""><Setter TargetName="FixStatus" Property="Visibility" Value="Collapsed"/></DataTrigger>
+                      <DataTrigger Binding="{Binding State}" Value="running"><Setter TargetName="FixRowBar" Property="Visibility" Value="Visible"/><Setter TargetName="FixStatus" Property="Foreground" Value="White"/></DataTrigger>
+                      <DataTrigger Binding="{Binding State}" Value="reboot"><Setter TargetName="FixStatus" Property="Foreground" Value="{StaticResource Warn}"/></DataTrigger>
+                      <DataTrigger Binding="{Binding State}" Value="error"><Setter TargetName="FixStatus" Property="Foreground" Value="{StaticResource Bad}"/></DataTrigger>
+                      <DataTrigger Binding="{Binding State}" Value="skipped"><Setter TargetName="FixStatus" Property="Foreground" Value="#8A8A8A"/></DataTrigger>
+                    </DataTemplate.Triggers>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </Border>
+          <DockPanel Grid.Row="2" Margin="30,18,30,24">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+              <Button x:Name="FixClose" Content="Cancel"/>
+              <Button x:Name="FixGo" Style="{StaticResource Primary}" Margin="0" MinWidth="130">
+                <TextBlock x:Name="FixGoText" Text="Fix"/>
+              </Button>
+            </StackPanel>
+            <TextBlock x:Name="FixNote" Foreground="{StaticResource Muted}" FontSize="12.5" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,16,0"/>
+          </DockPanel>
         </Grid>
       </Border>
     </Grid>
