@@ -425,6 +425,37 @@ namespace WingetUM {
         public string Action2Text { get { return IsTweak ? "Restore" : (on ? "Remove from desktop" : "Add to desktop"); } }
     }
 
+    // A suggestion in Fix my PC: one to tick (Recommended or Optional), or one it can't do itself (Worth a look),
+    // with a button that goes where it can be done
+    public class FixItem : INotifyPropertyChanged {
+        public event PropertyChangedEventHandler PropertyChanged;
+        private void Changed(params string[] names) {
+            PropertyChangedEventHandler h = PropertyChanged;
+            if (h == null) return;
+            foreach (string n in names) h(this, new PropertyChangedEventArgs(n));
+        }
+        private bool included, locked;
+        private string state = "", result = "";
+        public string Key { get; set; }
+        public string Section { get; set; }
+        public string SortKey { get; set; }
+        public string Name { get; set; }
+        public string Detail { get; set; }
+        public bool CanChoose { get; set; }
+        public bool NeedsAdmin { get; set; }
+        public string ActionText { get; set; }
+        public bool HasAction { get { return !string.IsNullOrEmpty(ActionText); } }
+        public bool Included { get { return included; } set { included = value; Changed("Included"); } }
+        // once the run starts, the ticks stay as they are
+        public bool Locked { get { return locked; } set { locked = value; Changed("Locked", "CanCheck"); } }
+        public bool CanCheck { get { return CanChoose && !locked; } }
+        // running | ok | reboot (done, with something to notice) | error | skipped
+        public string State { get { return state; } set { state = value ?? ""; Changed("State", "StatusText", "IsBusy"); } }
+        public string Result { get { return result; } set { result = value ?? ""; Changed("Result", "StatusText"); } }
+        public bool IsBusy { get { return state == "running"; } }
+        public string StatusText { get { return state == "running" && result.Length == 0 ? "Working" + (char)0x2026 : result; } }
+    }
+
     // One line of the History panel (history.jsonl)
     public class HistoryEntry {
         public System.DateTime Time { get; set; }
@@ -457,6 +488,7 @@ namespace WingetUM {
                     case "tweakon": return "Turned on:";
                     case "tweakoff": return "Turned off:";
                     case "tweakrestore": return "Restored:";
+                    case "fixpc": return "Fix my PC:";
                     default: return "Updated";
                 }
             }
@@ -473,6 +505,7 @@ namespace WingetUM {
                     case "startupoff": case "startupon": return ((char)0xE7E8).ToString();
                     case "cleanup": return ((char)0xE74D).ToString();
                     case "tweakon": case "tweakoff": case "tweakrestore": return ((char)0xE713).ToString();
+                    case "fixpc": return ((char)0xE90F).ToString();
                     default: return ((char)0xE777).ToString();
                 }
             }
