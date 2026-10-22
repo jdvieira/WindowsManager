@@ -49,6 +49,7 @@ function Open-FixMyPC {
     if (-not $script:CleanReader -and -not $script:Cleaner) { Start-CleanScan }
     if (-not $script:HealthReader) { Start-HealthScan }
     if ($script:StartupState -in 'none', 'error') { Start-StartupScan }
+    if (-not $script:SecReader) { Start-SecRead }
     $script:FixTimer.Start()
     Update-FixView
 }
@@ -59,6 +60,7 @@ function Test-FixChecked {
     if ($script:CleanReader -or -not $script:CleanMeasured) { return $false }
     if ($script:HealthReader -or -not $script:HealthInfo) { return $false }
     if ($script:StartupState -eq 'running') { return $false }
+    if ($script:SecReader -or $script:Lister) { return $false }
     return $true
 }
 
@@ -85,6 +87,15 @@ function Build-FixList {
         if ($def.ScanAge -ge 7) { Add-FixItem 'defscan' 'Recommended' 'Run a quick virus scan' "The last quick scan was $(if ($def.ScanAge -gt 3650) { 'never run' } else { "$($def.ScanAge) days ago" }). It takes a few minutes; Windows Security has the details if it finds anything." $true -Admin }
         if (-not $def.Realtime) { Add-FixItem 'realtime' 'Recommended' "Turn Defender's real-time protection back on" "It's off, so files aren't checked as they're opened or downloaded." $true -Admin }
     }
+    # what the Security tab found: active threats (Defender removes them in the administrator run) and unwanted apps
+    $secThreats = @($SecItems | Where-Object { -not $_.IsApp -and $_.CanRemove })
+    if ($secThreats.Count -and (Test-DefenderInCharge)) {
+        Add-FixItem 'threats' 'Recommended' "Remove $($secThreats.Count) active threat$(if ($secThreats.Count -ne 1) { 's' })" "Microsoft Defender found $(Format-FixNames @($secThreats | ForEach-Object { $_.Name }) 3) and hasn't removed $(if ($secThreats.Count -ne 1) { 'them' } else { 'it' }). Defender removes $(if ($secThreats.Count -ne 1) { 'them' } else { 'it' }) now; the Security tab has the details." $true -Admin -Ref $secThreats
+    }
+    $secApps = @($SecItems | Where-Object { $_.IsApp -and $_.CanRemove })
+    $junk = @($secApps | Where-Object { $_.Selected })
+    if ($junk.Count) { Add-FixItem 'unwanted' 'Recommended' "Uninstall $($junk.Count) unwanted app$(if ($junk.Count -ne 1) { 's' })" "$(Format-FixNames @($junk | ForEach-Object { $_.Name }) 3) ($($junk[0].Category.ToLower())$(if ($junk.Count -gt 1) { ', and the like' })). Uninstalled one at a time; the Security tab lists them." $true -Ref $junk }
+    elseif ($secApps.Count) { Add-FixItem 'unwanted' 'Optional' "Uninstall $(Format-FixNames @($secApps | ForEach-Object { $_.Name }) 2)" "$($secApps[0].Category). Uninstalled one at a time; the Security tab lists them." $false -Ref $secApps }
     $fwOff = @($sec.Firewall | Where-Object { -not $_.On } | ForEach-Object { $_.Name })
     if ($fwOff.Count) { Add-FixItem 'firewall' 'Recommended' 'Turn the firewall back on' "Windows Firewall is off for the $($fwOff -join ', ') network profile$(if ($fwOff.Count -ne 1) { 's' }).$(if ($otherAv) { ' If another security app has its own firewall, it may have turned this off on purpose: untick it then.' })" (-not $otherAv) -Admin }
     # the leftover files the Cleanup tab ticks by default (never the Recycle Bin, old downloads or saved drivers)
@@ -125,6 +136,12 @@ function Get-FixPart([string]$Key, [string]$Title, [string]$Code) {
 }
 function Get-FixAdminBody($Keys, $Wins, $CleanAdmin) {
     $body = ''
+    if ('threats' -in $Keys) { $body += Get-FixPart 'threats' 'Removing the threats Defender found' @'
+Remove-MpThreat -ErrorAction Stop
+Start-Sleep -Seconds 3
+$left = @(Get-MpThreat -ErrorAction SilentlyContinue | Where-Object { $_.IsActive }).Count
+if ($left) { Say ('RESULT|fix|threats|error|' + $left + ' still active: Windows Security can remove them, or a restart may finish it') } else { Say 'RESULT|fix|threats|ok|Removed' }
+'@ }
     if ('defsig' -in $Keys) { $body += Get-FixPart 'defsig' "Updating Defender's virus definitions" @'
 Update-MpSignature -ErrorAction Stop
 Say 'RESULT|fix|defsig|ok|Updated'
@@ -191,6 +208,7 @@ function Start-FixRun {
     $keys = $script:FixRun.Keys
     if (@($chosen | Where-Object { $_.NeedsAdmin }).Count) { $script:FixQueue.Enqueue('admin') }
     if ('apps' -in $keys) { $script:FixQueue.Enqueue('apps') }
+    if ('unwanted' -in $keys) { $script:FixQueue.Enqueue('unwanted') }
     if ('clean' -in $keys) { $script:FixQueue.Enqueue('clean') }
     if (@($keys | Where-Object { $_ -like 'startup|*' }).Count) { $script:FixQueue.Enqueue('startup') }
     if ('clean' -in $keys) { $script:CleanFreed = [long]0; $script:CleanFailed = 0; $script:CleanDone = @(); foreach ($i in $script:FixRefs['clean']) { $i.State = 'running'; $i.Detail = 'Cleaning' + $Ellipsis } }
@@ -208,6 +226,7 @@ function Start-FixStep([string]$Step) {
             Start-Elevated 'fixpc' 'Fix my PC' $body @() @{ Keys = $keys } -RestorePoint -RestoreText 'Before Fix my PC' -StallMinutes 90
         }
         'apps' { Add-UpdateJob @($script:FixRefs['apps'] | Where-Object { $_.CanUpdate }) }
+        'unwanted' { Complete-SecApps @($script:FixRefs['unwanted']) }
         'clean' {
             $mine = @($script:FixRefs['clean'] | Where-Object { -not $_.NeedsAdmin })
             if ($mine.Count) { Start-CleanMine $mine }
@@ -232,6 +251,14 @@ function Test-FixStepDone([string]$Step) {
             $bad = @($apps | Where-Object { $_.State -eq 'error' }).Count
             $f.State = if ($bad) { 'error' } elseif (@($apps | Where-Object { $_.State -eq 'reboot' }).Count) { 'reboot' } else { 'ok' }
             $f.Result = "$ok of $($apps.Count) updated$(if ($bad) { "; $bad didn't update (Software Updates has why)" })$(if ($f.State -eq 'reboot') { '. Restart to finish' })"
+            return $true
+        }
+        'unwanted' {
+            if ($script:Worker -or $Sync.Jobs.Count) { return $false }
+            $apps = @($script:FixRefs['unwanted']); $f = Get-FixItem 'unwanted'
+            $ok = @($apps | Where-Object { $_.Package -and $_.Package.State -eq 'ok' }).Count
+            $f.State = if ($ok -lt $apps.Count) { 'error' } else { 'ok' }
+            $f.Result = "$ok of $($apps.Count) uninstalled$(if ($ok -lt $apps.Count) { ' (Uninstall Software has why)' })"
             return $true
         }
         'clean' {
@@ -294,6 +321,7 @@ function Complete-FixRun {
     $script:FixSummary = $text
     $script:LastSummary = "Fix my PC: $text"
     Start-HealthScan
+    Start-SecRead
     Update-FixView
     Update-View
 }

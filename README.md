@@ -5,7 +5,8 @@ manager, it keeps apps updated (on demand or on a schedule), finds and installs 
 longer need. It also turns startup apps on and off, installs Windows' own updates, keeps drivers current (from Windows
 Update, the PC's vendor, NVIDIA and AMD, with a saved copy to roll back to), turns Windows'
 optional features on and off, shows the PC's health (with trends over time, alerts and a shareable report), and cleans
-up leftover files, including what uninstalled apps leave behind. Extras has Windows tweaks, each one restorable,
+up leftover files, including what uninstalled apps leave behind. Security runs Microsoft Defender's scans and removes the
+threats and unwanted apps it finds. Extras has Windows tweaks, each one restorable,
 and shortcuts to Windows' hidden tools. A setup backup puts your apps and options on a new PC.
 
 ## Screenshots
@@ -18,6 +19,11 @@ glance.
 **Fix my PC**, on Device Health: what would make the PC run better, the safe fixes ticked, done with one click.
 
 ![Fix my PC](docs/screenshots/10-fix-my-pc.png)
+
+**Security**: Microsoft Defender's quick and full scans, what it found, and unwanted apps (browser hijackers, adware,
+fake optimizers), removed one at a time or all at once.
+
+![Security](docs/screenshots/12-security.png)
 
 **Uninstall Software**: every app on the PC, with its size and its source. Uninstall one, or tick several and
 uninstall them together, or clear out the vendor bloat a new PC comes with.
@@ -63,9 +69,9 @@ to off, tell me, or do it.
 
 Download `Windows Manager.exe` from the [latest release](https://github.com/jdvieira/WindowsManager/releases/latest)
 and run it; there is nothing to install. (To build it yourself, see [Building](#building); it lands in
-`dist\Windows Manager.exe`.) There are ten sections, as tabs under the header (Ctrl+1 to Ctrl+9, and Ctrl+0): Device
-Health (where the app opens), Software Updates, Discover Software, Uninstall Software, Startup, Drivers, Windows
-Update, Windows Features, Cleanup and Extras. One copy of the app runs at a time: opening it again brings the open window to
+`dist\Windows Manager.exe`.) There are eleven sections, as tabs under the header: Device
+Health (where the app opens), Security, Software Updates, Discover Software, Uninstall Software, Startup, Drivers, Windows
+Update, Windows Features, Cleanup and Extras (Ctrl+1 to Ctrl+9 and Ctrl+0 open them, all but Security). One copy of the app runs at a time: opening it again brings the open window to
 the front.
 
 ### Device Health
@@ -78,7 +84,7 @@ each card's lines have a green, amber, red or grey dot.
 | This PC | Model, Windows version and build, processor, memory, how long since the last restart (and a note when a restart is waiting, or it's been two weeks), when Windows was installed |
 | BIOS and firmware | BIOS version and release date, and whether the last driver check found a newer one. **Check for updates** runs the Drivers tab's check |
 | Battery | Health (what it holds now against what it held new, from Windows' battery report), charge cycles, and the charge right now. **Battery report** opens Windows' full report. A PC without a battery has no Battery card (a desktop's placeholder battery, which some report, doesn't count), and This PC and BIOS share the top row |
-| Security | Antivirus (whichever Windows Security Center reports), real-time protection, how old the virus definitions and the last quick scan are, the firewall, BitLocker on the system drive, Secure Boot, the TPM, and Windows activation. **Windows Security** opens it |
+| Security | Antivirus (whichever Windows Security Center reports), active threats Defender hasn't removed, real-time protection, how old the virus definitions and the last quick scan are, the firewall, BitLocker on the system drive, Secure Boot, the TPM, and Windows activation. **Scan for threats** opens the Security tab |
 | Performance | Memory in use (with a bar), how busy the processor is right now, how many programs are running and how many start with Windows, then the three apps using the most memory in a list of their own (each with a bar against the biggest and how much it uses). **Task Manager** opens it |
 | Reliability | Windows' stability index; unexpected shutdowns and blue screens in the last 30 days, with the last blue screen's date and reason in plain words (its stop code in the tooltip); hardware errors Windows recorded (WHEA: processor, memory, PCIe) and disk errors (bad blocks, failed reads, file system errors) in 30 days; app crashes (amber with any, red with 10 or more; and which apps) and apps that stopped responding in the last 7 days; failed Windows updates in 30 days; and devices with a problem. **Reliability history** opens Windows' Reliability Monitor |
 | Updates | What's waiting from winget (Software Updates), Windows Update and the drivers check, and a waiting restart. **See updates** opens the tab with them |
@@ -110,6 +116,24 @@ default) and send a Windows notification when something needs attention: antivir
 virus definitions, a firewall off, a drive under 10% free, a disk reporting a problem, a battery under 60% of its
 original capacity, blue screens, or a restart that has been waiting for days. Each problem is mentioned once, and
 again after a week if it's still there.
+
+### Security
+
+Microsoft Defender finds the threats; this tab shows what it found and asks it to act. Scanning and removing need
+administrator approval (one per scan or removal).
+
+| Action | How |
+| --- | --- |
+| Scan | **Quick scan** (the places malware usually hides, a few minutes) or **Full scan** (every file, an hour or more). Defender's virus definitions are updated first. You can keep using the app; the list is read again when it's done |
+| See what was found | Active threats, with their kind (Trojan, Adware ...), severity, when and where they were found. **Show history** also lists what Defender already quarantined or removed |
+| Remove threats | Tick them (the box above the list ticks everything that can be removed), then **Remove ticked**, or **Remove** on a row. All active threats at once is Defender's own removal; just some of them rescans the files they were found in, so Defender removes only those. With **Restore point first** on, a restore point is made first |
+| Unwanted apps | Installed apps on a list of known unwanted ones: browser hijackers (Wave Browser, OneLaunch), adware, fake antivirus (Segurazo), fake optimizers and paid driver updaters. Clear junk starts ticked; apps some people choose (IObit, CCleaner) are listed unticked. They uninstall like on Uninstall Software |
+| Block unwanted apps | Turns Defender's protection against potentially unwanted apps on or off: they're blocked as they download or install |
+| Another antivirus | When another antivirus is in charge, Defender stands by and can't scan or remove: the tab says so, and unwanted apps can still be uninstalled |
+| More | **Windows Security** opens Defender's own protection history and quarantine. Right-click a row: open the file's location, copy the name, or look it up in Microsoft's threat encyclopedia |
+
+Fix my PC suggests removing active threats and unwanted apps, and Device Health's Security card shows active threats
+with a button to this tab.
 
 ### Software Updates
 

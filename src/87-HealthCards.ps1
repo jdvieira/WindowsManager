@@ -135,6 +135,7 @@ function Update-HealthCards($h) {
         if ($on.Count) { $sec.Add((New-Check 'Antivirus' (($on | ForEach-Object { $_.Name }) -join ', ') $(if (@($on | Where-Object { -not $_.Current }).Count) { 'warn' } else { 'ok' }))) }
         elseif (@($s.Av).Count) { $sec.Add((New-Check 'Antivirus' "$(@($s.Av)[0].Name) is off" 'bad')) }
         else { $sec.Add((New-Check 'Antivirus' 'None reported' 'bad')) }
+        if ($null -ne $s.Threats) { $sec.Add((New-Check 'Active threats' $(if ($s.Threats) { "$($s.Threats) found" } else { 'None' }) $(if ($s.Threats) { 'bad' } else { 'ok' }) 'What Microsoft Defender found and has not removed yet: the Security tab lists and removes them')) }
         if ($s.Defender -and $s.Defender.On) {
             $sec.Add((New-Check 'Real-time protection' $(if ($s.Defender.Realtime) { 'On' } else { 'Off' }) $(if ($s.Defender.Realtime) { 'ok' } else { 'bad' })))
             $sec.Add((New-Check 'Virus definitions' "Updated $(Format-Days $s.Defender.SigAge)" $(if ($s.Defender.SigAge -gt 3) { 'warn' } else { 'ok' })))
@@ -272,7 +273,7 @@ function Update-HealthCards($h) {
     return $issues
 }
 
-$UI.HlSecOpen.Add_Click({ try { Start-Process 'windowsdefender:' } catch { } })
+$UI.HlSecOpen.Add_Click({ $UI.TabSecurity.IsChecked = $true })
 $UI.HlPerfOpen.Add_Click({ try { Start-Process taskmgr.exe } catch { } })
 $UI.HlRelOpen.Add_Click({ try { Start-Process perfmon.exe -ArgumentList '/rel' } catch { } })
 $UI.HlNetOpen.Add_Click({ try { Start-Process 'ms-settings:network' } catch { } })

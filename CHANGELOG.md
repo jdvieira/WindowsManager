@@ -5,6 +5,20 @@ All notable changes to Windows Manager (called Windows Software Manager in 2.0, 
 version's section becomes its release notes, which the app shows under "What's new", so it lists only changes to the
 app, not to the repository.
 
+## 2.10.0.0 - 2026-10-22
+
+- New **Security** tab, next to Device Health, for malware and spyware:
+  - **Quick scan** and **Full scan** through Microsoft Defender (one administrator approval), with its virus
+    definitions updated first.
+  - What Defender found: active threats with their kind, severity and where they were found, to remove one at a time
+    or all at once; what it already quarantined or removed is listed as history.
+  - Installed apps that are known to be unwanted (browser hijackers, adware, fake optimizers and driver updaters),
+    uninstalled the way Uninstall Software does it.
+  - **Block unwanted apps** turns Defender's protection against potentially unwanted apps on or off.
+  - When another antivirus is in charge, the tab says so and leaves scanning to it.
+- Fix my PC suggests removing active threats and unwanted apps.
+- Device Health: the Security card shows active threats, and its button opens the Security tab.
+
 ## 2.9.3.0 - 2026-10-22
 
 - Uninstall Software: **Remove vendor bloat** finds the trials, promos and PC maker add-ons a new PC comes with
