@@ -20,9 +20,14 @@ glance.
 ![Fix my PC](docs/screenshots/10-fix-my-pc.png)
 
 **Uninstall Software**: every app on the PC, with its size and its source. Uninstall one, or tick several and
-uninstall them together.
+uninstall them together, or clear out the vendor bloat a new PC comes with.
 
 ![Uninstall Software](docs/screenshots/02-installed-software.png)
+
+**Remove vendor bloat**: the trials, promos and PC maker add-ons a new PC comes with. The safe ones start ticked; the
+maker's tools some people use are listed unticked, with what each one does.
+
+![Remove vendor bloat](docs/screenshots/11-vendor-bloat.png)
 
 **Startup**: apps that start when you sign in, turned on or off the way Task Manager does it.
 
@@ -149,6 +154,7 @@ Everything installed on the PC, including apps winget did not install. **winget 
 | Action | How |
 | --- | --- |
 | Uninstall | **Uninstall** on its row. The app asks you to confirm first |
+| Remove vendor bloat | **Remove vendor bloat** lists the trials, promos and PC maker add-ons a new PC comes with (McAfee and Norton trials, preinstalled games, Dell, HP, Lenovo, Acer, ASUS and MSI extras). The safe ones start ticked; maker tools some people use (support, hotkeys, fan and lighting control) are listed unticked, each with what it does. Drivers and Microsoft's own apps are never listed. **Uninstall ticked** makes a restore point first (when **Restore point first** is on) and uninstalls them one at a time |
 | Uninstall several | Tick them (the box above the list ticks every app shown), then **Uninstall selected**. One confirmation lists them; they uninstall one at a time, and each one's leftovers are offered in turn |
 | Remove what it left behind | After an uninstall, the app looks for what the app left: folders named after it (or its publisher's folder) in AppData, ProgramData and Program Files, its scheduled tasks, and startup entries whose program is gone. If it finds any, it lists them, all ticked: **Remove ticked** sends folders to the Recycle Bin (so a wrong guess can be brought back) and deletes the rest. Folders a running program uses are left out; items outside your profile need one administrator approval |
 | See what takes space | The **Size** column (click it to sort, largest first) and the total in the status bar. Sizes come from what each app reports to Windows; Store apps are measured from their install folders in the background and remembered in `sizes.json`. Apps that report nothing (Office language packs, for example) show no size |

@@ -90,13 +90,16 @@ function Show-Pick([string]$Kind, [string]$Title, [string]$Text, [string]$OkText
     foreach ($p in $Items) {
         $cb = New-Object System.Windows.Controls.CheckBox
         $cb.Style = $Window.FindResource('CheckItem')
-        $cb.IsChecked = $true
+        # a row can say whether it starts ticked (Remove vendor bloat); otherwise every row does
+        $cb.IsChecked = if ($p.PSObject.Properties['Checked']) { [bool]$p.Checked } else { $true }
         $cb.Tag = $p
         $stack = New-Object System.Windows.Controls.StackPanel
         $n = New-Object System.Windows.Controls.TextBlock
         $n.Text = $p.Name; $n.TextTrimming = 'CharacterEllipsis'
         $s = New-Object System.Windows.Controls.TextBlock
         $s.Text = "$($p.Id)  $Dot  $($p.Source)"; $s.FontFamily = 'Consolas'; $s.FontSize = 12; $s.Foreground = $muted; $s.Margin = '0,2,0,0'
+        # a row with a Note (Remove vendor bloat) shows it in words, wrapped, instead of the ID and source
+        if ($p.PSObject.Properties['Note']) { $s.Text = $p.Note; $s.FontFamily = $n.FontFamily; $s.TextWrapping = 'Wrap' }
         [void]$stack.Children.Add($n); [void]$stack.Children.Add($s)
         $cb.Content = $stack
         $cb.Add_Click({ Update-PickCount })
@@ -117,6 +120,7 @@ function Complete-Pick {
     if ($script:Pick -eq 'export') { Save-AppList $chosen }
     elseif ($script:Pick -eq 'setup') { Save-SetupFile $chosen }
     elseif ($script:Pick -eq 'leftovers') { Remove-Leftovers $chosen }
+    elseif ($script:Pick -eq 'bloat') { Remove-VendorBloat $chosen }
 }
 
 # A source's details as winget export writes them (from winget source export, or the defaults)

@@ -343,6 +343,7 @@ $UI.OptSrcAdd.Add_Click({ Add-WingetSource })
 # App lists: import on Discover, export on Installed
 $UI.BtnImportList.Add_Click({ Import-AppList })
 $UI.BtnExportList.Add_Click({ Open-ExportList })
+$UI.BtnVendorBloat.Add_Click({ Open-VendorBloat })
 $UI.PickAll.Add_Click({ foreach ($c in $UI.PickList.Children) { $c.IsChecked = $true }; Update-PickCount })
 $UI.PickNone.Add_Click({ foreach ($c in $UI.PickList.Children) { $c.IsChecked = $false }; Update-PickCount })
 $UI.PickCancel.Add_Click({ $UI.PickOverlay.Visibility = 'Collapsed' })

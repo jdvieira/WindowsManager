@@ -30,7 +30,7 @@ foreach ($name in 'HeaderLogo', 'HeaderVersion', 'SubTitle', 'AdminBadge', 'Admi
     'DetHomepage', 'DetAction', 'ConfirmOverlay', 'ConfirmTitle', 'ConfirmText', 'ConfirmNo', 'ConfirmYes',
     'HColVer', 'HColThird', 'HColSource', 'HColStatus', 'HdrStatus', 'BtnAbout', 'AboutOverlay', 'AboutLogo', 'AboutVersion', 'AboutMail', 'AboutRepo', 'AboutCopy', 'AboutClose',
     'OptCancel', 'OptSave', 'OptMessage', 'BtnShowHidden', 'ShowHiddenGlyph', 'ShowHiddenText', 'OptHiddenList', 'OptHiddenEmpty', 'OptHideAdd', 'OptHideAddBtn',
-    'BtnImportList', 'BtnExportList', 'BtnHistory', 'PageSources', 'OptSourceList', 'OptSourceEmpty',
+    'BtnImportList', 'BtnExportList', 'BtnVendorBloat', 'BtnHistory', 'PageSources', 'OptSourceList', 'OptSourceEmpty',
     'OptSrcName', 'OptSrcUrl', 'OptSrcTypeRest', 'OptSrcTypeIndexed', 'OptSrcExplicit', 'OptSrcAdd',
     'HistoryOverlay', 'HistClose', 'HistSub', 'HistSearch', 'HistAll', 'HistAutoOnly', 'HistFailed', 'HistList', 'HistEmpty', 'HistEmptyText', 'HistClear', 'HistDone',
     'NotesOverlay', 'NotesClose', 'NotesTitle', 'NotesSub', 'NotesText', 'NotesOpen', 'NotesUpdate',

@@ -54,6 +54,8 @@ function Update-View {
     $UI.BtnImportList.Visibility = ConvertTo-Visibility $isD
     $UI.BtnExportList.Visibility = ConvertTo-Visibility $isI
     $UI.BtnExportList.IsEnabled = $script:InstalledMode -eq 'ready'
+    $UI.BtnVendorBloat.Visibility = ConvertTo-Visibility $isI
+    $UI.BtnVendorBloat.IsEnabled = $script:InstalledMode -eq 'ready'
     $UI.BtnRefresh.Visibility = ConvertTo-Visibility (-not $isD)
     $UI.BtnRefresh.IsEnabled = [bool]$WingetPath -and -not $busy -and $(if ($isI) { -not $script:Lister } else { -not $scanning })
     $UI.BtnRefresh.ToolTip = if ($isI) { 'Read the installed apps again (F5)' } else { 'Check for updates again (F5)' }
