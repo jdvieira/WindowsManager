@@ -45,6 +45,8 @@ foreach ($name in 'HeaderLogo', 'HeaderVersion', 'SubTitle', 'AdminBadge', 'Admi
 }
 # 2.0: the Startup, Windows Update and Health tabs, diagnostics, notifications, setup backups
 foreach ($name in 'TabStartup', 'TabWindows', 'TabHealth', 'WinBadge', 'WinBadgeText', 'BtnDiag',
+    'TabSecurity', 'SecBadge', 'SecBadgeText', 'SecurityPanel', 'SecWinSec', 'SecQuick', 'SecFull', 'SecIcon', 'SecTitle', 'SecText', 'SecScanBar', 'SecPua', 'SecHistory', 'SecRefresh',
+    'SecRemove', 'SecRemoveText', 'SecHeader', 'SecCheckAll', 'SecList', 'SecMsgPanel', 'SecMsgBar', 'SecMsgTitle', 'SecMsgText', 'SecMsgAction',
     'StartupPanel', 'StTitle', 'StText', 'StOpenTaskMgr', 'StSearch', 'StOffOnly', 'StRefresh', 'StHeader', 'StList', 'StMsgPanel', 'StMsgBar', 'StMsgTitle', 'StMsgText', 'StMsgAction',
     'WinPanel', 'WinTitle', 'WinVersion', 'WinStatus', 'WinSettings', 'WinRestart', 'WinViewAvail', 'WinViewAvailText', 'WinViewHistory', 'WinSearch', 'WinRestore',
     'WinRefresh', 'WinRefreshText', 'WinApply', 'WinApplyText', 'WinNote', 'WinNoteText', 'WinAvailHeader', 'WinHistHeader', 'WinList', 'WinHistList',

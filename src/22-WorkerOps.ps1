@@ -530,6 +530,7 @@ if ($Op -eq 'health') {
                     @{ Name = [string]$_.displayName; On = ((($st -shr 8) -band 0xFF) -band 0x10) -ne 0; Current = ((($st) -band 0xFF) -band 0x10) -eq 0 } })
         }
         catch { $sec.Av = @() }
+        try { $sec.Threats = @(Get-MpThreat -ErrorAction Stop | Where-Object { $_.IsActive }).Count } catch { }
         try { $m = Get-MpComputerStatus -ErrorAction Stop; $sec.Defender = @{ On = [bool]$m.AntivirusEnabled; Realtime = [bool]$m.RealTimeProtectionEnabled; SigAge = [int]$m.AntivirusSignatureAge; ScanAge = [int]$m.QuickScanAge } } catch { }
         try { $sec.Firewall = @(Get-NetFirewallProfile -ErrorAction Stop | ForEach-Object { @{ Name = [string]$_.Name; On = [bool]$_.Enabled } }) } catch { }
         try { $sec.BitLocker = (New-Object -ComObject Shell.Application).NameSpace("$env:SystemDrive\").Self.ExtendedProperty('System.Volume.BitLockerProtection') } catch { }
@@ -669,8 +670,54 @@ if ($Op -eq 'health') {
     Send $h
 }
 
-if ($Op -eq 'bigfiles') {
-    # Cleanup: the largest files in your folders (Arg.Folders), at least Arg.MinBytes, the biggest Arg.Top. Files
+if ($Op -eq 'security') {
+    # The Security tab: Defender's state (is it the antivirus, real-time protection, scans, definitions, blocking of
+    # unwanted apps), every antivirus Windows Security Center knows, and what Defender detected: one row per detection
+    # (a threat can be found in several places), with the threat's name, kind and severity. Reading needs no
+    # administrator rights.
+    $r = @{ T = 'security'; Error = $null; Threats = @(); Av = @() }
+    try {
+        $r.Av = @(Get-CimInstance -Namespace root\SecurityCenter2 -ClassName AntiVirusProduct -ErrorAction Stop | ForEach-Object {
+                $st = [int]$_.productState
+                @{ Name = [string]$_.displayName; On = ((($st -shr 8) -band 0xFF) -band 0x10) -ne 0 } })
+    }
+    catch { }
+    try {
+        $m = Get-MpComputerStatus -ErrorAction Stop
+        $r.Status = @{ Mode = [string]$m.AMRunningMode; On = [bool]$m.AntivirusEnabled; Realtime = [bool]$m.RealTimeProtectionEnabled
+            SigAge = [int]$m.AntivirusSignatureAge; QuickAge = [int]$m.QuickScanAge; FullAge = [int]$m.FullScanAge
+            QuickEnd = $m.QuickScanEndTime; FullEnd = $m.FullScanEndTime }
+    }
+    catch { $r.Error = "Couldn't read Microsoft Defender's status: $($_.Exception.Message)" }
+    try { $r.Pua = [int](Get-MpPreference -ErrorAction Stop).PUAProtection } catch { $r.Pua = $null }
+    try {
+        $threats = @{}
+        foreach ($t in @(Get-MpThreat -ErrorAction Stop)) { $threats[[long]$t.ThreatID] = $t }
+        $rows = New-Object Collections.Generic.List[object]
+        $seen = @{}
+        foreach ($d in @(Get-MpThreatDetection -ErrorAction Stop | Sort-Object InitialDetectionTime -Descending)) {
+            $id = [long]$d.ThreatID; $t = $threats[$id]
+            $files = @(@($d.Resources) | ForEach-Object { [string]$_ } | Where-Object { $_ })
+            $key = "$id|$($files -join ';')"
+            if ($seen[$key]) { continue }
+            $seen[$key] = $true
+            $rows.Add(@{ Id = $id; Name = $(if ($t) { [string]$t.ThreatName } else { "Threat $id" }); Severity = $(if ($t) { [int]$t.SeverityID } else { 0 })
+                    Category = $(if ($t) { [int]$t.CategoryID } else { 0 }); Active = $(if ($t) { [bool]$t.IsActive } else { $false }); Status = [int]$d.ThreatStatusID
+                    Time = $d.InitialDetectionTime; Resources = $files })
+        }
+        # a threat Defender still lists without a detection record
+        foreach ($id in $threats.Keys) {
+            if (@($rows | Where-Object { $_.Id -eq $id }).Count) { continue }
+            $t = $threats[$id]
+            $rows.Add(@{ Id = $id; Name = [string]$t.ThreatName; Severity = [int]$t.SeverityID; Category = [int]$t.CategoryID; Active = [bool]$t.IsActive; Status = $(if ($t.IsActive) { 1 } else { 0 }); Time = $null; Resources = @(@($t.Resources) | ForEach-Object { [string]$_ }) })
+        }
+        $r.Threats = $rows.ToArray()
+    }
+    catch { if (-not $r.Error) { $r.Error = "Couldn't read what Microsoft Defender found: $($_.Exception.Message)" } }
+    Send $r
+}
+
+if ($Op -eq 'bigfiles') {    # Cleanup: the largest files in your folders (Arg.Folders), at least Arg.MinBytes, the biggest Arg.Top. Files
     # that live only in OneDrive (not downloaded) are skipped, so nothing is fetched from the cloud.
     $found = New-Object Collections.Generic.List[object]
     # Offline, RecallOnOpen and RecallOnDataAccess, as numbers (Windows PowerShell won't cast the last two to FileAttributes)

@@ -456,6 +456,45 @@ namespace WingetUM {
         public string StatusText { get { return state == "running" && result.Length == 0 ? "Working" + (char)0x2026 : result; } }
     }
 
+    // Security tab: something Defender detected (Kind threat), or an installed app on the list of unwanted ones (Kind
+    // app). Active threats and apps can be ticked and removed; resolved detections (quarantined, removed) are history.
+    public class ThreatItem : INotifyPropertyChanged {
+        public event PropertyChangedEventHandler PropertyChanged;
+        private void Changed(params string[] names) {
+            PropertyChangedEventHandler h = PropertyChanged;
+            if (h == null) return;
+            foreach (string n in names) h(this, new PropertyChangedEventArgs(n));
+        }
+        private bool selected, active;
+        private string state = "", detail = "", status = "";
+        public string Kind { get; set; }
+        public string Name { get; set; }
+        // the kind of threat (Trojan, Adware ...) or what the app is
+        public string Category { get; set; }
+        public string Location { get; set; }
+        public string LocationTip { get; set; }
+        // Low | Moderate | High | Severe, or Unwanted for an app
+        public string Severity { get; set; }
+        public int SeverityLevel { get; set; }
+        public string Found { get; set; }
+        public System.DateTime Time { get; set; }
+        public long ThreatId { get; set; }
+        public string[] Files { get; set; }
+        public object Package { get; set; }
+        public bool IsApp { get { return Kind == "app"; } }
+        public bool IsActive { get { return active; } set { active = value; Changed("IsActive", "CanRemove", "SortGroup"); } }
+        public string Status { get { return status; } set { status = value ?? ""; Changed("Status", "StatusText"); } }
+        public bool Selected { get { return selected; } set { selected = value; Changed("Selected"); } }
+        // running | ok | error
+        public string State { get { return state; } set { state = value ?? ""; Changed("State", "StatusText", "IsBusy", "CanRemove"); } }
+        public string Detail { get { return detail; } set { detail = value ?? ""; Changed("Detail", "StatusText"); } }
+        public bool IsBusy { get { return state == "running"; } }
+        public bool CanRemove { get { return active && state != "running" && state != "ok"; } }
+        public string StatusText { get { return !string.IsNullOrEmpty(state) && !string.IsNullOrEmpty(detail) ? detail : status; } }
+        // active threats first, then unwanted apps, then history
+        public int SortGroup { get { return active ? (Kind == "app" ? 1 : 0) : 2; } }
+    }
+
     // One line of the History panel (history.jsonl)
     public class HistoryEntry {
         public System.DateTime Time { get; set; }
@@ -489,6 +528,10 @@ namespace WingetUM {
                     case "tweakoff": return "Turned off:";
                     case "tweakrestore": return "Restored:";
                     case "fixpc": return "Fix my PC:";
+                    case "secscan": return "Virus scan:";
+                    case "secremove": return "Removed threats:";
+                    case "puaon": return "Blocking unwanted apps:";
+                    case "puaoff": return "Stopped blocking unwanted apps:";
                     default: return "Updated";
                 }
             }
@@ -506,6 +549,7 @@ namespace WingetUM {
                     case "cleanup": return ((char)0xE74D).ToString();
                     case "tweakon": case "tweakoff": case "tweakrestore": return ((char)0xE713).ToString();
                     case "fixpc": return ((char)0xE90F).ToString();
+                    case "secscan": case "secremove": case "puaon": case "puaoff": return ((char)0xEA18).ToString();
                     default: return ((char)0xE777).ToString();
                 }
             }

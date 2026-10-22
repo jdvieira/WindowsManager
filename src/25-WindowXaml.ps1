@@ -730,6 +730,14 @@ $Xaml = @'
     <Border Margin="32,18,32,0" BorderBrush="#2A2A2A" BorderThickness="0,0,0,1">
       <StackPanel Orientation="Horizontal">
         <RadioButton x:Name="TabHealth" GroupName="Section" Style="{StaticResource Tab}" IsChecked="True" Content="Device Health" ToolTip="How this PC is doing: security, performance, reliability, battery, drives and more (Ctrl+1)"/>
+        <RadioButton x:Name="TabSecurity" GroupName="Section" Style="{StaticResource Tab}" ToolTip="Virus and malware scans, what Microsoft Defender found, and unwanted apps to remove">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="Security"/>
+            <Border x:Name="SecBadge" Margin="8,2,0,0" Padding="7,0,7,1" CornerRadius="9" Background="#5A2626" VerticalAlignment="Center" Visibility="Collapsed">
+              <TextBlock x:Name="SecBadgeText" FontSize="11.5" Foreground="White"/>
+            </Border>
+          </StackPanel>
+        </RadioButton>
         <RadioButton x:Name="TabUpdates" GroupName="Section" Style="{StaticResource Tab}" ToolTip="Apps with an update available (Ctrl+2)">
           <StackPanel Orientation="Horizontal">
             <TextBlock Text="Software Updates"/>
@@ -1279,8 +1287,148 @@ $Xaml = @'
       </Border>
     </Grid>
 
-    <!-- Windows Update: Windows' own updates (not drivers, which are on the Drivers tab), and its recent history -->
-    <Grid x:Name="WinPanel" Grid.Row="2" Margin="32,16,32,18" Visibility="Collapsed">
+    <!-- Security: Microsoft Defender's scans and what it found, and installed apps on the list of unwanted ones -->
+    <Grid x:Name="SecurityPanel" Grid.Row="2" Margin="32,16,32,18" Visibility="Collapsed">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="*"/>
+      </Grid.RowDefinitions>
+      <Border Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+            <Button x:Name="SecWinSec" Style="{StaticResource Ghost}" Content="Windows Security" ToolTip="Open Windows Security: its protection history and quarantine"/>
+            <Button x:Name="SecQuick" Content="Quick scan" ToolTip="Scan the places malware usually hides (a few minutes). Asks for administrator approval"/>
+            <Button x:Name="SecFull" Style="{StaticResource Primary}" Margin="0" ToolTip="Scan every file on the PC (an hour or more). Asks for administrator approval">
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="13" Margin="0,1,8,0" VerticalAlignment="Center"/>
+                <TextBlock Text="Full scan"/>
+              </StackPanel>
+            </Button>
+          </StackPanel>
+          <Border x:Name="SecIcon" Width="44" Height="44" CornerRadius="10" Background="#17414C" Margin="0,0,14,0" VerticalAlignment="Center">
+            <TextBlock Text="&#xEA18;" FontFamily="Segoe MDL2 Assets" FontSize="20" Foreground="{StaticResource Highlight}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+            <TextBlock x:Name="SecTitle" FontSize="16" FontWeight="SemiBold" Foreground="White" TextTrimming="CharacterEllipsis" Text="Security"/>
+            <TextBlock x:Name="SecText" Foreground="#BDBDBD" FontSize="12.5" Margin="0,4,0,0" TextWrapping="Wrap"/>
+            <ProgressBar x:Name="SecScanBar" Style="{StaticResource Bar}" IsIndeterminate="True" Margin="0,8,0,0" MaxWidth="320" HorizontalAlignment="Left" Width="320" Visibility="Collapsed"/>
+          </StackPanel>
+        </DockPanel>
+      </Border>
+      <Grid Grid.Row="1" Margin="0,14,0,12">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto"/>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+          <ToggleButton x:Name="SecPua" Content="Block unwanted apps" Style="{StaticResource Chip}" Margin="0,0,8,0"
+                        ToolTip="Microsoft Defender's protection against potentially unwanted apps: adware, bundled toolbars and the like are blocked as they download or install. Changing it asks for administrator approval"/>
+          <ToggleButton x:Name="SecHistory" Content="Show history" Style="{StaticResource Chip}" IsChecked="True" Margin="0,0,8,0"
+                        ToolTip="Also list what Defender already quarantined or removed"/>
+        </StackPanel>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+          <Button x:Name="SecRefresh" ToolTip="Read Defender's status and findings again (F5)">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="&#xE72C;" FontFamily="Segoe MDL2 Assets" FontSize="13" Margin="0,1,8,0" VerticalAlignment="Center"/>
+              <TextBlock Text="Refresh"/>
+            </StackPanel>
+          </Button>
+          <Button x:Name="SecRemove" Style="{StaticResource Danger}" Margin="0" IsEnabled="False">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="&#xE74D;" FontFamily="Segoe MDL2 Assets" FontSize="13" Margin="0,1,8,0" VerticalAlignment="Center"/>
+              <TextBlock x:Name="SecRemoveText" Text="Remove ticked"/>
+            </StackPanel>
+          </Button>
+        </StackPanel>
+      </Grid>
+      <Border Grid.Row="2" Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+          </Grid.RowDefinitions>
+          <Border x:Name="SecHeader" BorderBrush="#2E2E2E" BorderThickness="0,0,0,1">
+            <Grid Height="40" Margin="16,0,26,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="34"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="100"/>
+                <ColumnDefinition Width="120"/>
+                <ColumnDefinition Width="170"/>
+                <ColumnDefinition Width="100"/>
+              </Grid.ColumnDefinitions>
+              <CheckBox x:Name="SecCheckAll" Style="{StaticResource Check}" VerticalAlignment="Center" ToolTip="Tick everything that can be removed"/>
+              <TextBlock Grid.Column="1" Text="THREAT OR APP" Style="{StaticResource Label}" VerticalAlignment="Center"/>
+              <TextBlock Grid.Column="2" Text="SEVERITY" Style="{StaticResource Label}" VerticalAlignment="Center"/>
+              <TextBlock Grid.Column="3" Text="FOUND" Style="{StaticResource Label}" VerticalAlignment="Center"/>
+              <TextBlock Grid.Column="4" Text="STATUS" Style="{StaticResource Label}" VerticalAlignment="Center"/>
+            </Grid>
+          </Border>
+          <ListBox x:Name="SecList" Grid.Row="1" Background="Transparent" BorderThickness="0" ItemContainerStyle="{StaticResource Row}" ScrollViewer.HorizontalScrollBarVisibility="Disabled" VirtualizingPanel.ScrollUnit="Pixel" Focusable="False">
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <Grid x:Name="SecRow" Height="56" Margin="16,0,16,0" Background="Transparent">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="34"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="120"/>
+                    <ColumnDefinition Width="170"/>
+                    <ColumnDefinition Width="100"/>
+                  </Grid.ColumnDefinitions>
+                  <Grid.ContextMenu>
+                    <ContextMenu>
+                      <MenuItem Header="Open file location" Tag="secopen"/>
+                      <MenuItem Header="Copy name" Tag="seccopy"/>
+                      <MenuItem Header="Look it up online" Tag="secweb"/>
+                    </ContextMenu>
+                  </Grid.ContextMenu>
+                  <CheckBox x:Name="SecCheck" Style="{StaticResource Check}" VerticalAlignment="Center" IsChecked="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanRemove}"/>
+                  <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,14,0">
+                    <TextBlock Text="{Binding Name}" Foreground="#F2F2F2" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
+                    <TextBlock Foreground="#8A8A8A" FontSize="12" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" ToolTip="{Binding LocationTip}">
+                      <Run Text="{Binding Category, Mode=OneWay}"/><Run Text="  &#x00B7;  "/><Run Text="{Binding Location, Mode=OneWay}" FontFamily="Consolas"/>
+                    </TextBlock>
+                  </StackPanel>
+                  <TextBlock x:Name="SecSev" Grid.Column="2" Text="{Binding Severity}" Foreground="#9A9A9A" VerticalAlignment="Center" FontSize="12.5"/>
+                  <TextBlock Grid.Column="3" Text="{Binding Found}" Foreground="#9A9A9A" VerticalAlignment="Center" FontSize="12.5" TextTrimming="CharacterEllipsis"/>
+                  <StackPanel Grid.Column="4" VerticalAlignment="Center" Margin="0,0,10,0">
+                    <TextBlock x:Name="SecStatus" Text="{Binding StatusText}" Foreground="{StaticResource Good}" FontSize="12.5" TextTrimming="CharacterEllipsis" ToolTip="{Binding StatusText}"/>
+                    <ProgressBar x:Name="SecBar" Style="{StaticResource Bar}" IsIndeterminate="True" Margin="0,6,0,0" Visibility="Collapsed"/>
+                  </StackPanel>
+                  <Button x:Name="SecRowRemove" Grid.Column="5" Content="Remove" Tag="secremove" Style="{StaticResource RowButton}" IsEnabled="{Binding CanRemove}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+                <DataTemplate.Triggers>
+                  <DataTrigger Binding="{Binding IsActive}" Value="False">
+                    <Setter TargetName="SecRow" Property="Opacity" Value="0.6"/>
+                    <Setter TargetName="SecCheck" Property="Visibility" Value="Hidden"/>
+                    <Setter TargetName="SecRowRemove" Property="Visibility" Value="Collapsed"/>
+                  </DataTrigger>
+                  <DataTrigger Binding="{Binding IsActive}" Value="True"><Setter TargetName="SecStatus" Property="Foreground" Value="{StaticResource Bad}"/></DataTrigger>
+                  <DataTrigger Binding="{Binding IsApp}" Value="True"><Setter TargetName="SecStatus" Property="Foreground" Value="{StaticResource Warn}"/></DataTrigger>
+                  <DataTrigger Binding="{Binding Severity}" Value="Severe"><Setter TargetName="SecSev" Property="Foreground" Value="{StaticResource Bad}"/></DataTrigger>
+                  <DataTrigger Binding="{Binding Severity}" Value="High"><Setter TargetName="SecSev" Property="Foreground" Value="{StaticResource Bad}"/></DataTrigger>
+                  <DataTrigger Binding="{Binding Severity}" Value="Moderate"><Setter TargetName="SecSev" Property="Foreground" Value="{StaticResource Warn}"/></DataTrigger>
+                  <DataTrigger Binding="{Binding State}" Value="running"><Setter TargetName="SecBar" Property="Visibility" Value="Visible"/><Setter TargetName="SecStatus" Property="Foreground" Value="White"/></DataTrigger>
+                  <DataTrigger Binding="{Binding State}" Value="ok"><Setter TargetName="SecStatus" Property="Foreground" Value="{StaticResource Good}"/><Setter TargetName="SecRow" Property="Opacity" Value="0.6"/></DataTrigger>
+                  <DataTrigger Binding="{Binding State}" Value="error"><Setter TargetName="SecStatus" Property="Foreground" Value="{StaticResource Bad}"/></DataTrigger>
+                </DataTemplate.Triggers>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <StackPanel x:Name="SecMsgPanel" Grid.RowSpan="2" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="560" Visibility="Collapsed">
+            <ProgressBar x:Name="SecMsgBar" Style="{StaticResource Bar}" Width="240" IsIndeterminate="True" Margin="0,0,0,20"/>
+            <TextBlock x:Name="SecMsgTitle" FontSize="17" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"/>
+            <TextBlock x:Name="SecMsgText" Foreground="{StaticResource Muted}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,6,0,0"/>
+            <Button x:Name="SecMsgAction" Style="{StaticResource Primary}" HorizontalAlignment="Center" Margin="0,18,0,0" Visibility="Collapsed"/>
+          </StackPanel>
+        </Grid>
+      </Border>
+    </Grid>
+
+    <!-- Windows Update: Windows' own updates (not drivers, which are on the Drivers tab), and its recent history -->    <Grid x:Name="WinPanel" Grid.Row="2" Margin="32,16,32,18" Visibility="Collapsed">
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto"/>
         <RowDefinition Height="Auto"/>
@@ -1518,7 +1666,7 @@ $Xaml = @'
               <TextBlock Text="SECURITY" Style="{StaticResource Label}"/>
               <TextBlock x:Name="HlSecTitle" FontSize="16" FontWeight="SemiBold" Foreground="White" Margin="0,10,0,0" TextTrimming="CharacterEllipsis"/>
               <ItemsControl x:Name="HlSecItems" Margin="0,8,0,0" ItemTemplate="{StaticResource CheckRow}"/>
-              <Button x:Name="HlSecOpen" Style="{StaticResource Ghost}" Content="Windows Security" HorizontalAlignment="Left" Margin="0,10,0,0" ToolTip="Open Windows Security"/>
+              <Button x:Name="HlSecOpen" Style="{StaticResource Ghost}" Content="Scan for threats" HorizontalAlignment="Left" Margin="0,10,0,0" ToolTip="Open the Security tab: virus scans, what Microsoft Defender found, and unwanted apps"/>
             </StackPanel>
           </Border>
           <Border Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="2" Background="#232323" BorderBrush="#2C2C2C" BorderThickness="1" CornerRadius="10" Padding="20,16" Margin="0,0,12,12">
