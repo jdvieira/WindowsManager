@@ -25,6 +25,11 @@ fake optimizers), removed one at a time or all at once.
 
 ![Security](docs/screenshots/12-security.png)
 
+**Suspicious changes**, on Security: the places malware changes to start with Windows or take over the PC (startup
+points, the registry, WMI, browser policies, the hosts file), with why each one looks suspicious, and Remove and Restore.
+
+![Suspicious changes](docs/screenshots/13-suspicious-changes.png)
+
 **Uninstall Software**: every app on the PC, with its size and its source. Uninstall one, or tick several and
 uninstall them together, or clear out the vendor bloat a new PC comes with.
 
@@ -129,11 +134,34 @@ administrator approval (one per scan or removal).
 | Remove threats | Tick them (the box above the list ticks everything that can be removed), then **Remove ticked**, or **Remove** on a row. All active threats at once is Defender's own removal; just some of them rescans the files they were found in, so Defender removes only those. With **Restore point first** on, a restore point is made first |
 | Unwanted apps | Installed apps on a list of known unwanted ones: browser hijackers (Wave Browser, OneLaunch), adware, fake antivirus (Segurazo), fake optimizers and paid driver updaters. Clear junk starts ticked; apps some people choose (IObit, CCleaner) are listed unticked. They uninstall like on Uninstall Software |
 | Block unwanted apps | Turns Defender's protection against potentially unwanted apps on or off: they're blocked as they download or install |
+| Scan a folder, or offline | **More scans**: **Scan a folder or drive** (Defender scans just that), or **Offline scan**, which restarts the PC and scans before Windows starts, finding malware that hides while Windows runs (about 15 minutes; Windows Security's protection history has what it found) |
+| Suspicious changes | Checks the places malware changes to start with Windows or take over the PC, and lists what looks suspicious, with why and how sure (High, Medium, Low). Signed programs from known publishers aren't listed. See below |
 | Another antivirus | When another antivirus is in charge, Defender stands by and can't scan or remove: the tab says so, and unwanted apps can still be uninstalled |
 | More | **Windows Security** opens Defender's own protection history and quarantine. Right-click a row: open the file's location, copy the name, or look it up in Microsoft's threat encyclopedia |
 
 Fix my PC suggests removing active threats and unwanted apps, and Device Health's Security card shows active threats
 with a button to this tab.
+
+**Suspicious changes** looks in these places (reading needs no administrator rights):
+
+| Where | What looks suspicious |
+| --- | --- |
+| Startup | Run and RunOnce keys, the Startup folders, scheduled tasks (outside Windows' own) and services that run a script host with hidden or downloaded commands (mshta, wscript, PowerShell -EncodedCommand, rundll32, regsvr32, certutil), an unsigned program from Temp, Downloads, AppData or ProgramData, or a program that no longer exists |
+| Signing in | Winlogon's Shell or Userinit changed, AppInit_DLLs |
+| Programs redirected | Image File Execution Options debuggers (High for security tools, Task Manager and the sign-in screen's accessibility programs), SilentProcessExit monitors, accessibility programs swapped for a shell |
+| Commands | Command Prompt AutoRun, the open command for programs, and your account's open commands for programs, Settings, management consoles and folders (ways to get administrator rights without asking), BootExecute, unusual sign-in security (LSA) packages |
+| Hidden starts | WMI event subscriptions that run a command or a script |
+| Browser | Chrome, Edge and Brave policies that force an extension, or lock the home page, new tab page, search engine or startup pages |
+| Network | hosts file entries for Microsoft, Google, banks and security vendors, a proxy, a proxy script |
+| Microsoft Defender | Defender switched off by policy, and its exclusions (when Windows lets your account read them) |
+
+These are signs, not verdicts: workplaces, parental controls, developer tools and some apps make the same changes, so
+nothing starts ticked and each one says why it's listed. **Remove** deletes the value or key, turns the task off, stops
+the service starting by itself, comments out the hosts line or removes the exclusion, after saving what was there in
+`suspects.json`; **Restore** puts it back. Changes outside your account need one administrator approval (after a
+restore point, with **Restore point first** on). **Scan** has Defender scan the program it runs; right-click opens the
+file, the registry key (in Registry Editor) or Task Scheduler. What it can't undo safely (sign-in security packages,
+BootExecute, swapped accessibility programs) is listed to look into, without Remove.
 
 ### Software Updates
 

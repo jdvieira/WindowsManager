@@ -130,23 +130,28 @@ function Update-SecApps([switch]$Force) {
     }
 }
 
-# ---- Scans (as administrator: Defender's scans need it), with the definitions updated first
-function Start-DefenderScan([string]$Kind) {
+# ---- Scans (as administrator: Defender's scans need it), with the definitions updated first. A custom scan covers
+# the Paths given (a folder or drive, or the programs Suspicious changes found).
+function Start-DefenderScan([string]$Kind, [string[]]$Paths) {
     if ($script:Elev) { $script:LastSummary = "Wait for $($script:ElevTitle) to finish first."; Update-View; return }
-    if (-not (Test-DefenderInCharge)) { return }
-    $type = if ($Kind -eq 'full') { 'FullScan' } else { 'QuickScan' }
+    if (-not (Test-DefenderInCharge)) { $script:LastSummary = "Microsoft Defender isn't in charge, so it can't scan."; Update-View; return }
+    $scan = if ($Kind -eq 'custom') {
+        (@($Paths | Where-Object { $_ } | ForEach-Object { "Say ('Scanning ' + '$($_ -replace "'", "''")'); Start-MpScan -ScanType CustomScan -ScanPath '$($_ -replace "'", "''")' -ErrorAction Stop" }) -join "`r`n")
+    }
+    else { "Start-MpScan -ScanType $(if ($Kind -eq 'full') { 'FullScan' } else { 'QuickScan' }) -ErrorAction Stop" }
     $body = @"
 Say 'Updating virus definitions first$Ellipsis'
 try { Update-MpSignature -ErrorAction Stop; Say 'Definitions updated.' } catch { Say ('Definitions not updated: ' + `$_.Exception.Message) }
 `$t0 = Get-Date
 Say 'Scanning$Ellipsis'
-Start-MpScan -ScanType $type -ErrorAction Stop
+$scan
 `$found = @(Get-MpThreatDetection -ErrorAction SilentlyContinue | Where-Object { `$_.InitialDetectionTime -ge `$t0 }).Count
 Say ('RESULT|secscan|' + `$found)
 exit 0
 "@
-    $script:SecScan = @{ Kind = $Kind; Started = Get-Date }
-    Start-Elevated 'secscan' "Running a $Kind virus scan" $body @() @{ Kind = $Kind } -StallMinutes $(if ($Kind -eq 'full') { 600 } else { 90 })
+    $what = if ($Kind -eq 'custom') { "Scanning $(if (@($Paths).Count -eq 1) { Split-Path -Leaf $Paths[0] } else { "$(@($Paths).Count) places" })" } else { "Running a $Kind virus scan" }
+    $script:SecScan = @{ Kind = $Kind; Started = Get-Date; Title = $what }
+    Start-Elevated 'secscan' $what $body @() @{ Kind = $Kind } -StallMinutes $(if ($Kind -eq 'full') { 600 } else { 90 })
     Update-View
 }
 $ElevHandlers.secscan = {
@@ -168,6 +173,28 @@ $ElevHandlers.secscan = {
     }
     Start-SecRead
     if ($script:HealthInfo) { Start-HealthScan }
+}
+
+# Microsoft Defender Offline: restarts the PC and scans before Windows starts, which finds what hides while it runs
+function Start-OfflineScan {
+    if ($script:Elev) { $script:LastSummary = "Wait for $($script:ElevTitle) to finish first."; Update-View; return }
+    if (-not (Test-DefenderInCharge)) { $script:LastSummary = "Microsoft Defender isn't in charge, so it can't scan."; Update-View; return }
+    Show-Confirm 'secoffline' $null 'Restart and scan offline?' "Microsoft Defender Offline restarts the PC within a minute and scans it before Windows starts, which finds malware that hides while Windows runs. It takes about 15 minutes; then Windows starts as usual, and Windows Security's protection history has what it found.`n`nSave your work first. It asks for administrator approval." 'Restart and scan' -Danger
+}
+$ConfirmHandlers.secoffline = {
+    param($Payload)
+    Add-History 'secscan' 'Offline scan' '' '' '' 'ok' 'Started: the PC restarts to scan'
+    Start-Elevated 'secoffline' 'Starting the offline scan' "Say 'Starting Microsoft Defender Offline; the PC restarts shortly.'`r`nStart-MpWDOScan -ErrorAction Stop`r`nexit 0" @() @{}
+}
+$ElevHandlers.secoffline = {
+    param($Ev, $why, $code, $last, $tag)
+    $script:LastSummary = if ($why) { "Offline scan: $why" } elseif ($code -ne 0) { "Offline scan didn't start$(if ($last) { ": $last" })" } else { 'Offline scan: the PC restarts shortly to scan' }
+}
+function Select-ScanFolder {
+    Add-Type -AssemblyName System.Windows.Forms
+    $dlg = New-Object System.Windows.Forms.FolderBrowserDialog
+    $dlg.Description = 'Choose a folder or drive for Microsoft Defender to scan'
+    if ($dlg.ShowDialog() -eq 'OK' -and $dlg.SelectedPath) { Start-DefenderScan 'custom' @($dlg.SelectedPath) }
 }
 
 # ---- Removing: threats by Defender (as administrator, after a restore point with Restore point first on), then
@@ -271,7 +298,7 @@ function Update-SecView {
     $threats = @($SecItems | Where-Object { -not $_.IsApp -and $_.IsActive -and $_.State -ne 'ok' })
     $apps = @($SecItems | Where-Object { $_.IsApp -and $_.State -ne 'ok' })
     $scanning = $script:SecScan -and $script:Elev -and $script:ElevName -eq 'secscan'
-    $UI.SecTitle.Text = if ($scanning) { "Running a $($script:SecScan.Kind) scan$Ellipsis" }
+    $UI.SecTitle.Text = if ($scanning) { "$($script:SecScan.Title)$Ellipsis" }
     elseif (-not $script:SecInfo) { if ($script:SecState -eq 'error') { "Couldn't read Microsoft Defender" } else { "Reading Microsoft Defender$Ellipsis" } }
     elseif ($threats.Count) { "$($threats.Count) active threat$(if ($threats.Count -ne 1) { 's' }) found" }
     elseif (-not $inCharge) { if ($other) { "$other is protecting this PC" } else { "Microsoft Defender isn't protecting this PC" } }
@@ -287,12 +314,20 @@ function Update-SecView {
     $UI.SecIcon.Background = if ($threats.Count -or ($script:SecInfo -and -not $inCharge -and -not $other)) { '#5A2626' } elseif ($apps.Count) { '#4A3A1A' } else { '#17414C' }
     $free = -not $script:Elev
     $UI.SecQuick.IsEnabled = $inCharge -and $free
+    $UI.SecMore.IsEnabled = $inCharge -and $free
     $UI.SecFull.IsEnabled = $inCharge -and $free
     $UI.SecRefresh.IsEnabled = -not $script:SecReader
     $pua = if ($script:SecInfo) { $script:SecInfo.Pua } else { $null }
     $UI.SecPua.IsChecked = $pua -eq 1
     $UI.SecPua.IsEnabled = $inCharge -and $free -and $null -ne $pua
     $UI.SecPua.Content = if ($pua -eq 2) { 'Block unwanted apps (audit only)' } else { 'Block unwanted apps' }
+    $UI.SecViewDefenderText.Text = if ($threats.Count + $apps.Count) { "Defender ($($threats.Count + $apps.Count))" } else { 'Defender' }
+    $susOpen = @($SusItems | Where-Object { -not $_.Removed }).Count
+    $UI.SecViewSuspectsText.Text = if ($script:SusReader -and -not $SusItems.Count) { "Suspicious changes ($Ellipsis)" } elseif ($susOpen) { "Suspicious changes ($susOpen)" } else { 'Suspicious changes' }
+    $susView = $UI.SecViewSuspects.IsChecked -eq $true
+    $UI.SecDefChips.Visibility = ConvertTo-Visibility (-not $susView)
+    if ($susView) { $UI.SecHeader.Visibility = 'Collapsed'; $UI.SecList.Visibility = 'Collapsed'; Update-SusView; return }
+    $UI.SusHeader.Visibility = 'Collapsed'; $UI.SusList.Visibility = 'Collapsed'
     $ticked = @($SecItems | Where-Object { $_.Selected -and $_.CanRemove })
     $UI.SecRemoveText.Text = if ($ticked.Count) { "Remove ticked ($($ticked.Count))" } else { 'Remove ticked' }
     $UI.SecRemove.IsEnabled = $ticked.Count -gt 0 -and $free
@@ -328,15 +363,17 @@ $Panels.security = @{
             $a = @($SecItems | Where-Object { $_.IsApp -and $_.State -ne 'ok' }).Count
             if ($t) { "$t active threat$(if ($t -ne 1) { 's' })" } else { 'no active threats' }
             if ($a) { "$a unwanted app$(if ($a -ne 1) { 's' })" }
+            $n = @($SusItems | Where-Object { -not $_.Removed }).Count
+            if ($n) { "$n suspicious change$(if ($n -ne 1) { 's' })" }
         }
     }
-    Open    = { if ($script:SecState -eq 'none') { Start-SecRead } }
-    Refresh = { Start-SecRead }
+    Open    = { if ($script:SecState -eq 'none') { Start-SecRead }; if ($script:SusState -eq 'none') { Start-SusRead } }
+    Refresh = { if ($UI.SecViewSuspects.IsChecked) { Start-SusRead } else { Start-SecRead } }
 }
 
 $UI.TabSecurity.Add_Checked({ Set-Section 'security' })
-$UI.SecRefresh.Add_Click({ Start-SecRead })
-$UI.SecMsgAction.Add_Click({ Start-SecRead })
+$UI.SecRefresh.Add_Click({ & $Panels.security.Refresh })
+$UI.SecMsgAction.Add_Click({ & $Panels.security.Refresh })
 $UI.SecQuick.Add_Click({ Start-DefenderScan 'quick' })
 $UI.SecFull.Add_Click({ Start-DefenderScan 'full' })
 $UI.SecWinSec.Add_Click({ try { Start-Process 'windowsdefender://threat' } catch { try { Start-Process 'windowsdefender:' } catch { } } })
@@ -348,6 +385,7 @@ $UI.SecCheckAll.Add_Click({
         Update-View
     })
 $UI.SecRemove.Add_Click({
+        if ($UI.SecViewSuspects.IsChecked) { Request-SusChange @($SusItems | Where-Object { $_.Selected }) 'remove'; return }
         $items = @($SecItems | Where-Object { $_.Selected -and $_.CanRemove })
         if (-not $items.Count) { return }
         $names = @($items | Select-Object -First 8 | ForEach-Object { "  $($_.Name)" })

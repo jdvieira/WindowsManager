@@ -495,6 +495,43 @@ namespace WingetUM {
         public int SortGroup { get { return active ? (Kind == "app" ? 1 : 0) : 2; } }
     }
 
+    // Security tab, Suspicious changes: a place malware changes to start with Windows or hijack the PC, set in a way
+    // that looks suspicious (Removed: one this app took out, with a backup to put it back)
+    public class SuspectItem : INotifyPropertyChanged {
+        public event PropertyChangedEventHandler PropertyChanged;
+        private void Changed(params string[] names) {
+            PropertyChangedEventHandler h = PropertyChanged;
+            if (h == null) return;
+            foreach (string n in names) h(this, new PropertyChangedEventArgs(n));
+        }
+        private bool selected, removed;
+        private string state = "", detail = "";
+        public string Key { get; set; }
+        public string Area { get; set; }
+        public string Name { get; set; }
+        public string Why { get; set; }
+        public string Location { get; set; }
+        // the program it runs, for Scan with Defender and Open location
+        public string Target { get; set; }
+        // High | Medium | Low
+        public string Severity { get; set; }
+        public int SeverityLevel { get; set; }
+        public bool Fixable { get; set; }
+        public object Fix { get; set; }
+        public bool Removed { get { return removed; } set { removed = value; Changed("Removed", "CanRemove", "CanRestore", "StatusText", "SortGroup", "ActionText"); } }
+        public bool Selected { get { return selected; } set { selected = value; Changed("Selected"); } }
+        // running | ok | error
+        public string State { get { return state; } set { state = value ?? ""; Changed("State", "StatusText", "IsBusy", "CanRemove", "CanRestore"); } }
+        public string Detail { get { return detail; } set { detail = value ?? ""; Changed("Detail", "StatusText"); } }
+        public bool IsBusy { get { return state == "running"; } }
+        public bool CanRemove { get { return Fixable && !removed && state != "running"; } }
+        public bool CanRestore { get { return removed && state != "running"; } }
+        public bool CanScan { get { return !string.IsNullOrEmpty(Target); } }
+        public string ActionText { get { return removed ? "Restore" : "Remove"; } }
+        public string StatusText { get { return !string.IsNullOrEmpty(state) && !string.IsNullOrEmpty(detail) ? detail : (removed ? "Removed" : (Fixable ? "Found" : "Found (look into it)")); } }
+        public int SortGroup { get { return removed ? 1 : 0; } }
+    }
+
     // One line of the History panel (history.jsonl)
     public class HistoryEntry {
         public System.DateTime Time { get; set; }
@@ -532,6 +569,8 @@ namespace WingetUM {
                     case "secremove": return "Removed threats:";
                     case "puaon": return "Blocking unwanted apps:";
                     case "puaoff": return "Stopped blocking unwanted apps:";
+                    case "suspectremove": return "Removed suspicious change:";
+                    case "suspectrestore": return "Put back:";
                     default: return "Updated";
                 }
             }
@@ -549,7 +588,7 @@ namespace WingetUM {
                     case "cleanup": return ((char)0xE74D).ToString();
                     case "tweakon": case "tweakoff": case "tweakrestore": return ((char)0xE713).ToString();
                     case "fixpc": return ((char)0xE90F).ToString();
-                    case "secscan": case "secremove": case "puaon": case "puaoff": return ((char)0xEA18).ToString();
+                    case "secscan": case "secremove": case "puaon": case "puaoff": case "suspectremove": case "suspectrestore": return ((char)0xEA18).ToString();
                     default: return ((char)0xE777).ToString();
                 }
             }

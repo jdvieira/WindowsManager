@@ -717,7 +717,307 @@ if ($Op -eq 'security') {
     Send $r
 }
 
-if ($Op -eq 'bigfiles') {    # Cleanup: the largest files in your folders (Arg.Folders), at least Arg.MinBytes, the biggest Arg.Top. Files
+if ($Op -eq 'suspects') {
+    # Security > Suspicious changes: the places malware changes to start with Windows or take over the PC, and what in
+    # them looks suspicious. Only reads (no administrator rights needed; what a standard user can't read is skipped).
+    # Each finding says why, how sure (High, Medium, Low), and, when it can be undone safely, its Fix: registry changes
+    # (Invoke-RegOps' set, del, delkey) and commands, with Admin when any of it needs administrator rights and Undo
+    # for the commands (registry values are backed up by the window before the change).
+    $found = New-Object Collections.Generic.List[object]
+    $sigCache = @{}
+    $win = $env:SystemRoot
+    function Add-Suspect([string]$Key, [string]$Area, [string]$Name, [string]$Why, [string]$Location, [string]$Target, [string]$Severity, $Fix) {
+        $found.Add(@{ Key = $Key; Area = $Area; Name = $Name; Why = $Why; Location = $Location; Target = $Target; Severity = $Severity
+                Level = @{ High = 3; Medium = 2; Low = 1 }[$Severity]; Fix = $Fix })
+    }
+    function Get-Reg([string]$Path) {
+        $i = $Path.IndexOf('\')
+        $hive = if ($Path.Substring(0, $i) -eq 'HKLM') { 'LocalMachine' } else { 'CurrentUser' }
+        $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey($hive, [Microsoft.Win32.RegistryView]::Registry64)
+        try { return $base.OpenSubKey($Path.Substring($i + 1)) } catch { return $null } finally { $base.Close() }
+    }
+    function Get-RegVal([string]$Path, [string]$Name) {
+        $k = Get-Reg $Path
+        if (-not $k) { return $null }
+        try { return $k.GetValue($Name, $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames) } finally { $k.Close() }
+    }
+    # the program a command line runs (its path, environment variables expanded), or ''
+    function Get-CmdTarget([string]$Cmd) {
+        $c = [Environment]::ExpandEnvironmentVariables($Cmd.Trim())
+        if (-not $c) { return '' }
+        $exe = if ($c.StartsWith('"')) { $c.Substring(1, [Math]::Max(0, $c.IndexOf('"', 1) - 1)) }
+        elseif ($c -match '^(.+?\.(exe|com|bat|cmd|vbs|js|ps1|scr|pif|hta|lnk))(\s|$)') { $Matches[1] }
+        else { ($c -split '\s+')[0] }
+        if ($exe -and -not [IO.Path]::IsPathRooted($exe)) {
+            foreach ($d in "$win\System32", $win, "$win\SysWOW64") { foreach ($x in '', '.exe') { if (Test-Path -LiteralPath (Join-Path $d "$exe$x")) { return (Join-Path $d "$exe$x") } } }
+        }
+        return $exe
+    }
+    function Test-Signed([string]$File) {
+        if (-not $sigCache.ContainsKey($File)) {
+            $ok = $false
+            try { $ok = (Get-AuthenticodeSignature -LiteralPath $File -ErrorAction Stop).Status -eq 'Valid' } catch { }
+            $sigCache[$File] = $ok
+        }
+        return $sigCache[$File]
+    }
+    # why a command that runs at startup (or in a task or service) looks suspicious, as @(severity, why), or $null
+    function Test-Command([string]$Cmd) {
+        $c = [Environment]::ExpandEnvironmentVariables($Cmd)
+        $low = $c.ToLowerInvariant()
+        if ($low -match '\b(mshta|wscript|cscript)(\.exe)?\b' -and $low -match 'http|javascript:|vbscript:|\.(js|vbs|hta|jse|vbe)\b') { return @('High', 'Runs a script through a Windows script host, a common way for malware to start') }
+        if ($low -match '\bpowershell(\.exe)?\b|\bpwsh\b') {
+            if ($low -match '\s-(e|en|enc|enco|encod|encode|encoded|encodedcommand)\s' -or $low -match 'downloadstring|downloadfile|invoke-webrequest|iwr |iex|invoke-expression|frombase64string|net\.webclient') { return @('High', 'Runs a hidden or downloaded PowerShell command, a common way for malware to start') }
+        }
+        if ($low -match '\brundll32(\.exe)?\b' -and $low -match 'javascript:|\\(appdata|temp|downloads|users\\public)\\') { return @('High', 'Runs code from a user folder through rundll32, a common way for malware to start') }
+        if ($low -match '\bregsvr32(\.exe)?\b' -and $low -match '/i:http|scrobj') { return @('High', 'Runs code from the internet through regsvr32, a common way for malware to start') }
+        if ($low -match '\b(certutil|bitsadmin)(\.exe)?\b' -and $low -match 'http') { return @('High', 'Downloads a file at startup through a Windows tool malware often uses') }
+        $t = Get-CmdTarget $Cmd
+        if (-not $t) { return $null }
+        if (-not (Test-Path -LiteralPath $t)) { return @('Low', "Runs a program that no longer exists ($t)") }
+        # Store apps start through an alias in WindowsApps, which can't be read; the Store signs them
+        if ($t -match '\\WindowsApps\\' -or (Test-Signed $t)) { return $null }
+        $lt = $t.ToLowerInvariant()
+        if ($lt -match '\\(temp|tmp)\\|\\downloads\\|\\users\\public\\|\$recycle\.bin|\\appdata\\local\\temp\\') { return @('High', 'Runs an unsigned program from a temporary or download folder') }
+        if ($lt -match '\\appdata\\|^[a-z]:\\programdata\\[^\\]+\.(exe|scr|com)$|\\programdata\\') { return @('Medium', 'Runs an unsigned program from a folder anyone can write to (AppData or ProgramData)') }
+        if ($lt -match '\.(vbs|js|jse|vbe|hta|bat|cmd|ps1|scr|pif)$') { return @('Medium', 'Runs a script file at startup') }
+        return @('Low', 'Runs a program without a valid digital signature')
+    }
+
+    # ---- Startup points: Run and RunOnce keys (both registry views), Policies\Explorer\Run, the Startup folders
+    $runKeys = @('HKCU\Software\Microsoft\Windows\CurrentVersion\Run', 'HKCU\Software\Microsoft\Windows\CurrentVersion\RunOnce', 'HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer\Run',
+        'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run', 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce', 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer\Run',
+        'HKLM\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run', 'HKLM\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\RunOnce')
+    foreach ($rk in $runKeys) {
+        $k = Get-Reg $rk
+        if (-not $k) { continue }
+        try {
+            foreach ($n in $k.GetValueNames()) {
+                if (-not $n) { continue }
+                $cmd = [string]$k.GetValue($n, '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+                $r = Test-Command $cmd
+                if ($r) { Add-Suspect "run|$rk|$n" 'Starts with Windows' $n "$($r[1]). Command: $cmd" "$rk\$n" (Get-CmdTarget $cmd) $r[0] @{ Ops = @(@{ Do = 'del'; Path = $rk; Name = $n }); Admin = $rk -like 'HKLM*' } }
+            }
+        }
+        finally { $k.Close() }
+    }
+    $shell = $null; try { $shell = New-Object -ComObject WScript.Shell } catch { }
+    foreach ($dir in @([Environment]::GetFolderPath('Startup'), [Environment]::GetFolderPath('CommonStartup'))) {
+        if (-not $dir -or -not (Test-Path -LiteralPath $dir)) { continue }
+        foreach ($f in @(Get-ChildItem -LiteralPath $dir -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne 'desktop.ini' })) {
+            $cmd = $f.FullName
+            if ($f.Extension -eq '.lnk' -and $shell) { try { $l = $shell.CreateShortcut($f.FullName); $cmd = "`"$($l.TargetPath)`" $($l.Arguments)" } catch { } }
+            $r = Test-Command $cmd
+            if (-not $r) { continue }
+            $q = "'" + ($f.FullName -replace "'", "''") + "'"
+            $store = "'" + ((Join-Path $env:LOCALAPPDATA "WindowsManager\Removed\$($f.Name)") -replace "'", "''") + "'"
+            $admin = $f.FullName -notlike "$env:APPDATA*"
+            Add-Suspect "startupfile|$($f.FullName)" 'Starts with Windows' $f.Name "$($r[1]). Runs: $cmd" $f.FullName (Get-CmdTarget $cmd) $r[0] @{
+                Ops = @(@{ Do = 'cmd'; Code = "New-Item -ItemType Directory -Force -Path (Split-Path -Parent $store) | Out-Null; Move-Item -LiteralPath $q -Destination $store -Force" })
+                Undo = @(@{ Do = 'cmd'; Code = "Move-Item -LiteralPath $store -Destination $q -Force" }); Admin = $admin }
+        }
+    }
+
+    # ---- Scheduled tasks outside Windows' own folder, that run a program
+    try {
+        foreach ($t in @(Get-ScheduledTask -ErrorAction Stop | Where-Object { $_.TaskPath -notlike '\Microsoft\*' -and $_.State -ne 'Disabled' })) {
+            foreach ($a in @($t.Actions | Where-Object { $_.Execute })) {
+                $cmd = "`"$($a.Execute)`" $($a.Arguments)"
+                $r = Test-Command $cmd
+                if (-not $r) { continue }
+                $tn = "'" + ($t.TaskName -replace "'", "''") + "'"; $tp = "'" + ($t.TaskPath -replace "'", "''") + "'"
+                Add-Suspect "task|$($t.TaskPath)$($t.TaskName)" 'Scheduled task' $t.TaskName "$($r[1]). Command: $cmd" "Task Scheduler: $($t.TaskPath)$($t.TaskName)" (Get-CmdTarget $cmd) $r[0] @{
+                    Ops = @(@{ Do = 'cmd'; Code = "Disable-ScheduledTask -TaskName $tn -TaskPath $tp -ErrorAction Stop | Out-Null" })
+                    Undo = @(@{ Do = 'cmd'; Code = "Enable-ScheduledTask -TaskName $tn -TaskPath $tp -ErrorAction Stop | Out-Null" }); Admin = $true }
+                break
+            }
+        }
+    }
+    catch { }
+
+    # ---- Services that start by themselves and run their own program (not svchost)
+    try {
+        foreach ($s in @(Get-CimInstance Win32_Service -ErrorAction Stop | Where-Object { $_.PathName -and $_.StartMode -in 'Auto', 'Manual' -and $_.PathName -notmatch '\\svchost\.exe' })) {
+            $r = Test-Command ([string]$s.PathName)
+            if (-not $r -or $r[0] -eq 'Low' -and $r[1] -like '*no longer exists*' -and $s.StartMode -eq 'Manual') { continue }
+            $sk = "HKLM\SYSTEM\CurrentControlSet\Services\$($s.Name)"
+            Add-Suspect "service|$($s.Name)" 'Service' $(if ($s.DisplayName) { [string]$s.DisplayName } else { [string]$s.Name }) "$($r[1]). Runs: $($s.PathName)" $sk (Get-CmdTarget ([string]$s.PathName)) $r[0] @{
+                Ops = @(@{ Do = 'set'; Path = $sk; Name = 'Start'; Kind = 'DWord'; Data = 4 }); Admin = $true; Note = 'Turned off; it stops at the next restart' }
+        }
+    }
+    catch { }
+
+    # ---- Signing in: Winlogon's Shell and Userinit, AppInit_DLLs
+    $wl = 'HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon'
+    $sh = [string](Get-RegVal $wl 'Shell')
+    if ($sh -and $sh.Trim() -ne 'explorer.exe') { Add-Suspect 'winlogon-shell' 'Signing in' 'Windows shell changed' "Windows starts `"$sh`" instead of just explorer.exe when you sign in. Malware does this to start before anything else." "$wl\Shell" (Get-CmdTarget $sh) 'High' @{ Ops = @(@{ Do = 'set'; Path = $wl; Name = 'Shell'; Kind = 'String'; Data = 'explorer.exe' }); Admin = $true } }
+    $ush = Get-RegVal 'HKCU\Software\Microsoft\Windows NT\CurrentVersion\Winlogon' 'Shell'
+    if ($ush) { Add-Suspect 'winlogon-shell-user' 'Signing in' 'Windows shell changed for your account' "Your account starts `"$ush`" instead of explorer.exe." 'HKCU\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\Shell' (Get-CmdTarget ([string]$ush)) 'High' @{ Ops = @(@{ Do = 'del'; Path = 'HKCU\Software\Microsoft\Windows NT\CurrentVersion\Winlogon'; Name = 'Shell' }); Admin = $false } }
+    $ui = [string](Get-RegVal $wl 'Userinit')
+    if ($ui -and ($ui.Trim().TrimEnd(',') -replace '^.*\\', '').ToLowerInvariant() -ne 'userinit.exe') { Add-Suspect 'winlogon-userinit' 'Signing in' 'Sign-in program changed' "Windows runs `"$ui`" when you sign in, not just userinit.exe." "$wl\Userinit" '' 'High' @{ Ops = @(@{ Do = 'set'; Path = $wl; Name = 'Userinit'; Kind = 'String'; Data = "$win\system32\userinit.exe," }); Admin = $true } }
+    foreach ($ap in 'HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Windows', 'HKLM\SOFTWARE\WOW6432Node\Microsoft\Windows NT\CurrentVersion\Windows') {
+        $dlls = [string](Get-RegVal $ap 'AppInit_DLLs')
+        if ($dlls.Trim()) {
+            $on = [int](Get-RegVal $ap 'LoadAppInit_DLLs') -eq 1
+            Add-Suspect "appinit|$ap" 'Signing in' 'AppInit_DLLs' "Loads $dlls into every program that starts$(if (-not $on) { ' (switched off right now)' }). Malware uses it to run inside other programs." "$ap\AppInit_DLLs" '' $(if ($on) { 'High' } else { 'Medium' }) @{ Ops = @(@{ Do = 'set'; Path = $ap; Name = 'AppInit_DLLs'; Kind = 'String'; Data = '' }); Admin = $true }
+        }
+    }
+
+    # ---- Programs redirected: Image File Execution Options debuggers and SilentProcessExit monitors
+    $guard = 'taskmgr|msmpeng|mpcmdrun|msseces|securityhealth|regedit|msconfig|procexp|autoruns|rstrui|explorer|sethc|utilman|osk|magnify|narrator|displayswitch|atbroker|cmd|powershell|mbam|avast|avg|norton|mcafee|kaspersky|bdagent|eset|hijackthis|rkill|adwcleaner'
+    foreach ($ifeo in 'HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options', 'HKLM\SOFTWARE\WOW6432Node\Microsoft\Windows NT\CurrentVersion\Image File Execution Options') {
+        $k = Get-Reg $ifeo
+        if (-not $k) { continue }
+        try {
+            foreach ($sub in $k.GetSubKeyNames()) {
+                $dbg = Get-RegVal "$ifeo\$sub" 'Debugger'
+                if (-not $dbg -or [string]$dbg -match 'vsjitdebugger|windbg|devenv') { continue }
+                $high = $sub -match "^($guard)"
+                Add-Suspect "ifeo|$ifeo|$sub" 'Program redirected' "$sub is redirected" "Starting $sub runs `"$dbg`" instead.$(if ($high) { ' Malware does this to stop security tools or to open a back door at the sign-in screen.' } else { ' Debugging tools do this; so does malware.' })" "$ifeo\$sub\Debugger" (Get-CmdTarget ([string]$dbg)) $(if ($high) { 'High' } else { 'Medium' }) @{ Ops = @(@{ Do = 'del'; Path = "$ifeo\$sub"; Name = 'Debugger' }); Admin = $true }
+            }
+        }
+        finally { $k.Close() }
+    }
+    $spe = 'HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SilentProcessExit'
+    $k = Get-Reg $spe
+    if ($k) {
+        try {
+            foreach ($sub in $k.GetSubKeyNames()) {
+                $mon = Get-RegVal "$spe\$sub" 'MonitorProcess'
+                if ($mon) { Add-Suspect "spe|$sub" 'Program redirected' "$sub starts another program when it closes" "When $sub closes, Windows runs `"$mon`". Malware uses this to come back." "$spe\$sub\MonitorProcess" (Get-CmdTarget ([string]$mon)) 'Medium' @{ Ops = @(@{ Do = 'del'; Path = "$spe\$sub"; Name = 'MonitorProcess' }); Admin = $true } }
+            }
+        }
+        finally { $k.Close() }
+    }
+    # accessibility programs swapped for something else (a sign-in screen back door)
+    foreach ($a in 'sethc.exe', 'utilman.exe', 'osk.exe', 'magnify.exe', 'narrator.exe', 'displayswitch.exe', 'atbroker.exe') {
+        $p = Join-Path "$win\System32" $a
+        if (-not (Test-Path -LiteralPath $p)) { continue }
+        $orig = ''; try { $orig = [string](Get-Item -LiteralPath $p).VersionInfo.OriginalFilename } catch { }
+        # Windows' own copies have other internal names (utilman2.exe.mui ...); a swap is a shell under another name, or unsigned
+        if (($orig -match '^(cmd|powershell|pwsh|explorer|taskmgr|regedit|mmc|conhost)\.exe' -or -not (Test-Signed $p))) { Add-Suspect "access|$a" 'Program redirected' "$a was replaced" "The accessibility program $a is really $(if ($orig) { $orig } else { 'an unsigned program' }). Swapping it opens a back door at the sign-in screen. Fix my PC's Repair Windows files puts the original back." $p $p 'High' $null }
+    }
+
+    # ---- Commands and file types: Command Processor AutoRun, .exe and settings open commands, BootExecute, LSA
+    foreach ($cp in 'HKCU\Software\Microsoft\Command Processor', 'HKLM\SOFTWARE\Microsoft\Command Processor') {
+        $ar = Get-RegVal $cp 'AutoRun'
+        if ($ar) { Add-Suspect "cmdautorun|$cp" 'Commands' 'Command Prompt runs a command first' "Every Command Prompt runs `"$ar`" before anything else." "$cp\AutoRun" (Get-CmdTarget ([string]$ar)) 'Medium' @{ Ops = @(@{ Do = 'del'; Path = $cp; Name = 'AutoRun' }); Admin = $cp -like 'HKLM*' } }
+    }
+    $exeCmd = [string](Get-RegVal 'HKLM\SOFTWARE\Classes\exefile\shell\open\command' '')
+    if ($exeCmd -and $exeCmd.Trim() -ne '"%1" %*') { Add-Suspect 'exefile' 'Commands' 'Programs open through something else' "Every program you open runs through `"$exeCmd`"." 'HKLM\SOFTWARE\Classes\exefile\shell\open\command' (Get-CmdTarget $exeCmd) 'High' @{ Ops = @(@{ Do = 'set'; Path = 'HKLM\SOFTWARE\Classes\exefile\shell\open\command'; Name = ''; Kind = 'String'; Data = '"%1" %*' }); Admin = $true } }
+    foreach ($cls in 'exefile', 'ms-settings', 'mscfile', 'Folder') {
+        $ck = "HKCU\Software\Classes\$cls\shell\open\command"
+        $k = Get-Reg $ck
+        if (-not $k) { continue }
+        $v = [string]$k.GetValue(''); $de = $k.GetValue('DelegateExecute'); $k.Close()
+        if ($cls -eq 'Folder' -and -not $v) { continue }
+        Add-Suspect "classhijack|$cls" 'Commands' "$cls open command set for your account" "Opening $(switch ($cls) { 'exefile' { 'any program' } 'ms-settings' { 'Settings' } 'mscfile' { 'a management console (Event Viewer and others)' } default { 'a folder' } }) runs `"$v`". Malware uses this to get administrator rights without asking$(if ($null -ne $de) { ' (it has the DelegateExecute value that goes with it)' })." $ck (Get-CmdTarget $v) 'High' @{ Ops = @(@{ Do = 'delkey'; Path = $ck }); Admin = $false }
+    }
+    $be = @(Get-RegVal 'HKLM\SYSTEM\CurrentControlSet\Control\Session Manager' 'BootExecute') | Where-Object { $_ -and $_ -notmatch '^autocheck autochk' }
+    if ($be.Count) { Add-Suspect 'bootexecute' 'Commands' 'Runs a program before Windows starts' "Session Manager runs `"$($be -join '", "')`" while Windows starts. Disk and backup tools do this; so do rootkits." 'HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\BootExecute' '' 'Medium' $null }
+    $lsa = 'HKLM\SYSTEM\CurrentControlSet\Control\Lsa'
+    $known = @{ 'Authentication Packages' = 'msv1_0'; 'Notification Packages' = 'scecli|rassfm'; 'Security Packages' = 'kerberos|msv1_0|schannel|wdigest|tspkg|pku2u|cloudap|negoexts' }
+    foreach ($n in $known.Keys) {
+        $odd = @(@(Get-RegVal $lsa $n) | Where-Object { $_ -and $_ -notmatch "^($($known[$n]))$" -and $_ -ne '""' })
+        if ($odd.Count) { Add-Suspect "lsa|$n" 'Commands' "Unusual sign-in security package: $($odd -join ', ')" "Windows loads $($odd -join ', ') into its sign-in process (LSA $n). Some security and password tools do this; so does malware that steals passwords. Look it up before changing anything." "$lsa\$n" '' 'Medium' $null }
+    }
+
+    # ---- Hidden starts: WMI event subscriptions that run a command or a script
+    try {
+        $bind = @(Get-CimInstance -Namespace root\subscription -ClassName __FilterToConsumerBinding -ErrorAction Stop)
+        foreach ($c in @(Get-CimInstance -Namespace root\subscription -ClassName CommandLineEventConsumer -ErrorAction SilentlyContinue) + @(Get-CimInstance -Namespace root\subscription -ClassName ActiveScriptEventConsumer -ErrorAction SilentlyContinue)) {
+            if (-not $c) { continue }
+            $cls = $c.CimClass.CimClassName
+            $what = if ($cls -eq 'CommandLineEventConsumer') { [string]$c.CommandLineTemplate } else { "a $($c.ScriptingEngine) script" }
+            $b = @($bind | Where-Object { [string]$_.Consumer.Name -eq [string]$c.Name }) | Select-Object -First 1
+            $fname = if ($b) { [string]$b.Filter.Name } else { '' }
+            $cn = ([string]$c.Name) -replace "'", "''"; $fn = $fname -replace "'", "''"
+            Add-Suspect "wmi|$($c.Name)" 'Hidden start' "WMI subscription: $($c.Name)" "Windows runs $what when an event happens$(if ($fname) { " ($fname)" }). Malware uses this to start without a file in any startup place." "WMI root\subscription: $cls.Name=`"$($c.Name)`"" (Get-CmdTarget $what) 'High' $(if ($b) {
+                    @{ Ops = @(@{ Do = 'cmd'; Code = "Get-WmiObject -Namespace root\subscription -Class __FilterToConsumerBinding | Where-Object { `$_.Consumer -like '*Name=`"$cn`"*' } | Remove-WmiObject" })
+                        Undo = @(@{ Do = 'cmd'; Code = "Set-WmiInstance -Namespace root\subscription -Class __FilterToConsumerBinding -Arguments @{ Filter = [wmi]'\\.\root\subscription:__EventFilter.Name=`"$fn`"'; Consumer = [wmi]'\\.\root\subscription:$cls.Name=`"$cn`"' } | Out-Null" }); Admin = $true }
+                } else { $null })
+        }
+    }
+    catch { }
+
+    # ---- Browsers: policies that force extensions or set the home page, search and startup pages
+    $browsers = @{ 'Google\Chrome' = 'Chrome'; 'Microsoft\Edge' = 'Edge'; 'BraveSoftware\Brave' = 'Brave' }
+    foreach ($hive in 'HKLM', 'HKCU') {
+        foreach ($bk in $browsers.Keys) {
+            $pol = "$hive\SOFTWARE\Policies\$bk"
+            $k = Get-Reg "$pol\ExtensionInstallForcelist"
+            if ($k) {
+                try {
+                    foreach ($n in $k.GetValueNames()) {
+                        $v = [string]$k.GetValue($n)
+                        Add-Suspect "forcelist|$pol|$n" 'Browser' "$($browsers[$bk]) installs an extension you can't remove" "A policy installs the extension $(($v -split ';')[0]) and keeps it from being removed. Workplaces and parental-control apps do this; so do browser hijackers." "$pol\ExtensionInstallForcelist\$n" '' 'Medium' @{ Ops = @(@{ Do = 'del'; Path = "$pol\ExtensionInstallForcelist"; Name = $n }); Admin = $hive -eq 'HKLM' }
+                    }
+                }
+                finally { $k.Close() }
+            }
+            foreach ($n in 'HomepageLocation', 'NewTabPageLocation', 'DefaultSearchProviderSearchURL') {
+                $v = Get-RegVal $pol $n
+                if ($v) { Add-Suspect "browserpol|$pol|$n" 'Browser' "$($browsers[$bk]) $(switch ($n) { 'HomepageLocation' { 'home page' } 'NewTabPageLocation' { 'new tab page' } default { 'search engine' } }) is locked" "A policy sets it to $v, and the browser's settings can't change it." "$pol\$n" '' 'Medium' @{ Ops = @(@{ Do = 'del'; Path = $pol; Name = $n }); Admin = $hive -eq 'HKLM' } }
+            }
+            $k = Get-Reg "$pol\RestoreOnStartupURLs"
+            if ($k) {
+                $urls = @($k.GetValueNames() | ForEach-Object { [string]$k.GetValue($_) }); $k.Close()
+                if ($urls.Count) { Add-Suspect "browserpol|$pol|startup" 'Browser' "$($browsers[$bk]) startup pages are locked" "A policy opens $($urls -join ', ') when the browser starts." "$pol\RestoreOnStartupURLs" '' 'Medium' @{ Ops = @(@{ Do = 'delkey'; Path = "$pol\RestoreOnStartupURLs" }); Admin = $hive -eq 'HKLM' } }
+            }
+        }
+    }
+
+    # ---- Network: the hosts file and a proxy
+    $hosts = "$win\System32\drivers\etc\hosts"
+    try {
+        $entries = @(Get-Content -LiteralPath $hosts -ErrorAction Stop | Where-Object { $_.Trim() -and -not $_.Trim().StartsWith('#') } | Where-Object { $_ -notmatch '^\s*(127\.0\.0\.1|::1)\s+localhost\s*$' })
+        $vendors = 'microsoft|windowsupdate|windows\.com|live\.com|bing|google|apple|facebook|amazon|paypal|bank|defender|avast|avg|norton|symantec|mcafee|kaspersky|malwarebytes|bitdefender|eset|sophos|trendmicro'
+        $odd = @($entries | Where-Object { ($_ -split '\s+', 3)[1] -match $vendors })
+        foreach ($line in $odd) {
+            $f = $line.Trim() -split '\s+'
+            $block = $f[0] -in '0.0.0.0', '127.0.0.1', '::1', '::'
+            $ql = "'" + ($line -replace "'", "''") + "'"
+            Add-Suspect "hosts|$line" 'Network' "hosts file: $($f[1])" $(if ($block) { "$($f[1]) is blocked. Malware blocks Windows Update and security vendors this way; some privacy tools block Microsoft's sites on purpose." } else { "$($f[1]) is sent to $($f[0]) instead of the real site, a way to steal sign-ins." }) $hosts '' $(if ($block -and $f[1] -notmatch 'update|defender|avast|avg|norton|symantec|mcafee|kaspersky|malwarebytes|bitdefender|eset|sophos|trendmicro') { 'Low' } else { 'High' }) @{
+                Ops = @(@{ Do = 'cmd'; Code = "`$h = '$hosts'; `$l = [IO.File]::ReadAllLines(`$h); [IO.File]::WriteAllLines(`$h, [string[]]@(`$l | ForEach-Object { if (`$_ -ceq $ql) { '# removed by Windows Manager: ' + `$_ } else { `$_ } }))" })
+                Undo = @(@{ Do = 'cmd'; Code = "`$h = '$hosts'; `$l = [IO.File]::ReadAllLines(`$h); [IO.File]::WriteAllLines(`$h, [string[]]@(`$l | ForEach-Object { if (`$_ -ceq ('# removed by Windows Manager: ' + $ql)) { $ql } else { `$_ } }))" }); Admin = $true }
+        }
+        $rest = $entries.Count - $odd.Count
+        if ($rest -gt 0) { Add-Suspect 'hosts|other' 'Network' "hosts file: $rest other entr$(if ($rest -ne 1) { 'ies' } else { 'y' })" "Names the hosts file sends somewhere other than the internet's own answer. Ad blockers and developer tools add these; look them over if you didn't." $hosts '' 'Low' $null }
+    }
+    catch { }
+    $is = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings'
+    if ([int](Get-RegVal $is 'ProxyEnable') -eq 1) {
+        $ps = Get-RegVal $is 'ProxyServer'
+        Add-Suspect 'proxy' 'Network' 'A proxy is set' "Web traffic goes through $ps. Workplaces and VPNs do this; so does malware that reads or changes what you browse." "$is\ProxyServer" '' 'Medium' @{ Ops = @(@{ Do = 'set'; Path = $is; Name = 'ProxyEnable'; Kind = 'DWord'; Data = 0 }); Admin = $false }
+    }
+    $pac = Get-RegVal $is 'AutoConfigURL'
+    if ($pac) { Add-Suspect 'pac' 'Network' 'A proxy script is set' "Windows asks $pac which proxy to use. Workplaces do this; so does malware that redirects your browsing." "$is\AutoConfigURL" '' 'Medium' @{ Ops = @(@{ Do = 'del'; Path = $is; Name = 'AutoConfigURL' }); Admin = $false } }
+
+    # ---- Microsoft Defender switched off by policy, or told to skip places
+    $dp = 'HKLM\SOFTWARE\Policies\Microsoft\Windows Defender'
+    foreach ($pv in @(@($dp, 'DisableAntiSpyware'), @($dp, 'DisableAntiVirus'), @("$dp\Real-Time Protection", 'DisableRealtimeMonitoring'), @("$dp\Real-Time Protection", 'DisableBehaviorMonitoring'), @("$dp\Real-Time Protection", 'DisableOnAccessProtection'), @("$dp\Spynet", 'SpynetReporting'))) {
+        $v = Get-RegVal $pv[0] $pv[1]
+        if ($null -eq $v) { continue }
+        if ($pv[1] -eq 'SpynetReporting') { if ([int]$v -ne 0) { continue } } elseif ([int]$v -ne 1) { continue }
+        Add-Suspect "defpol|$($pv[1])" 'Microsoft Defender' "Defender's $($pv[1] -replace '^Disable', '' -replace '([a-z])([A-Z])', '$1 $2') is switched off by policy" "A policy ($($pv[1])) keeps part of Microsoft Defender off. Workplaces with another antivirus do this; so does malware." "$($pv[0])\$($pv[1])" '' 'High' @{ Ops = @(@{ Do = 'del'; Path = $pv[0]; Name = $pv[1] }); Admin = $true }
+    }
+    try {
+        $mp = Get-MpPreference -ErrorAction Stop
+        foreach ($kind in 'ExclusionPath', 'ExclusionProcess', 'ExclusionExtension') {
+            foreach ($x in @($mp.$kind | Where-Object { $_ -and $_ -notmatch '^N/A' })) {
+                $qx = "'" + ($x -replace "'", "''") + "'"
+                Add-Suspect "defex|$kind|$x" 'Microsoft Defender' "Defender skips $x" "Microsoft Defender doesn't scan $(switch ($kind) { 'ExclusionPath' { 'this place' } 'ExclusionProcess' { 'what this program opens' } default { 'files of this type' } }). Developer tools and games ask for this; malware adds itself here to hide." "Defender exclusion ($($kind -replace 'Exclusion', ''))" $(if ($kind -ne 'ExclusionExtension') { $x } else { '' }) 'Medium' @{
+                    Ops = @(@{ Do = 'cmd'; Code = "Remove-MpPreference -$kind $qx -ErrorAction Stop" }); Undo = @(@{ Do = 'cmd'; Code = "Add-MpPreference -$kind $qx -ErrorAction Stop" }); Admin = $true }
+            }
+        }
+    }
+    catch { }
+
+    Send @{ T = 'suspects'; Items = $found.ToArray() }
+}
+
+if ($Op -eq 'bigfiles') {
+    # Cleanup: the largest files in your folders (Arg.Folders), at least Arg.MinBytes, the biggest Arg.Top. Files
     # that live only in OneDrive (not downloaded) are skipped, so nothing is fetched from the cloud.
     $found = New-Object Collections.Generic.List[object]
     # Offline, RecallOnOpen and RecallOnDataAccess, as numbers (Windows PowerShell won't cast the last two to FileAttributes)
