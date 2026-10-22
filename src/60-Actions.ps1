@@ -10,6 +10,17 @@ function Invoke-RowAction($p, [switch]$Interactive, [string]$Scope) {
     Add-Job @($p) -Interactive:$Interactive -Scope $Scope
 }
 
+# Uninstall Software: the ticked apps, after one confirmation that names them
+function Confirm-UninstallSelected {
+    $items = @($InstalledItems | Where-Object { $_.Selected -and $_.CanUpdate })
+    if (-not $items.Count) { return }
+    if ($items.Count -eq 1) { Invoke-RowAction $items[0]; return }
+    $how = if ($Settings.Silent) { "winget runs each app's uninstaller silently, one at a time." } else { "winget runs each app's uninstaller, one at a time." }
+    $names = @($items | Select-Object -First 8 | ForEach-Object { "  $($_.Name)" })
+    if ($items.Count -gt 8) { $names += "  and $($items.Count - 8) more" }
+    Show-Confirm 'uninstallmany' @{ Items = $items } "Uninstall $($items.Count) apps?" "$how Settings and files the apps keep in your profile may stay behind.`n`n$($names -join "`n")" 'Uninstall' -Danger
+}
+
 function Add-Job {
     param([object[]]$Items, [switch]$Interactive, [string]$Scope, [string]$Version, [switch]$PinAfter)
     foreach ($p in $Items) {
@@ -86,6 +97,7 @@ function Complete-Confirm([bool]$Yes) {
     if (-not $Yes) { $h = $ConfirmDeclined[[string]$c.Kind]; if ($h) { & $h $c.Payload }; return }
     switch ($c.Kind) {
         'uninstall' { Add-Job @($c.Payload.Item) -Interactive:$c.Payload.Interactive }
+        'uninstallmany' { Add-Job $c.Payload.Items }
         'migrate' { Move-LegacyTask }
         'clearhistory' { try { Remove-Item -LiteralPath $HistoryPath -Force -ErrorAction Stop } catch { }; Open-History }
         'drvapply' { Start-DellApply $c.Payload.Types $c.Payload.Count $c.Payload.Wu $c.Payload.DellCount $c.Payload.Nv }

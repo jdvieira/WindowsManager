@@ -60,6 +60,7 @@ function Update-View {
     $UI.BtnUpdateSelected.Visibility = ConvertTo-Visibility $isU
     $UI.BtnUpdateAll.Visibility = ConvertTo-Visibility $isU
     $UI.BtnInstallSelected.Visibility = ConvertTo-Visibility $isD
+    $UI.BtnUninstallSelected.Visibility = ConvertTo-Visibility $isI
 
     $updatable = @($upd | Where-Object { $_.CanUpdate -and -not $_.ExplicitTarget })
     $selectedU = @($upd | Where-Object { $_.Selected -and $_.CanUpdate })
@@ -70,6 +71,9 @@ function Update-View {
     $selectedD = @($DiscoverItems | Where-Object { $_.Selected -and $_.CanUpdate })
     $UI.InstallSelectedText.Text = if ($selectedD.Count) { "Install selected ($($selectedD.Count))" } else { 'Install selected' }
     $UI.BtnInstallSelected.IsEnabled = $selectedD.Count -gt 0
+    $selectedI = @($InstalledItems | Where-Object { $_.Selected -and $_.CanUpdate })
+    $UI.UninstallSelectedText.Text = if ($selectedI.Count) { "Uninstall selected ($($selectedI.Count))" } else { 'Uninstall selected' }
+    $UI.BtnUninstallSelected.IsEnabled = $script:InstalledMode -eq 'ready' -and $selectedI.Count -gt 0
 
     $UI.BtnElevate.IsEnabled = -not $busy -and -not $reading
     $UI.BtnStop.Visibility = ConvertTo-Visibility ($Sync.Jobs.Count -gt 0)
@@ -94,7 +98,6 @@ function Update-View {
     $UI.HdrAvailable.Visibility = if ($isI) { 'Collapsed' } else { 'Visible' }
     $UI.HdrStatus.Visibility = if ($isU) { 'Visible' } else { 'Collapsed' }
     $UI.SortSource.Visibility = if ($isD) { 'Collapsed' } else { 'Visible' }
-    $UI.CheckAll.Visibility = if ($isI) { 'Hidden' } else { 'Visible' }
     $shown = @($visible | Where-Object { $_.CanUpdate })
     $shownSel = @($shown | Where-Object { $_.Selected }).Count
     $UI.CheckAll.IsEnabled = $shown.Count -gt 0

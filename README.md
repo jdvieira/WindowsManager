@@ -19,9 +19,10 @@ glance.
 
 ![Fix my PC](docs/screenshots/10-fix-my-pc.png)
 
-**Installed Software**: every app on the PC, with its size, its source and uninstall on every row.
+**Uninstall Software**: every app on the PC, with its size and its source. Uninstall one, or tick several and
+uninstall them together.
 
-![Installed Software](docs/screenshots/02-installed-software.png)
+![Uninstall Software](docs/screenshots/02-installed-software.png)
 
 **Startup**: apps that start when you sign in, turned on or off the way Task Manager does it.
 
@@ -58,7 +59,7 @@ to off, tell me, or do it.
 Download `Windows Manager.exe` from the [latest release](https://github.com/jdvieira/WindowsManager/releases/latest)
 and run it; there is nothing to install. (To build it yourself, see [Building](#building); it lands in
 `dist\Windows Manager.exe`.) There are ten sections, as tabs under the header (Ctrl+1 to Ctrl+9, and Ctrl+0): Device
-Health (where the app opens), Software Updates, Discover Software, Installed Software, Startup, Drivers, Windows
+Health (where the app opens), Software Updates, Discover Software, Uninstall Software, Startup, Drivers, Windows
 Update, Windows Features, Cleanup and Extras. One copy of the app runs at a time: opening it again brings the open window to
 the front.
 
@@ -141,13 +142,14 @@ its category and marked if it is already installed. Microsoft Store apps carry a
 
 New installs use the scope set in Options > Packages ("Installer default", "Just me" or "All users").
 
-### Installed Software
+### Uninstall Software
 
 Everything installed on the PC, including apps winget did not install. **winget packages only** hides those.
 
 | Action | How |
 | --- | --- |
 | Uninstall | **Uninstall** on its row. The app asks you to confirm first |
+| Uninstall several | Tick them (the box above the list ticks every app shown), then **Uninstall selected**. One confirmation lists them; they uninstall one at a time, and each one's leftovers are offered in turn |
 | Remove what it left behind | After an uninstall, the app looks for what the app left: folders named after it (or its publisher's folder) in AppData, ProgramData and Program Files, its scheduled tasks, and startup entries whose program is gone. If it finds any, it lists them, all ticked: **Remove ticked** sends folders to the Recycle Bin (so a wrong guess can be brought back) and deletes the rest. Folders a running program uses are left out; items outside your profile need one administrator approval |
 | See what takes space | The **Size** column (click it to sort, largest first) and the total in the status bar. Sizes come from what each app reports to Windows; Store apps are measured from their install folders in the background and remembered in `sizes.json`. Apps that report nothing (Office language packs, for example) show no size |
 | Save your app list | **Export list**: choose the apps (all winget and Store apps are ticked), then save. The file is in winget's own export format, so `winget import` reads it too |
@@ -278,7 +280,7 @@ Explorer and the taskbar (open File Explorer windows close) so changes to them s
 | Drive space | The system drive's free space, and how much the leftover files take. **Disk Cleanup** and **Storage settings** open Windows' own tools |
 | Leftover files | What apps, installers and Windows leave behind, measured: temporary files, winget downloads, old downloads (90 days, off by default), the Recycle Bin, crash dumps, error reports, this app's old driver files, saved drivers, Windows' temporary files, Windows Update downloads, Delivery Optimization files, Dell Command \| Update downloads, NVIDIA's and AMD's installer folders, browser caches (Edge, Chrome, Brave, Firefox) and graphics shader caches (both off by default). Three use Windows' own tools and are off by default: **Windows' own cleanup** runs Disk Cleanup's system items (the previous Windows installation, update leftovers, installation files, old driver packages, thumbnails, the DirectX shader cache), **Windows component store** runs DISM's component cleanup (installed updates stay removable), and **Old driver versions** removes older copies of drivers in Windows' driver store with `pnputil`, never one a device uses; what they free is measured from the drive's free space, and automatic maintenance doesn't offer them. Tick what to delete, then **Clean up**. Files in use are left alone; items with a shield need one administrator approval |
 | Large files | The 25 largest files over 100 MB in Downloads, Desktop, Documents, Videos, Pictures and Music. **Show** opens the folder; **Delete** moves the file to the Recycle Bin (after asking). Files kept only in OneDrive aren't listed, so nothing is downloaded |
-| Biggest apps | The eight apps that take the most space, with **Uninstall** (which asks first). **All installed software** opens Installed Software sorted by size |
+| Biggest apps | The eight apps that take the most space, with **Uninstall** (which asks first). **All installed software** opens Uninstall Software sorted by size |
 
 ### Everywhere
 

@@ -5,6 +5,15 @@ All notable changes to Windows Manager (called Windows Software Manager in 2.0, 
 version's section becomes its release notes, which the app shows under "What's new", so it lists only changes to the
 app, not to the repository.
 
+## 2.9.2.0 - 2026-10-22
+
+- Updates: ticking the check box above the list to select every app no longer shows an error ("The property
+  'Selected' cannot be found") when more than one app is listed.
+- Device Health fills in about twice as fast when the app opens: its checks run side by side instead of one after
+  another, and start while the window is still opening.
+- Installed Software is now Uninstall Software, and it can uninstall several apps at once: tick them (or tick the box
+  above the list for all), then **Uninstall selected**. One confirmation lists them.
+
 ## 2.9.1.0 - 2026-10-03
 
 - **Reliability says more.** Device Health's Reliability card adds the last blue screen's date and why it happened in

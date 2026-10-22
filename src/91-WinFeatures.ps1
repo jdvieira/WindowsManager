@@ -2,7 +2,7 @@
 
 # The Windows Features tab: Windows' optional features, turned on or off with administrator approval
 # (Enable/Disable-WindowsOptionalFeature), and shown as Windows' own tree; some need a restart. (Built-in Store apps
-# were listed here too in earlier versions; Installed Software lists and uninstalls them.)
+# were listed here too in earlier versions; Uninstall Software lists and uninstalls them.)
 $FeatureItems = New-Object 'System.Collections.ObjectModel.ObservableCollection[WingetUM.FeatureItem]'
 $FeatureView = [System.Windows.Data.CollectionViewSource]::GetDefaultView($FeatureItems)
 # in tree order

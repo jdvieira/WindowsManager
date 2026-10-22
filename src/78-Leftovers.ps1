@@ -1,6 +1,6 @@
 ﻿# Windows Manager - Leftovers (part of src\; see Windows_Manager.ps1)
 
-# After an uninstall from Installed Software: what the app left behind (folders named after it, its scheduled tasks,
+# After an uninstall from Uninstall Software: what the app left behind (folders named after it, its scheduled tasks,
 # startup entries pointing at it), offered in a list to tick. Folders go to the Recycle Bin, so a wrong guess can be
 # brought back. Leftovers in your own profile go straight away; Program Files, ProgramData, other users' startup
 # entries and scheduled tasks need one administrator approval.

@@ -46,7 +46,7 @@ Tick each line once it has worked, with the PC and the date.
 | [ ] | **Diagnostics** | A zip on the desktop; Explorer opens with it selected |
 | [x] Dell laptop, 2026-10-01 | Windows Features > Optional features: **Turn on** a harmless one (TFTP Client), then **Turn off** | One approval each; the row says Turned on / Turned off; History has both |
 | [ ] | Windows Features: an optional feature that needs a restart (Windows Sandbox, Hyper-V) | The row says "Restart to finish" |
-| [x] Dell laptop, 2026-10-01 (a made-up app folder) | Installed Software: uninstall an app that leaves folders behind | The leftovers list opens with its folders ticked; **Remove ticked** moves them to the Recycle Bin |
+| [x] Dell laptop, 2026-10-01 (a made-up app folder) | Uninstall Software: uninstall an app that leaves folders behind | The leftovers list opens with its folders ticked; **Remove ticked** moves them to the Recycle Bin |
 | [x] Dell laptop, 2026-10-01 | Startup lists scheduled tasks | Tasks that start at sign-in or startup appear as *Scheduled task* |
 | [ ] | Startup: **Turn off** a scheduled task, then **Turn on** | Task Scheduler shows it Disabled, then Ready |
 | [x] Dell laptop, 2026-10-01 | Device Health > **Save report** | An HTML file on the desktop with every card |
