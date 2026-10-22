@@ -795,6 +795,13 @@ $Xaml = @'
             <TextBlock Text="Import list"/>
           </StackPanel>
         </Button>
+        <Button x:Name="BtnVendorBloat" Style="{StaticResource Ghost}" BorderBrush="#383838" Padding="14,8" Visibility="Collapsed"
+                ToolTip="Find the trials, promos and PC maker add-ons a new PC comes with, and uninstall the ones you tick">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="&#xE75C;" FontFamily="Segoe MDL2 Assets" FontSize="13" Margin="0,1,8,0" VerticalAlignment="Center"/>
+            <TextBlock Text="Remove vendor bloat"/>
+          </StackPanel>
+        </Button>
         <Button x:Name="BtnExportList" Style="{StaticResource Ghost}" BorderBrush="#383838" Padding="14,8" Visibility="Collapsed"
                 ToolTip="Save the apps on this PC to a file, to install them on another PC (or after a reset)">
           <StackPanel Orientation="Horizontal">

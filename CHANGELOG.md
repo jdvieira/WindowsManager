@@ -5,6 +5,14 @@ All notable changes to Windows Manager (called Windows Software Manager in 2.0, 
 version's section becomes its release notes, which the app shows under "What's new", so it lists only changes to the
 app, not to the repository.
 
+## 2.9.3.0 - 2026-10-22
+
+- Uninstall Software: **Remove vendor bloat** finds the trials, promos and PC maker add-ons a new PC comes with
+  (McAfee and Norton trials, preinstalled games, Dell, HP, Lenovo, Acer, ASUS and MSI extras) and uninstalls the ones
+  you tick, after a restore point. The ones that are safe to remove start ticked; maker tools some people use (support,
+  hotkeys, fan and lighting control) are listed unticked with what each one does. Drivers and Microsoft's own apps
+  are never listed.
+
 ## 2.9.2.0 - 2026-10-22
 
 - Updates: ticking the check box above the list to select every app no longer shows an error ("The property
