@@ -5,26 +5,49 @@
 # what apps, installers and Windows leave behind.
 $script:HealthState = 'none'      # none | running | ready | error
 $script:HealthInfo = $null
-$script:HealthReader = $null
+$script:HealthReader = 0          # how many parts of the scan are still running
+$script:HealthPending = $null     # the scan's parts as they come in, until every part is in
+$script:HealthPartsIn = 0
 $script:HealthRead = $null
 
+# The scan runs in parts at once (see the health op in 22-WorkerOps.ps1), so the page waits for the slowest part
+# rather than for all of them one after another
+$HealthParts = 'sys', 'disks', 'security', 'reliability', 'perf', 'net'
 function Start-HealthScan {
     if ($script:HealthReader) { return }
     $script:HealthState = 'running'
-    $script:HealthReader = Start-Tracked 'health' @{} {
-        $script:HealthReader = $null
-        if ($script:HealthState -eq 'running') { $script:HealthState = 'error' }
+    $script:HealthPending = @{ T = 'health'; Error = $null }
+    $script:HealthPartsIn = 0
+    $script:HealthReader = $HealthParts.Count
+    foreach ($part in $HealthParts) {
+        [void](Start-Tracked 'health' @{ Parts = @($part) } {
+                $script:HealthReader--
+                if ($script:HealthReader -gt 0 -or -not $script:HealthPending) { return }
+                # a part stopped without its results: show the rest
+                if ($script:HealthPending.Count -gt 2) { Show-HealthResult $script:HealthPending }
+                elseif ($script:HealthState -eq 'running') { $script:HealthPending = $null; $script:HealthState = 'error' }
+            })
     }
+    Update-View
+}
+function Show-HealthResult($h) {
+    $script:HealthPending = $null
+    $script:HealthInfo = $h
+    $script:HealthRead = Get-Date
+    $script:HealthState = if ($h.Error -and -not $h.Sys) { 'error' } else { 'ready' }
+    if (-not $SelfTest -or $env:WSM_T2) { try { Add-HealthSnapshot $h } catch { } }
+    Update-HealthTrends
     Update-View
 }
 $EventHandlers.health = {
     param($Ev)
-    $script:HealthInfo = $Ev
-    $script:HealthRead = Get-Date
-    $script:HealthState = if ($Ev.Error -and -not $Ev.Sys) { 'error' } else { 'ready' }
-    if (-not $SelfTest -or $env:WSM_T2) { try { Add-HealthSnapshot $Ev } catch { } }
-    Update-HealthTrends
-    Update-View
+    if (-not $Ev.Part) { Show-HealthResult $Ev; return }
+    # one part: joined with the others, and shown once every part is in (one that comes in late joins what is shown)
+    $into = if ($script:HealthPending) { $script:HealthPending } else { $script:HealthInfo }
+    if (-not $into) { return }
+    foreach ($k in @($Ev.Keys)) { if ($k -ne 'Part' -and ($k -ne 'Error' -or $Ev.Error)) { $into[$k] = $Ev[$k] } }
+    if (-not $script:HealthPending) { Update-View }
+    elseif (++$script:HealthPartsIn -ge $HealthParts.Count) { Show-HealthResult $script:HealthPending }
 }
 
 # Format-Size is in 29-AutoJobs.ps1 (automatic runs use it too)

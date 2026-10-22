@@ -14,7 +14,7 @@ $Window.Add_SourceInitialized({
     })
 $UI = @{}
 foreach ($name in 'HeaderLogo', 'HeaderVersion', 'SubTitle', 'AdminBadge', 'AdminGlyph', 'AdminText', 'BtnElevate', 'Search', 'BtnRefresh',
-    'BtnUpdateSelected', 'BtnUpdateAll', 'UpdateAllText', 'ColumnHeader', 'CheckAll', 'SortName', 'SortNameGlyph', 'SortSource', 'SortSourceGlyph', 'SortSize', 'SortSizeGlyph',
+    'BtnUpdateSelected', 'BtnUninstallSelected', 'UninstallSelectedText', 'BtnUpdateAll', 'UpdateAllText', 'ColumnHeader', 'CheckAll', 'SortName', 'SortNameGlyph', 'SortSource', 'SortSourceGlyph', 'SortSize', 'SortSizeGlyph',
     'List', 'LoadingPanel', 'EmptyPanel', 'EmptyText', 'NoMatchPanel', 'NoMatchText', 'ErrorPanel', 'ErrorTitle', 'ErrorText', 'BtnRetry',
     'BtnGetWinget', 'LogPanel', 'LogBox', 'BtnStop', 'BtnLog', 'BtnLogFolder', 'BusyBar', 'StatusText',
     'BtnSchedule', 'ScheduleText', 'ScheduleOverlay', 'SchEnabled', 'SchOptions', 'SchDaily', 'SchWeekly', 'SchTime', 'SchDays', 'SchElevated', 'SchCard', 'SchJobs',

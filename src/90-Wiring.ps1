@@ -60,6 +60,7 @@ $UI.ChkWingetOnly.Add_Click({ $InstalledView.Refresh(); Update-View })
 $UI.BtnInstallSelected.Add_Click({ Add-Job @($DiscoverItems | Where-Object { $_.Selected -and $_.CanUpdate }) })
 $UI.BtnGetWinget.Add_Click({ try { Start-Process 'ms-windows-store://pdp/?productid=9NBLGGH4NNS1' } catch { Start-Process 'https://aka.ms/getwinget' } })
 $UI.BtnUpdateAll.Add_Click({ Add-UpdateJob @($Packages | Where-Object { $_.CanUpdate -and -not $_.ExplicitTarget -and -not $_.Hidden }) })
+$UI.BtnUninstallSelected.Add_Click({ Confirm-UninstallSelected })
 $UI.BtnUpdateSelected.Add_Click({ Add-UpdateJob @($View | Where-Object { $_.Selected -and $_.CanUpdate }) })
 $UI.BtnStop.Add_Click({ Stop-Queue })
 $UI.BtnShowHidden.Add_Click({ $script:ShowHidden = -not $script:ShowHidden; $View.Refresh(); Update-View })
@@ -74,7 +75,7 @@ $UI.SortSource.Add_Click({ Set-Sort 'Source' })
 $UI.SortSize.Add_Click({ Set-Sort 'SizeKB' })
 $UI.CheckAll.Add_Click({
         $on = $UI.CheckAll.IsChecked -eq $true
-        foreach ($p in @(Get-SectionView)) { if ($p.CanUpdate) { $p.Selected = $on } }
+        foreach ($p in (Get-SectionView)) { if ($p.CanUpdate) { $p.Selected = $on } }
         Update-View
     })
 $UI.BtnLog.Add_Click({

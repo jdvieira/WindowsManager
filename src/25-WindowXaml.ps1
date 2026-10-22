@@ -575,8 +575,7 @@ $Xaml = @'
           <Setter TargetName="Bar" Property="Visibility" Value="Visible"/>
           <Setter TargetName="StatusText" Property="Foreground" Value="White"/>
         </DataTrigger>
-        <!-- Installed: no selection; an available version only when there is one. Discover: the third column is the match/category -->
-        <DataTrigger Binding="{Binding IsInstalledList}" Value="True"><Setter TargetName="RowCheck" Property="Visibility" Value="Hidden"/></DataTrigger>
+        <!-- Installed: an available version only when there is one. Discover: the third column is the match/category -->
         <DataTrigger Binding="{Binding HasAvailable}" Value="False"><Setter TargetName="AvailArrow" Property="Visibility" Value="Collapsed"/></DataTrigger>
         <DataTrigger Binding="{Binding IsDiscover}" Value="True">
           <Setter TargetName="AvailPanel" Property="Visibility" Value="Collapsed"/>
@@ -740,9 +739,9 @@ $Xaml = @'
           </StackPanel>
         </RadioButton>
         <RadioButton x:Name="TabDiscover" GroupName="Section" Style="{StaticResource Tab}" Content="Discover Software" ToolTip="Find and install new apps (Ctrl+3)"/>
-        <RadioButton x:Name="TabInstalled" GroupName="Section" Style="{StaticResource Tab}" ToolTip="Everything installed on this PC (Ctrl+4)">
+        <RadioButton x:Name="TabInstalled" GroupName="Section" Style="{StaticResource Tab}" ToolTip="Everything installed on this PC, to uninstall (Ctrl+4)">
           <StackPanel Orientation="Horizontal">
-            <TextBlock Text="Installed Software"/>
+            <TextBlock Text="Uninstall Software"/>
             <TextBlock x:Name="InstalledCount" Foreground="#6E6E6E" Margin="8,0,0,0"/>
           </StackPanel>
         </RadioButton>
@@ -819,6 +818,12 @@ $Xaml = @'
           </StackPanel>
         </Button>
         <Button x:Name="BtnUpdateSelected" Content="Update selected"/>
+        <Button x:Name="BtnUninstallSelected" Style="{StaticResource Danger}" Margin="0" Visibility="Collapsed">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="&#xE74D;" FontFamily="Segoe MDL2 Assets" FontSize="13" Margin="0,1,8,0" VerticalAlignment="Center"/>
+            <TextBlock x:Name="UninstallSelectedText" Text="Uninstall selected"/>
+          </StackPanel>
+        </Button>
         <Button x:Name="BtnInstallSelected" Style="{StaticResource Primary}" Margin="0" Visibility="Collapsed">
           <StackPanel Orientation="Horizontal">
             <TextBlock Text="&#xE896;" FontFamily="Segoe MDL2 Assets" FontSize="13" Margin="0,1,8,0" VerticalAlignment="Center"/>
@@ -2029,7 +2034,7 @@ $Xaml = @'
             <StackPanel>
               <DockPanel>
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                  <Button x:Name="ClAllApps" Style="{StaticResource Ghost}" Content="All installed software" Margin="0" ToolTip="Open Installed Software, sorted by size"/>
+                  <Button x:Name="ClAllApps" Style="{StaticResource Ghost}" Content="All installed software" Margin="0" ToolTip="Open Uninstall Software, sorted by size"/>
                 </StackPanel>
                 <StackPanel VerticalAlignment="Center">
                   <TextBlock Text="BIGGEST APPS" Style="{StaticResource Label}"/>

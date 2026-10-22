@@ -374,281 +374,297 @@ if ($Op -eq 'health') {
     # The Health tab: the PC and Windows, a waiting restart, the battery (Windows' battery report, which a standard
     # user can read), and the drives. Disk wear and temperature need administrator rights, so they appear when the
     # app runs elevated.
-    $h = @{ T = 'health'; Error = $null }
-    try {
-        $os = Get-CimInstance Win32_OperatingSystem
-        $cs = Get-CimInstance Win32_ComputerSystem
-        $bios = Get-CimInstance Win32_BIOS
-        $cpu = @(Get-CimInstance Win32_Processor) | Select-Object -First 1
-        $cv = Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
-        $biosDate = ''; try { $biosDate = ([datetime]$bios.ReleaseDate).ToString('yyyy-MM-dd') } catch { }
-        $h.Sys = @{ Maker = ([string]$cs.Manufacturer).Trim(); Model = ([string]$cs.Model).Trim(); Serial = ([string]$bios.SerialNumber).Trim()
-            Os = ([string]$os.Caption -replace '^Microsoft\s+', ''); Display = [string]$cv.DisplayVersion; Build = "$($cv.CurrentBuildNumber).$($cv.UBR)"
-            Boot = [datetime]$os.LastBootUpTime; Installed = [datetime]$os.InstallDate; MemoryGB = [Math]::Round([double]$cs.TotalPhysicalMemory / 1GB)
-            Cpu = ([string]$cpu.Name -replace '\s+', ' ').Trim(); Bios = [string]$bios.SMBIOSBIOSVersion; BiosDate = $biosDate; BiosMaker = [string]$bios.Manufacturer }
-        $h.Reboot = (Test-Path -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending') -or (Test-Path -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired')
-        try { if (-not $h.Reboot) { $h.Reboot = [bool](New-Object -ComObject Microsoft.Update.SystemInfo).RebootRequired } } catch { }
-    }
-    catch { $h.Error = $_.Exception.Message }
-    # Battery: capacity when new, capacity now, cycles, and the charge right now
-    try {
-        $b = @(Get-CimInstance Win32_Battery)
-        if ($b.Count) {
-            $xml = Join-Path ([IO.Path]::GetTempPath()) "wsm-battery-$PID.xml"
-            $null = & "$env:SystemRoot\System32\powercfg.exe" /batteryreport /xml /output $xml 2>&1
-            $bats = @()
-            if (Test-Path -LiteralPath $xml) {
-                try { [xml]$x = Get-Content -LiteralPath $xml -Raw; $bats = @($x.BatteryReport.Batteries.Battery) } finally { Remove-Item -LiteralPath $xml -Force -ErrorAction SilentlyContinue }
-            }
-            $h.Battery = @{ Charge = [int]$b[0].EstimatedChargeRemaining; Status = [int]$b[0].BatteryStatus; Count = $b.Count
-                Design = [long](($bats | Measure-Object -Property DesignCapacity -Sum).Sum); Full = [long](($bats | Measure-Object -Property FullChargeCapacity -Sum).Sum)
-                Cycles = [int](($bats | Measure-Object -Property CycleCount -Maximum).Maximum); Name = [string](@($bats | ForEach-Object { $_.Id }) -join ', ') }
-            # Some desktops report a placeholder battery (100 mWh of 100 mWh, always full). It isn't one: a laptop
-            # battery holds tens of thousands of mWh. Ignored when it is that small, and on a PC that isn't a laptop
-            # or tablet (PCSystemType 2 mobile, 8 slate) whenever it is under 10 Wh.
-            $design = [long]$h.Battery.Design
-            $portable = $null -ne $cs -and [int]$cs.PCSystemType -in 2, 8
-            if (($design -gt 0 -and $design -lt 1000) -or (-not $portable -and $design -lt 10000)) { $h.Battery = $null }
-        }
-    }
-    catch { }
-    # Drives: each fixed volume's space, and each physical disk's health
-    try {
-        $h.Volumes = @(Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3' | Where-Object { $_.Size -gt 0 } | ForEach-Object { @{ Letter = [string]$_.DeviceID; Label = [string]$_.VolumeName; Size = [long]$_.Size; Free = [long]$_.FreeSpace } })
-    }
-    catch { $h.Volumes = @() }
-    try {
-        $disks = New-Object Collections.Generic.List[object]
-        foreach ($d in @(Get-PhysicalDisk -ErrorAction Stop)) {
-            $rel = $null; try { $rel = $d | Get-StorageReliabilityCounter -ErrorAction Stop } catch { }
-            $disks.Add(@{ Name = ([string]$d.FriendlyName).Trim(); Media = [string]$d.MediaType; Bus = [string]$d.BusType; Size = [long]$d.Size; Health = [string]$d.HealthStatus
-                    Status = [string](@($d.OperationalStatus) -join ', '); Wear = $(if ($rel) { $rel.Wear } else { $null }); Temp = $(if ($rel) { $rel.Temperature } else { $null })
-                    Hours = $(if ($rel) { $rel.PowerOnHours } else { $null }) })
-        }
-        $h.Disks = $disks.ToArray()
-    }
-    catch { $h.Disks = @() }
+    # In parts, which Start-HealthScan runs at once (each in its own runspace) and the page joins: sys (the PC and
+    # battery), disks (drives and temperatures), security, reliability, perf and net. Automatic runs ask for all of
+    # them in one go.
+    $parts = if ($Arg -and $Arg.Parts) { @($Arg.Parts) } else { @('sys', 'disks', 'security', 'reliability', 'perf', 'net') }
+    $h = @{ T = 'health'; Error = $null; Part = $(if ($Arg -and $Arg.Parts) { $parts -join ',' } else { '' }) }
     $ProgressPreference = 'SilentlyContinue'
-    # Security: antivirus (Windows Security Center lists whichever is registered), Defender's own status, the
-    # firewall, BitLocker on the system drive (the shell's property, which a standard user can read), Secure Boot,
-    # the TPM (its device), and activation
-    $sec = @{}
-    try {
-        $sec.Av = @(Get-CimInstance -Namespace root\SecurityCenter2 -ClassName AntiVirusProduct -ErrorAction Stop | ForEach-Object {
-                # productState: the second byte says on (0x10/0x11) or off, the third out of date (0x10) or current
-                $st = [int]$_.productState
-                @{ Name = [string]$_.displayName; On = ((($st -shr 8) -band 0xFF) -band 0x10) -ne 0; Current = ((($st) -band 0xFF) -band 0x10) -eq 0 } })
-    }
-    catch { $sec.Av = @() }
-    try { $m = Get-MpComputerStatus -ErrorAction Stop; $sec.Defender = @{ On = [bool]$m.AntivirusEnabled; Realtime = [bool]$m.RealTimeProtectionEnabled; SigAge = [int]$m.AntivirusSignatureAge; ScanAge = [int]$m.QuickScanAge } } catch { }
-    try { $sec.Firewall = @(Get-NetFirewallProfile -ErrorAction Stop | ForEach-Object { @{ Name = [string]$_.Name; On = [bool]$_.Enabled } }) } catch { }
-    try { $sec.BitLocker = (New-Object -ComObject Shell.Application).NameSpace("$env:SystemDrive\").Self.ExtendedProperty('System.Volume.BitLockerProtection') } catch { }
-    try { $sec.SecureBoot = (Get-ItemProperty -LiteralPath 'HKLM:\SYSTEM\CurrentControlSet\Control\SecureBoot\State' -ErrorAction Stop).UEFISecureBootEnabled } catch { }
-    try { $sec.Tpm = [string](@(Get-CimInstance Win32_PnPEntity -Filter "PNPClass='SecurityDevices'" | Where-Object { $_.Name -match 'Trusted Platform' }) | Select-Object -First 1).Name } catch { }
-    try { $lic = @(Get-CimInstance SoftwareLicensingProduct -Filter "ApplicationID='55c92734-d682-4d71-983e-d6ec3f16059f' AND PartialProductKey IS NOT NULL") | Select-Object -First 1; if ($lic) { $sec.License = [int]$lic.LicenseStatus } } catch { }
-    $h.Security = $sec
-    # Performance: memory in use, the processor's load right now, and the apps using the most memory
-    try {
-        $o = Get-CimInstance Win32_OperatingSystem
-        $perf = @{ MemTotal = [long]$o.TotalVisibleMemorySize * 1KB; MemFree = [long]$o.FreePhysicalMemory * 1KB }
-        try { $perf.Cpu = [int](@(Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average).Average) } catch { }
-        $skip = 'Memory Compression', 'System', 'Idle', 'Registry', 'vmmem', 'Secure System'
-        $perf.Top = @(Get-Process | Where-Object { $skip -notcontains $_.ProcessName } | Group-Object ProcessName | ForEach-Object {
-                $p = $_.Group[0]
-                $desc = ''; try { $desc = [string]$p.MainModule.FileVersionInfo.FileDescription } catch { }
-                @{ Name = $(if ($desc) { $desc } else { $_.Name }); Bytes = [long]($_.Group | Measure-Object -Property WorkingSet64 -Sum).Sum } } |
-            Sort-Object { $_.Bytes } -Descending | Select-Object -First 3)
-        $perf.Processes = @(Get-Process).Count
-        $h.Perf = $perf
-    }
-    catch { }
-    # Temperatures. The processor's own sensor needs a kernel driver, so it comes from LibreHardwareMonitor or
-    # OpenHardwareMonitor when one is running (they publish their sensors to WMI); otherwise the hottest ACPI thermal
-    # zone, which a standard user can read but which on many desktops is the motherboard rather than the processor.
-    # Graphics cards report their temperature to Windows (WDDM 2.9 and later, as Task Manager shows it), for any make.
-    # The monitor gives every temperature of each processor (each core, the package) and graphics card (the core, hot
-    # spot, memory), with the highest each reached since it started.
-    $temps = @{ Gpus = @(); Detail = @(); Monitor = '' }
-    foreach ($ns in 'root\LibreHardwareMonitor', 'root\OpenHardwareMonitor') {
+    if ($parts -contains 'sys') {
         try {
-            $hw = @{}; foreach ($x in @(Get-CimInstance -Namespace $ns -ClassName Hardware -ErrorAction Stop)) { $hw[[string]$x.Identifier] = [string]$x.Name }
-            $sens = @(Get-CimInstance -Namespace $ns -ClassName Sensor -ErrorAction Stop | Where-Object { $_.SensorType -eq 'Temperature' -and $_.Value -gt 0 -and $_.Name -notmatch 'Distance to TjMax' -and $_.Parent -match '^/(amdcpu|intelcpu|gpu-nvidia|gpu-amd|gpu-intel|nvidiagpu|atigpu)/' })
-            if (-not $sens.Count) { continue }
-            $temps.Monitor = if ($ns -like '*Libre*') { 'LibreHardwareMonitor' } else { 'OpenHardwareMonitor' }
-            $temps.Detail = @($sens | Group-Object { [string]$_.Parent } | Sort-Object { $_.Name -notmatch 'cpu' }, Name | ForEach-Object {
-                    @{ Kind = $(if ($_.Name -match 'cpu') { 'cpu' } else { 'gpu' }); Name = $(if ($hw[$_.Name]) { $hw[$_.Name] } else { $_.Name })
-                        Sensors = @($_.Group | Sort-Object { [int]$_.Index } | ForEach-Object { @{ Name = [string]$_.Name; C = [Math]::Round([double]$_.Value); Max = $(if ($_.Max -gt 0) { [Math]::Round([double]$_.Max) } else { $null }) } }) } })
-            break
+            $os = Get-CimInstance Win32_OperatingSystem
+            $cs = Get-CimInstance Win32_ComputerSystem
+            $bios = Get-CimInstance Win32_BIOS
+            $cpu = @(Get-CimInstance Win32_Processor) | Select-Object -First 1
+            $cv = Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
+            $biosDate = ''; try { $biosDate = ([datetime]$bios.ReleaseDate).ToString('yyyy-MM-dd') } catch { }
+            $h.Sys = @{ Maker = ([string]$cs.Manufacturer).Trim(); Model = ([string]$cs.Model).Trim(); Serial = ([string]$bios.SerialNumber).Trim()
+                Os = ([string]$os.Caption -replace '^Microsoft\s+', ''); Display = [string]$cv.DisplayVersion; Build = "$($cv.CurrentBuildNumber).$($cv.UBR)"
+                Boot = [datetime]$os.LastBootUpTime; Installed = [datetime]$os.InstallDate; MemoryGB = [Math]::Round([double]$cs.TotalPhysicalMemory / 1GB)
+                Cpu = ([string]$cpu.Name -replace '\s+', ' ').Trim(); Bios = [string]$bios.SMBIOSBIOSVersion; BiosDate = $biosDate; BiosMaker = [string]$bios.Manufacturer }
+            $h.Reboot = (Test-Path -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending') -or (Test-Path -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired')
+            try { if (-not $h.Reboot) { $h.Reboot = [bool](New-Object -ComObject Microsoft.Update.SystemInfo).RebootRequired } } catch { }
+        }
+        catch { $h.Error = $_.Exception.Message }
+        # Battery: capacity when new, capacity now, cycles, and the charge right now
+        try {
+            $b = @(Get-CimInstance Win32_Battery)
+            if ($b.Count) {
+                $xml = Join-Path ([IO.Path]::GetTempPath()) "wsm-battery-$PID.xml"
+                $null = & "$env:SystemRoot\System32\powercfg.exe" /batteryreport /xml /output $xml 2>&1
+                $bats = @()
+                if (Test-Path -LiteralPath $xml) {
+                    try { [xml]$x = Get-Content -LiteralPath $xml -Raw; $bats = @($x.BatteryReport.Batteries.Battery) } finally { Remove-Item -LiteralPath $xml -Force -ErrorAction SilentlyContinue }
+                }
+                $h.Battery = @{ Charge = [int]$b[0].EstimatedChargeRemaining; Status = [int]$b[0].BatteryStatus; Count = $b.Count
+                    Design = [long](($bats | Measure-Object -Property DesignCapacity -Sum).Sum); Full = [long](($bats | Measure-Object -Property FullChargeCapacity -Sum).Sum)
+                    Cycles = [int](($bats | Measure-Object -Property CycleCount -Maximum).Maximum); Name = [string](@($bats | ForEach-Object { $_.Id }) -join ', ') }
+                # Some desktops report a placeholder battery (100 mWh of 100 mWh, always full). It isn't one: a laptop
+                # battery holds tens of thousands of mWh. Ignored when it is that small, and on a PC that isn't a laptop
+                # or tablet (PCSystemType 2 mobile, 8 slate) whenever it is under 10 Wh.
+                $design = [long]$h.Battery.Design
+                $portable = $null -ne $cs -and [int]$cs.PCSystemType -in 2, 8
+                if (($design -gt 0 -and $design -lt 1000) -or (-not $portable -and $design -lt 10000)) { $h.Battery = $null }
+            }
         }
         catch { }
     }
-    $temps.MonitorRunning = [bool](@(Get-Process -Name 'LibreHardwareMonitor', 'OpenHardwareMonitor' -ErrorAction SilentlyContinue).Count)
-    $temps.MonitorExe = @(@(Get-ChildItem -Path "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\LibreHardwareMonitor.LibreHardwareMonitor_*" -Directory -ErrorAction SilentlyContinue | ForEach-Object { Get-ChildItem -LiteralPath $_.FullName -Filter 'LibreHardwareMonitor.exe' -Recurse -Depth 2 -ErrorAction SilentlyContinue } | ForEach-Object { $_.FullName }) +
-        @("$env:ProgramFiles\LibreHardwareMonitor\LibreHardwareMonitor.exe", "${env:ProgramFiles(x86)}\LibreHardwareMonitor\LibreHardwareMonitor.exe") | Where-Object { $_ -and (Test-Path -LiteralPath $_) }) | Select-Object -First 1
-    try {
-        $zone = @(Get-CimInstance Win32_PerfFormattedData_Counters_ThermalZoneInformation -ErrorAction Stop | Where-Object { $_.HighPrecisionTemperature -gt 2732 } | Sort-Object HighPrecisionTemperature -Descending) | Select-Object -First 1
-        if ($zone) { $temps.Zone = @{ C = [Math]::Round([double]$zone.HighPrecisionTemperature / 10 - 273.15); Name = [string]$zone.Name } }
-    }
-    catch { }
-    try {
-        if (-not ('WsmKmt.Kmt' -as [type])) {
-            # (a plain string: this code is itself inside the worker's here-string)
-            Add-Type -Namespace WsmKmt -Name Kmt -MemberDefinition (@(
-                    '[StructLayout(LayoutKind.Sequential)] public struct LUID { public uint Low; public int High; }'
-                    '[StructLayout(LayoutKind.Sequential)] public struct ADAPTERINFO { public uint hAdapter; public LUID AdapterLuid; public uint NumOfSources; public int bPrecisePresentRegionsPreferred; }'
-                    '[StructLayout(LayoutKind.Sequential)] public struct ENUMADAPTERS2 { public uint NumAdapters; public IntPtr pAdapters; }'
-                    '[StructLayout(LayoutKind.Sequential)] public struct QUERYADAPTERINFO { public uint hAdapter; public int Type; public IntPtr pPrivateDriverData; public uint PrivateDriverDataSize; }'
-                    '[StructLayout(LayoutKind.Sequential)] public struct CLOSEADAPTER { public uint hAdapter; }'
-                    '[DllImport("gdi32.dll")] public static extern int D3DKMTEnumAdapters2(ref ENUMADAPTERS2 p);'
-                    '[DllImport("gdi32.dll")] public static extern int D3DKMTQueryAdapterInfo(ref QUERYADAPTERINFO p);'
-                    '[DllImport("gdi32.dll")] public static extern int D3DKMTCloseAdapter(ref CLOSEADAPTER p);'
-                ) -join "`n")
+    if ($parts -contains 'disks') {
+        # Drives: each fixed volume's space, and each physical disk's health
+        try {
+            $h.Volumes = @(Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3' | Where-Object { $_.Size -gt 0 } | ForEach-Object { @{ Letter = [string]$_.DeviceID; Label = [string]$_.VolumeName; Size = [long]$_.Size; Free = [long]$_.FreeSpace } })
         }
-        $M = [Runtime.InteropServices.Marshal]
-        $en = New-Object WsmKmt.Kmt+ENUMADAPTERS2
-        if ([WsmKmt.Kmt]::D3DKMTEnumAdapters2([ref]$en) -eq 0 -and $en.NumAdapters) {
-            $sz = $M::SizeOf([type][WsmKmt.Kmt+ADAPTERINFO])
-            $en.pAdapters = $M::AllocHGlobal($sz * $en.NumAdapters)
-            # 62 is KMTQAITYPE_ADAPTERPERFDATA (temperature in tenths of a degree at offset 56), 8 the adapter's name
-            $perfBuf = $M::AllocHGlobal(64); $nameBuf = $M::AllocHGlobal(2080)
+        catch { $h.Volumes = @() }
+        try {
+            $disks = New-Object Collections.Generic.List[object]
+            foreach ($d in @(Get-PhysicalDisk -ErrorAction Stop)) {
+                $rel = $null; try { $rel = $d | Get-StorageReliabilityCounter -ErrorAction Stop } catch { }
+                $disks.Add(@{ Name = ([string]$d.FriendlyName).Trim(); Media = [string]$d.MediaType; Bus = [string]$d.BusType; Size = [long]$d.Size; Health = [string]$d.HealthStatus
+                        Status = [string](@($d.OperationalStatus) -join ', '); Wear = $(if ($rel) { $rel.Wear } else { $null }); Temp = $(if ($rel) { $rel.Temperature } else { $null })
+                        Hours = $(if ($rel) { $rel.PowerOnHours } else { $null }) })
+            }
+            $h.Disks = $disks.ToArray()
+        }
+        catch { $h.Disks = @() }
+        # Temperatures. The processor's own sensor needs a kernel driver, so it comes from LibreHardwareMonitor or
+        # OpenHardwareMonitor when one is running (they publish their sensors to WMI); otherwise the hottest ACPI thermal
+        # zone, which a standard user can read but which on many desktops is the motherboard rather than the processor.
+        # Graphics cards report their temperature to Windows (WDDM 2.9 and later, as Task Manager shows it), for any make.
+        # The monitor gives every temperature of each processor (each core, the package) and graphics card (the core, hot
+        # spot, memory), with the highest each reached since it started.
+        $temps = @{ Gpus = @(); Detail = @(); Monitor = '' }
+        foreach ($ns in 'root\LibreHardwareMonitor', 'root\OpenHardwareMonitor') {
             try {
-                if ([WsmKmt.Kmt]::D3DKMTEnumAdapters2([ref]$en) -eq 0) {
-                    $gpus = New-Object Collections.Generic.List[object]
-                    for ($i = 0; $i -lt $en.NumAdapters; $i++) {
-                        $ad = $M::PtrToStructure([IntPtr]($en.pAdapters.ToInt64() + $i * $sz), [type][WsmKmt.Kmt+ADAPTERINFO])
-                        for ($b = 0; $b -lt 64; $b++) { $M::WriteByte($perfBuf, $b, 0) }
-                        $q = New-Object WsmKmt.Kmt+QUERYADAPTERINFO
-                        $q.hAdapter = $ad.hAdapter; $q.Type = 62; $q.pPrivateDriverData = $perfBuf; $q.PrivateDriverDataSize = 64
-                        $deci = if ([WsmKmt.Kmt]::D3DKMTQueryAdapterInfo([ref]$q) -eq 0) { $M::ReadInt32($perfBuf, 56) } else { 0 }
-                        if ($deci -gt 0 -and $deci -lt 1500) {
-                            $q.Type = 8; $q.pPrivateDriverData = $nameBuf; $q.PrivateDriverDataSize = 2080
-                            $name = if ([WsmKmt.Kmt]::D3DKMTQueryAdapterInfo([ref]$q) -eq 0) { ([string]$M::PtrToStringUni($nameBuf)).Trim() } else { 'Graphics' }
-                            $gpus.Add(@{ Name = $name; C = [Math]::Round($deci / 10.0) })
+                $hw = @{}; foreach ($x in @(Get-CimInstance -Namespace $ns -ClassName Hardware -ErrorAction Stop)) { $hw[[string]$x.Identifier] = [string]$x.Name }
+                $sens = @(Get-CimInstance -Namespace $ns -ClassName Sensor -ErrorAction Stop | Where-Object { $_.SensorType -eq 'Temperature' -and $_.Value -gt 0 -and $_.Name -notmatch 'Distance to TjMax' -and $_.Parent -match '^/(amdcpu|intelcpu|gpu-nvidia|gpu-amd|gpu-intel|nvidiagpu|atigpu)/' })
+                if (-not $sens.Count) { continue }
+                $temps.Monitor = if ($ns -like '*Libre*') { 'LibreHardwareMonitor' } else { 'OpenHardwareMonitor' }
+                $temps.Detail = @($sens | Group-Object { [string]$_.Parent } | Sort-Object { $_.Name -notmatch 'cpu' }, Name | ForEach-Object {
+                        @{ Kind = $(if ($_.Name -match 'cpu') { 'cpu' } else { 'gpu' }); Name = $(if ($hw[$_.Name]) { $hw[$_.Name] } else { $_.Name })
+                            Sensors = @($_.Group | Sort-Object { [int]$_.Index } | ForEach-Object { @{ Name = [string]$_.Name; C = [Math]::Round([double]$_.Value); Max = $(if ($_.Max -gt 0) { [Math]::Round([double]$_.Max) } else { $null }) } }) } })
+                break
+            }
+            catch { }
+        }
+        $temps.MonitorRunning = [bool](@(Get-Process -Name 'LibreHardwareMonitor', 'OpenHardwareMonitor' -ErrorAction SilentlyContinue).Count)
+        $temps.MonitorExe = @(@(Get-ChildItem -Path "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\LibreHardwareMonitor.LibreHardwareMonitor_*" -Directory -ErrorAction SilentlyContinue | ForEach-Object { Get-ChildItem -LiteralPath $_.FullName -Filter 'LibreHardwareMonitor.exe' -Recurse -Depth 2 -ErrorAction SilentlyContinue } | ForEach-Object { $_.FullName }) +
+            @("$env:ProgramFiles\LibreHardwareMonitor\LibreHardwareMonitor.exe", "${env:ProgramFiles(x86)}\LibreHardwareMonitor\LibreHardwareMonitor.exe") | Where-Object { $_ -and (Test-Path -LiteralPath $_) }) | Select-Object -First 1
+        try {
+            $zone = @(Get-CimInstance Win32_PerfFormattedData_Counters_ThermalZoneInformation -ErrorAction Stop | Where-Object { $_.HighPrecisionTemperature -gt 2732 } | Sort-Object HighPrecisionTemperature -Descending) | Select-Object -First 1
+            if ($zone) { $temps.Zone = @{ C = [Math]::Round([double]$zone.HighPrecisionTemperature / 10 - 273.15); Name = [string]$zone.Name } }
+        }
+        catch { }
+        try {
+            if (-not ('WsmKmt.Kmt' -as [type])) {
+                # (a plain string: this code is itself inside the worker's here-string)
+                Add-Type -Namespace WsmKmt -Name Kmt -MemberDefinition (@(
+                        '[StructLayout(LayoutKind.Sequential)] public struct LUID { public uint Low; public int High; }'
+                        '[StructLayout(LayoutKind.Sequential)] public struct ADAPTERINFO { public uint hAdapter; public LUID AdapterLuid; public uint NumOfSources; public int bPrecisePresentRegionsPreferred; }'
+                        '[StructLayout(LayoutKind.Sequential)] public struct ENUMADAPTERS2 { public uint NumAdapters; public IntPtr pAdapters; }'
+                        '[StructLayout(LayoutKind.Sequential)] public struct QUERYADAPTERINFO { public uint hAdapter; public int Type; public IntPtr pPrivateDriverData; public uint PrivateDriverDataSize; }'
+                        '[StructLayout(LayoutKind.Sequential)] public struct CLOSEADAPTER { public uint hAdapter; }'
+                        '[DllImport("gdi32.dll")] public static extern int D3DKMTEnumAdapters2(ref ENUMADAPTERS2 p);'
+                        '[DllImport("gdi32.dll")] public static extern int D3DKMTQueryAdapterInfo(ref QUERYADAPTERINFO p);'
+                        '[DllImport("gdi32.dll")] public static extern int D3DKMTCloseAdapter(ref CLOSEADAPTER p);'
+                    ) -join "`n")
+            }
+            $M = [Runtime.InteropServices.Marshal]
+            $en = New-Object WsmKmt.Kmt+ENUMADAPTERS2
+            if ([WsmKmt.Kmt]::D3DKMTEnumAdapters2([ref]$en) -eq 0 -and $en.NumAdapters) {
+                $sz = $M::SizeOf([type][WsmKmt.Kmt+ADAPTERINFO])
+                $en.pAdapters = $M::AllocHGlobal($sz * $en.NumAdapters)
+                # 62 is KMTQAITYPE_ADAPTERPERFDATA (temperature in tenths of a degree at offset 56), 8 the adapter's name
+                $perfBuf = $M::AllocHGlobal(64); $nameBuf = $M::AllocHGlobal(2080)
+                try {
+                    if ([WsmKmt.Kmt]::D3DKMTEnumAdapters2([ref]$en) -eq 0) {
+                        $gpus = New-Object Collections.Generic.List[object]
+                        for ($i = 0; $i -lt $en.NumAdapters; $i++) {
+                            $ad = $M::PtrToStructure([IntPtr]($en.pAdapters.ToInt64() + $i * $sz), [type][WsmKmt.Kmt+ADAPTERINFO])
+                            for ($b = 0; $b -lt 64; $b++) { $M::WriteByte($perfBuf, $b, 0) }
+                            $q = New-Object WsmKmt.Kmt+QUERYADAPTERINFO
+                            $q.hAdapter = $ad.hAdapter; $q.Type = 62; $q.pPrivateDriverData = $perfBuf; $q.PrivateDriverDataSize = 64
+                            $deci = if ([WsmKmt.Kmt]::D3DKMTQueryAdapterInfo([ref]$q) -eq 0) { $M::ReadInt32($perfBuf, 56) } else { 0 }
+                            if ($deci -gt 0 -and $deci -lt 1500) {
+                                $q.Type = 8; $q.pPrivateDriverData = $nameBuf; $q.PrivateDriverDataSize = 2080
+                                $name = if ([WsmKmt.Kmt]::D3DKMTQueryAdapterInfo([ref]$q) -eq 0) { ([string]$M::PtrToStringUni($nameBuf)).Trim() } else { 'Graphics' }
+                                $gpus.Add(@{ Name = $name; C = [Math]::Round($deci / 10.0) })
+                            }
+                            $cl = New-Object WsmKmt.Kmt+CLOSEADAPTER; $cl.hAdapter = $ad.hAdapter; $null = [WsmKmt.Kmt]::D3DKMTCloseAdapter([ref]$cl)
                         }
-                        $cl = New-Object WsmKmt.Kmt+CLOSEADAPTER; $cl.hAdapter = $ad.hAdapter; $null = [WsmKmt.Kmt]::D3DKMTCloseAdapter([ref]$cl)
+                        $temps.Gpus = $gpus.ToArray()
                     }
-                    $temps.Gpus = $gpus.ToArray()
+                }
+                finally { $M::FreeHGlobal($en.pAdapters); $M::FreeHGlobal($perfBuf); $M::FreeHGlobal($nameBuf) }
+            }
+        }
+        catch { }
+        # older drivers don't report it to Windows: NVIDIA's own tool, which comes with its driver
+        if (-not @($temps.Gpus).Count) {
+            try {
+                $smi = @("$env:SystemRoot\System32\nvidia-smi.exe", "$env:ProgramFiles\NVIDIA Corporation\NVSMI\nvidia-smi.exe") | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+                if ($smi) { $temps.Gpus = @(& $smi --query-gpu=name,temperature.gpu --format=csv,noheader 2>$null | ForEach-Object { $f = ([string]$_).Split(','); if ($f.Count -ge 2 -and $f[1].Trim() -match '^\d+$') { @{ Name = $f[0].Trim(); C = [int]$f[1].Trim() } } }) }
+            }
+            catch { }
+        }
+        $h.Temps = $temps
+    }
+    if ($parts -contains 'security') {
+        # Security: antivirus (Windows Security Center lists whichever is registered), Defender's own status, the
+        # firewall, BitLocker on the system drive (the shell's property, which a standard user can read), Secure Boot,
+        # the TPM (its device), and activation
+        $sec = @{}
+        try {
+            $sec.Av = @(Get-CimInstance -Namespace root\SecurityCenter2 -ClassName AntiVirusProduct -ErrorAction Stop | ForEach-Object {
+                    # productState: the second byte says on (0x10/0x11) or off, the third out of date (0x10) or current
+                    $st = [int]$_.productState
+                    @{ Name = [string]$_.displayName; On = ((($st -shr 8) -band 0xFF) -band 0x10) -ne 0; Current = ((($st) -band 0xFF) -band 0x10) -eq 0 } })
+        }
+        catch { $sec.Av = @() }
+        try { $m = Get-MpComputerStatus -ErrorAction Stop; $sec.Defender = @{ On = [bool]$m.AntivirusEnabled; Realtime = [bool]$m.RealTimeProtectionEnabled; SigAge = [int]$m.AntivirusSignatureAge; ScanAge = [int]$m.QuickScanAge } } catch { }
+        try { $sec.Firewall = @(Get-NetFirewallProfile -ErrorAction Stop | ForEach-Object { @{ Name = [string]$_.Name; On = [bool]$_.Enabled } }) } catch { }
+        try { $sec.BitLocker = (New-Object -ComObject Shell.Application).NameSpace("$env:SystemDrive\").Self.ExtendedProperty('System.Volume.BitLockerProtection') } catch { }
+        try { $sec.SecureBoot = (Get-ItemProperty -LiteralPath 'HKLM:\SYSTEM\CurrentControlSet\Control\SecureBoot\State' -ErrorAction Stop).UEFISecureBootEnabled } catch { }
+        try { $sec.Tpm = [string](@(Get-CimInstance Win32_PnPEntity -Filter "PNPClass='SecurityDevices'" | Where-Object { $_.Name -match 'Trusted Platform' }) | Select-Object -First 1).Name } catch { }
+        try { $lic = @(Get-CimInstance SoftwareLicensingProduct -Filter "ApplicationID='55c92734-d682-4d71-983e-d6ec3f16059f' AND PartialProductKey IS NOT NULL") | Select-Object -First 1; if ($lic) { $sec.License = [int]$lic.LicenseStatus } } catch { }
+        $h.Security = $sec
+    }
+    if ($parts -contains 'reliability') {
+        # Reliability: Windows' stability index, unexpected shutdowns and blue screens (30 days), app crashes (7 days),
+        # devices with a problem
+        $rel = @{}
+        try { $si = @(Get-CimInstance Win32_ReliabilityStabilityMetrics -ErrorAction Stop | Sort-Object TimeGenerated -Descending) | Select-Object -First 1; if ($si) { $rel.Index = [double]$si.SystemStabilityIndex } } catch { }
+        $since = (Get-Date).AddDays(-30)
+        try { $rel.Shutdowns = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; Id = 41; StartTime = $since } -ErrorAction SilentlyContinue).Count } catch { }
+        try {
+            $bsod = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; Id = 1001; ProviderName = 'Microsoft-Windows-WER-SystemErrorReporting'; StartTime = $since } -ErrorAction SilentlyContinue)
+            $rel.BlueScreens = $bsod.Count
+            # the newest one's time and stop code ("The bugcheck was: 0x0000009f (...)")
+            if ($bsod.Count) {
+                $m = [regex]::Match([string]$bsod[0].Message, '0x[0-9a-fA-F]{8}')
+                $rel.LastBsod = @{ Time = $bsod[0].TimeCreated; Code = $(if ($m.Success) { $m.Value.ToLowerInvariant() } else { '' }) }
+            }
+        }
+        catch { }
+        # hardware errors Windows recorded (WHEA: processor, memory, PCIe), fatal ones among them; disk errors (bad blocks,
+        # failed reads, file system corruption); apps that stopped responding; failed Windows Update installs
+        try {
+            $whea = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-WHEA-Logger'; StartTime = $since } -ErrorAction SilentlyContinue)
+            $rel.Hardware = $whea.Count
+            $rel.HardwareFatal = @($whea | Where-Object { $_.Level -in 1, 2 }).Count
+        }
+        catch { }
+        try { $rel.DiskErrors = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; Id = 7, 51, 55, 153; StartTime = $since } -ErrorAction SilentlyContinue | Where-Object { $_.ProviderName -match '^(disk|Ntfs|Microsoft-Windows-Ntfs)$' }).Count } catch { }
+        try { $rel.Hangs = @(Get-WinEvent -FilterHashtable @{ LogName = 'Application'; Id = 1002; ProviderName = 'Application Hang'; StartTime = (Get-Date).AddDays(-7) } -ErrorAction SilentlyContinue).Count } catch { }
+        try { $rel.UpdateFails = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; Id = 20; ProviderName = 'Microsoft-Windows-WindowsUpdateClient'; StartTime = $since } -ErrorAction SilentlyContinue).Count } catch { }
+        try {
+            $crash = @(Get-WinEvent -FilterHashtable @{ LogName = 'Application'; Id = 1000; ProviderName = 'Application Error'; StartTime = (Get-Date).AddDays(-7) } -ErrorAction SilentlyContinue)
+            $rel.Crashes = $crash.Count
+            $rel.CrashApps = @($crash | Group-Object { [string]$_.Properties[0].Value } | Sort-Object Count -Descending | Select-Object -First 3 | ForEach-Object { "$($_.Name -replace '\.exe$', '') ($($_.Count))" })
+        }
+        catch { }
+        try { $rel.Devices = @(Get-CimInstance Win32_PnPEntity -Filter 'ConfigManagerErrorCode <> 0 AND ConfigManagerErrorCode <> 45').Count } catch { }
+        $h.Reliability = $rel
+    }
+    if ($parts -contains 'perf') {
+        # Performance: memory in use, the processor's load right now, and the apps using the most memory
+        try {
+            $o = Get-CimInstance Win32_OperatingSystem
+            $perf = @{ MemTotal = [long]$o.TotalVisibleMemorySize * 1KB; MemFree = [long]$o.FreePhysicalMemory * 1KB }
+            try { $perf.Cpu = [int](@(Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average).Average) } catch { }
+            $skip = 'Memory Compression', 'System', 'Idle', 'Registry', 'vmmem', 'Secure System'
+            $perf.Top = @(Get-Process | Where-Object { $skip -notcontains $_.ProcessName } | Group-Object ProcessName | ForEach-Object {
+                    $p = $_.Group[0]
+                    $desc = ''; try { $desc = [string]$p.MainModule.FileVersionInfo.FileDescription } catch { }
+                    @{ Name = $(if ($desc) { $desc } else { $_.Name }); Bytes = [long]($_.Group | Measure-Object -Property WorkingSet64 -Sum).Sum } } |
+                Sort-Object { $_.Bytes } -Descending | Select-Object -First 3)
+            $perf.Processes = @(Get-Process).Count
+            $h.Perf = $perf
+        }
+        catch { }
+    }
+    if ($parts -contains 'net') {
+        # Network: the connected adapters, their speed and address, the Wi-Fi network and signal, and the internet
+        try {
+            $nets = New-Object Collections.Generic.List[object]
+            $wlan = @{}
+            try {
+                $cur = ''
+                foreach ($l in @(& "$env:SystemRoot\System32\netsh.exe" wlan show interfaces 2>$null)) {
+                    if ($l -match '^\s+Name\s+:\s+(.+)$') { $cur = $Matches[1].Trim(); $wlan[$cur] = @{} }
+                    elseif ($cur -and $l -match '^\s+SSID\s+:\s+(.+)$') { $wlan[$cur].Ssid = $Matches[1].Trim() }
+                    elseif ($cur -and $l -match '^\s+Signal\s+:\s+(\d+)%') { $wlan[$cur].Signal = [int]$Matches[1] }
                 }
             }
-            finally { $M::FreeHGlobal($en.pAdapters); $M::FreeHGlobal($perfBuf); $M::FreeHGlobal($nameBuf) }
-        }
-    }
-    catch { }
-    # older drivers don't report it to Windows: NVIDIA's own tool, which comes with its driver
-    if (-not @($temps.Gpus).Count) {
-        try {
-            $smi = @("$env:SystemRoot\System32\nvidia-smi.exe", "$env:ProgramFiles\NVIDIA Corporation\NVSMI\nvidia-smi.exe") | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-            if ($smi) { $temps.Gpus = @(& $smi --query-gpu=name,temperature.gpu --format=csv,noheader 2>$null | ForEach-Object { $f = ([string]$_).Split(','); if ($f.Count -ge 2 -and $f[1].Trim() -match '^\d+$') { @{ Name = $f[0].Trim(); C = [int]$f[1].Trim() } } }) }
-        }
-        catch { }
-    }
-    $h.Temps = $temps
-    # Reliability: Windows' stability index, unexpected shutdowns and blue screens (30 days), app crashes (7 days),
-    # devices with a problem
-    $rel = @{}
-    try { $si = @(Get-CimInstance Win32_ReliabilityStabilityMetrics -ErrorAction Stop | Sort-Object TimeGenerated -Descending) | Select-Object -First 1; if ($si) { $rel.Index = [double]$si.SystemStabilityIndex } } catch { }
-    $since = (Get-Date).AddDays(-30)
-    try { $rel.Shutdowns = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; Id = 41; StartTime = $since } -ErrorAction SilentlyContinue).Count } catch { }
-    try {
-        $bsod = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; Id = 1001; ProviderName = 'Microsoft-Windows-WER-SystemErrorReporting'; StartTime = $since } -ErrorAction SilentlyContinue)
-        $rel.BlueScreens = $bsod.Count
-        # the newest one's time and stop code ("The bugcheck was: 0x0000009f (...)")
-        if ($bsod.Count) {
-            $m = [regex]::Match([string]$bsod[0].Message, '0x[0-9a-fA-F]{8}')
-            $rel.LastBsod = @{ Time = $bsod[0].TimeCreated; Code = $(if ($m.Success) { $m.Value.ToLowerInvariant() } else { '' }) }
-        }
-    }
-    catch { }
-    # hardware errors Windows recorded (WHEA: processor, memory, PCIe), fatal ones among them; disk errors (bad blocks,
-    # failed reads, file system corruption); apps that stopped responding; failed Windows Update installs
-    try {
-        $whea = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-WHEA-Logger'; StartTime = $since } -ErrorAction SilentlyContinue)
-        $rel.Hardware = $whea.Count
-        $rel.HardwareFatal = @($whea | Where-Object { $_.Level -in 1, 2 }).Count
-    }
-    catch { }
-    try { $rel.DiskErrors = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; Id = 7, 51, 55, 153; StartTime = $since } -ErrorAction SilentlyContinue | Where-Object { $_.ProviderName -match '^(disk|Ntfs|Microsoft-Windows-Ntfs)$' }).Count } catch { }
-    try { $rel.Hangs = @(Get-WinEvent -FilterHashtable @{ LogName = 'Application'; Id = 1002; ProviderName = 'Application Hang'; StartTime = (Get-Date).AddDays(-7) } -ErrorAction SilentlyContinue).Count } catch { }
-    try { $rel.UpdateFails = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; Id = 20; ProviderName = 'Microsoft-Windows-WindowsUpdateClient'; StartTime = $since } -ErrorAction SilentlyContinue).Count } catch { }
-    try {
-        $crash = @(Get-WinEvent -FilterHashtable @{ LogName = 'Application'; Id = 1000; ProviderName = 'Application Error'; StartTime = (Get-Date).AddDays(-7) } -ErrorAction SilentlyContinue)
-        $rel.Crashes = $crash.Count
-        $rel.CrashApps = @($crash | Group-Object { [string]$_.Properties[0].Value } | Sort-Object Count -Descending | Select-Object -First 3 | ForEach-Object { "$($_.Name -replace '\.exe$', '') ($($_.Count))" })
-    }
-    catch { }
-    try { $rel.Devices = @(Get-CimInstance Win32_PnPEntity -Filter 'ConfigManagerErrorCode <> 0 AND ConfigManagerErrorCode <> 45').Count } catch { }
-    $h.Reliability = $rel
-    # Network: the connected adapters, their speed and address, the Wi-Fi network and signal, and the internet
-    try {
-        $nets = New-Object Collections.Generic.List[object]
-        $wlan = @{}
-        try {
-            $cur = ''
-            foreach ($l in @(& "$env:SystemRoot\System32\netsh.exe" wlan show interfaces 2>$null)) {
-                if ($l -match '^\s+Name\s+:\s+(.+)$') { $cur = $Matches[1].Trim(); $wlan[$cur] = @{} }
-                elseif ($cur -and $l -match '^\s+SSID\s+:\s+(.+)$') { $wlan[$cur].Ssid = $Matches[1].Trim() }
-                elseif ($cur -and $l -match '^\s+Signal\s+:\s+(\d+)%') { $wlan[$cur].Signal = [int]$Matches[1] }
+            catch { }
+            $profiles = @{}
+            try { foreach ($c in @(Get-NetConnectionProfile -ErrorAction Stop)) { $profiles[[string]$c.InterfaceAlias] = $c } } catch { }
+            foreach ($a in @(Get-NetAdapter -Physical -ErrorAction Stop | Where-Object { $_.Status -eq 'Up' })) {
+                $ip = ''; try { $ip = [string](@(Get-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv4 -ErrorAction Stop | Where-Object { $_.IPAddress -notlike '169.254.*' }) | Select-Object -First 1).IPAddress } catch { }
+                $pf = $profiles[[string]$a.Name]
+                $w = $wlan[[string]$a.Name]
+                $nets.Add(@{ Name = [string]$a.Name; Description = [string]$a.InterfaceDescription; Speed = [string]$a.LinkSpeed; Ip = $ip
+                        Wireless = [bool]($w -or $a.PhysicalMediaType -match '802\.11'); Ssid = $(if ($w) { [string]$w.Ssid } else { '' }); Signal = $(if ($w) { $w.Signal } else { $null })
+                        Network = $(if ($pf) { [string]$pf.Name } else { '' }); Internet = $(if ($pf) { [string]$pf.IPv4Connectivity -eq 'Internet' -or [string]$pf.IPv6Connectivity -eq 'Internet' } else { $false }) })
             }
+            $h.Network = $nets.ToArray()
         }
-        catch { }
-        $profiles = @{}
-        try { foreach ($c in @(Get-NetConnectionProfile -ErrorAction Stop)) { $profiles[[string]$c.InterfaceAlias] = $c } } catch { }
-        foreach ($a in @(Get-NetAdapter -Physical -ErrorAction Stop | Where-Object { $_.Status -eq 'Up' })) {
-            $ip = ''; try { $ip = [string](@(Get-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv4 -ErrorAction Stop | Where-Object { $_.IPAddress -notlike '169.254.*' }) | Select-Object -First 1).IPAddress } catch { }
-            $pf = $profiles[[string]$a.Name]
-            $w = $wlan[[string]$a.Name]
-            $nets.Add(@{ Name = [string]$a.Name; Description = [string]$a.InterfaceDescription; Speed = [string]$a.LinkSpeed; Ip = $ip
-                    Wireless = [bool]($w -or $a.PhysicalMediaType -match '802\.11'); Ssid = $(if ($w) { [string]$w.Ssid } else { '' }); Signal = $(if ($w) { $w.Signal } else { $null })
-                    Network = $(if ($pf) { [string]$pf.Name } else { '' }); Internet = $(if ($pf) { [string]$pf.IPv4Connectivity -eq 'Internet' -or [string]$pf.IPv6Connectivity -eq 'Internet' } else { $false }) })
-        }
-        $h.Network = $nets.ToArray()
-    }
-    catch { $h.Network = @() }
-    # Connection quality: round trips to the router and to the internet (how long, how many are lost, how much they
-    # vary) and how long a DNS lookup takes. A network that blocks ping is timed with a connection to port 443 instead.
-    if (@($h.Network).Count) {
-        $q = @{}
-        $pinger = New-Object System.Net.NetworkInformation.Ping
-        $probe = {
-            param([string]$Target, [int]$Count)
-            $times = New-Object Collections.Generic.List[double]; $lost = 0
-            for ($i = 0; $i -lt $Count; $i++) {
-                try { $r = $pinger.Send($Target, 1000); if ($r.Status -eq 'Success') { $times.Add([double]$r.RoundtripTime) } else { $lost++ } } catch { $lost++ }
+        catch { $h.Network = @() }
+        # Connection quality: round trips to the router and to the internet (how long, how many are lost, how much they
+        # vary) and how long a DNS lookup takes. A network that blocks ping is timed with a connection to port 443 instead.
+        if (@($h.Network).Count) {
+            $q = @{}
+            $pinger = New-Object System.Net.NetworkInformation.Ping
+            $probe = {
+                param([string]$Target, [int]$Count)
+                $times = New-Object Collections.Generic.List[double]; $lost = 0
+                for ($i = 0; $i -lt $Count; $i++) {
+                    try { $r = $pinger.Send($Target, 1000); if ($r.Status -eq 'Success') { $times.Add([double]$r.RoundtripTime) } else { $lost++ } } catch { $lost++ }
+                }
+                $jit = $null
+                if ($times.Count -ge 2) { $d = 0.0; for ($i = 1; $i -lt $times.Count; $i++) { $d += [Math]::Abs($times[$i] - $times[$i - 1]) }; $jit = [Math]::Round($d / ($times.Count - 1), 1) }
+                @{ Target = $Target; Ms = $(if ($times.Count) { [Math]::Round(($times | Measure-Object -Average).Average, 1) } else { $null }); Jitter = $jit; Loss = [int][Math]::Round(100.0 * $lost / $Count); Method = 'ping' }
             }
-            $jit = $null
-            if ($times.Count -ge 2) { $d = 0.0; for ($i = 1; $i -lt $times.Count; $i++) { $d += [Math]::Abs($times[$i] - $times[$i - 1]) }; $jit = [Math]::Round($d / ($times.Count - 1), 1) }
-            @{ Target = $Target; Ms = $(if ($times.Count) { [Math]::Round(($times | Measure-Object -Average).Average, 1) } else { $null }); Jitter = $jit; Loss = [int][Math]::Round(100.0 * $lost / $Count); Method = 'ping' }
-        }
-        $route = $null
-        try { $route = @(Get-NetRoute -DestinationPrefix '0.0.0.0/0' -ErrorAction Stop | Where-Object { $_.NextHop -and $_.NextHop -ne '0.0.0.0' } | Sort-Object { [int]$_.RouteMetric + [int]$_.InterfaceMetric }) | Select-Object -First 1 } catch { }
-        if ($route) { try { $q.Gateway = & $probe ([string]$route.NextHop) 4 } catch { } }
-        try {
-            $q.Internet = & $probe '1.1.1.1' 6
-            if ($null -eq $q.Internet.Ms) {
-                $times = @(foreach ($i in 1..3) {
-                        $tcp = New-Object System.Net.Sockets.TcpClient
-                        try { $sw = [Diagnostics.Stopwatch]::StartNew(); if ($tcp.ConnectAsync('1.1.1.1', 443).Wait(2000)) { $sw.Elapsed.TotalMilliseconds } } catch { } finally { $tcp.Close() }
+            $route = $null
+            try { $route = @(Get-NetRoute -DestinationPrefix '0.0.0.0/0' -ErrorAction Stop | Where-Object { $_.NextHop -and $_.NextHop -ne '0.0.0.0' } | Sort-Object { [int]$_.RouteMetric + [int]$_.InterfaceMetric }) | Select-Object -First 1 } catch { }
+            if ($route) { try { $q.Gateway = & $probe ([string]$route.NextHop) 4 } catch { } }
+            try {
+                $q.Internet = & $probe '1.1.1.1' 6
+                if ($null -eq $q.Internet.Ms) {
+                    $times = @(foreach ($i in 1..3) {
+                            $tcp = New-Object System.Net.Sockets.TcpClient
+                            try { $sw = [Diagnostics.Stopwatch]::StartNew(); if ($tcp.ConnectAsync('1.1.1.1', 443).Wait(2000)) { $sw.Elapsed.TotalMilliseconds } } catch { } finally { $tcp.Close() }
+                        })
+                    if ($times.Count) { $q.Internet = @{ Target = '1.1.1.1'; Ms = [Math]::Round(($times | Measure-Object -Average).Average, 1); Jitter = $null; Loss = $null; Method = 'tcp' } }
+                }
+            }
+            catch { }
+            try {
+                $dns = $null
+                if ($route) { try { $dns = @((Get-DnsClientServerAddress -InterfaceIndex $route.ifIndex -AddressFamily IPv4 -ErrorAction Stop).ServerAddresses) | Select-Object -First 1 } catch { } }
+                $times = @(foreach ($n in 'www.microsoft.com', 'www.cloudflare.com') {
+                        $sw = [Diagnostics.Stopwatch]::StartNew()
+                        try {
+                            # asking the server itself skips Windows' DNS cache
+                            if ($dns) { $null = Resolve-DnsName $n -Type A -DnsOnly -QuickTimeout -Server $dns -ErrorAction Stop } else { $null = Resolve-DnsName $n -Type A -DnsOnly -QuickTimeout -ErrorAction Stop }
+                            $sw.Elapsed.TotalMilliseconds
+                        }
+                        catch { }
                     })
-                if ($times.Count) { $q.Internet = @{ Target = '1.1.1.1'; Ms = [Math]::Round(($times | Measure-Object -Average).Average, 1); Jitter = $null; Loss = $null; Method = 'tcp' } }
+                $q.Dns = @{ Server = [string]$dns; Ms = $(if ($times.Count) { [Math]::Round(($times | Measure-Object -Average).Average, 1) } else { $null }); Failed = 2 - $times.Count }
             }
+            catch { }
+            $h.Quality = $q
         }
-        catch { }
-        try {
-            $dns = $null
-            if ($route) { try { $dns = @((Get-DnsClientServerAddress -InterfaceIndex $route.ifIndex -AddressFamily IPv4 -ErrorAction Stop).ServerAddresses) | Select-Object -First 1 } catch { } }
-            $times = @(foreach ($n in 'www.microsoft.com', 'www.cloudflare.com') {
-                    $sw = [Diagnostics.Stopwatch]::StartNew()
-                    try {
-                        # asking the server itself skips Windows' DNS cache
-                        if ($dns) { $null = Resolve-DnsName $n -Type A -DnsOnly -QuickTimeout -Server $dns -ErrorAction Stop } else { $null = Resolve-DnsName $n -Type A -DnsOnly -QuickTimeout -ErrorAction Stop }
-                        $sw.Elapsed.TotalMilliseconds
-                    }
-                    catch { }
-                })
-            $q.Dns = @{ Server = [string]$dns; Ms = $(if ($times.Count) { [Math]::Round(($times | Measure-Object -Average).Average, 1) } else { $null }); Failed = 2 - $times.Count }
-        }
-        catch { }
-        $h.Quality = $q
     }
     Send $h
 }

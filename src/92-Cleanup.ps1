@@ -50,7 +50,7 @@ $ConfirmHandlers.bigdel = {
     Update-View
 }
 
-# The biggest apps, from the Installed Software list (sizes as each app reports them)
+# The biggest apps, from the Uninstall Software list (sizes as each app reports them)
 function Update-CleanupApps {
     $key = "$($script:InstalledChecked)|$($InstalledItems.Count)"
     if ($key -eq $script:AppsKey) { return }
