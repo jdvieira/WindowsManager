@@ -5,6 +5,24 @@ All notable changes to Windows Manager (called Windows Software Manager in 2.0, 
 version's section becomes its release notes, which the app shows under "What's new", so it lists only changes to the
 app, not to the repository.
 
+## 2.11.0.0 - 2026-10-22
+
+- Security: **Suspicious changes** checks the places malware changes to start with Windows or take over the PC, and
+  lists what looks suspicious, each with why and how sure:
+  - startup keys and folders, scheduled tasks and services that run a script host, an unsigned program from Temp,
+    Downloads, AppData or ProgramData, or a program that's gone;
+  - the registry: Winlogon's shell and sign-in program, AppInit_DLLs, programs redirected to another (Image File
+    Execution Options, SilentProcessExit), Command Prompt AutoRun, open commands for programs and Settings, BootExecute
+    and sign-in security packages;
+  - WMI subscriptions that run commands, browser policies that force extensions or lock pages, the hosts file, a
+    proxy, Defender switched off by policy or told to skip places, and swapped accessibility programs.
+
+  Nothing starts ticked. **Remove** saves what it changes first, so **Restore** puts it back; **Scan** has Defender
+  scan the program a finding runs.
+- Security: **More scans** adds a scan of a chosen folder or drive, and Microsoft Defender Offline, which restarts the
+  PC and scans before Windows starts.
+- Fix my PC points to the Security tab when it finds suspicious changes that are very likely malware.
+
 ## 2.10.0.0 - 2026-10-22
 
 - New **Security** tab, next to Device Health, for malware and spyware:

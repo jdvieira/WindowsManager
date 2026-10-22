@@ -47,6 +47,7 @@ foreach ($name in 'HeaderLogo', 'HeaderVersion', 'SubTitle', 'AdminBadge', 'Admi
 foreach ($name in 'TabStartup', 'TabWindows', 'TabHealth', 'WinBadge', 'WinBadgeText', 'BtnDiag',
     'TabSecurity', 'SecBadge', 'SecBadgeText', 'SecurityPanel', 'SecWinSec', 'SecQuick', 'SecFull', 'SecIcon', 'SecTitle', 'SecText', 'SecScanBar', 'SecPua', 'SecHistory', 'SecRefresh',
     'SecRemove', 'SecRemoveText', 'SecHeader', 'SecCheckAll', 'SecList', 'SecMsgPanel', 'SecMsgBar', 'SecMsgTitle', 'SecMsgText', 'SecMsgAction',
+    'SecMore', 'SecViewDefender', 'SecViewDefenderText', 'SecViewSuspects', 'SecViewSuspectsText', 'SecDefChips', 'SusHeader', 'SusCheckAll', 'SusList',
     'StartupPanel', 'StTitle', 'StText', 'StOpenTaskMgr', 'StSearch', 'StOffOnly', 'StRefresh', 'StHeader', 'StList', 'StMsgPanel', 'StMsgBar', 'StMsgTitle', 'StMsgText', 'StMsgAction',
     'WinPanel', 'WinTitle', 'WinVersion', 'WinStatus', 'WinSettings', 'WinRestart', 'WinViewAvail', 'WinViewAvailText', 'WinViewHistory', 'WinSearch', 'WinRestore',
     'WinRefresh', 'WinRefreshText', 'WinApply', 'WinApplyText', 'WinNote', 'WinNoteText', 'WinAvailHeader', 'WinHistHeader', 'WinList', 'WinHistList',

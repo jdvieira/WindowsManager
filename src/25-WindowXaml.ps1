@@ -1298,6 +1298,12 @@ $Xaml = @'
         <DockPanel>
           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
             <Button x:Name="SecWinSec" Style="{StaticResource Ghost}" Content="Windows Security" ToolTip="Open Windows Security: its protection history and quarantine"/>
+            <Button x:Name="SecMore" Style="{StaticResource Ghost}" ToolTip="Scan a folder or drive, or run Microsoft Defender Offline">
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="More scans"/>
+                <TextBlock Text="&#xE70D;" FontFamily="Segoe MDL2 Assets" FontSize="10" Margin="8,2,0,0" VerticalAlignment="Center"/>
+              </StackPanel>
+            </Button>
             <Button x:Name="SecQuick" Content="Quick scan" ToolTip="Scan the places malware usually hides (a few minutes). Asks for administrator approval"/>
             <Button x:Name="SecFull" Style="{StaticResource Primary}" Margin="0" ToolTip="Scan every file on the PC (an hour or more). Asks for administrator approval">
               <StackPanel Orientation="Horizontal">
@@ -1323,10 +1329,18 @@ $Xaml = @'
           <ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+          <RadioButton x:Name="SecViewDefender" GroupName="SecView" Style="{StaticResource Chip}" Margin="0,0,8,0" IsChecked="True" ToolTip="What Microsoft Defender found, and unwanted apps">
+            <TextBlock x:Name="SecViewDefenderText" Text="Defender"/>
+          </RadioButton>
+          <RadioButton x:Name="SecViewSuspects" GroupName="SecView" Style="{StaticResource Chip}" Margin="0,0,16,0" ToolTip="Places malware changes to start with Windows or take over the PC, and what in them looks suspicious">
+            <TextBlock x:Name="SecViewSuspectsText" Text="Suspicious changes"/>
+          </RadioButton>
+          <StackPanel x:Name="SecDefChips" Orientation="Horizontal">
           <ToggleButton x:Name="SecPua" Content="Block unwanted apps" Style="{StaticResource Chip}" Margin="0,0,8,0"
                         ToolTip="Microsoft Defender's protection against potentially unwanted apps: adware, bundled toolbars and the like are blocked as they download or install. Changing it asks for administrator approval"/>
           <ToggleButton x:Name="SecHistory" Content="Show history" Style="{StaticResource Chip}" IsChecked="True" Margin="0,0,8,0"
                         ToolTip="Also list what Defender already quarantined or removed"/>
+          </StackPanel>
         </StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
           <Button x:Name="SecRefresh" ToolTip="Read Defender's status and findings again (F5)">
@@ -1418,6 +1432,78 @@ $Xaml = @'
               </DataTemplate>
             </ListBox.ItemTemplate>
           </ListBox>
+          <Border x:Name="SusHeader" BorderBrush="#2E2E2E" BorderThickness="0,0,0,1" Visibility="Collapsed">
+            <Grid Height="40" Margin="16,0,26,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="34"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="140"/>
+                <ColumnDefinition Width="80"/>
+                <ColumnDefinition Width="150"/>
+                <ColumnDefinition Width="190"/>
+              </Grid.ColumnDefinitions>
+              <CheckBox x:Name="SusCheckAll" Style="{StaticResource Check}" VerticalAlignment="Center" ToolTip="Tick everything that can be removed"/>
+              <TextBlock Grid.Column="1" Text="WHAT WAS CHANGED" Style="{StaticResource Label}" VerticalAlignment="Center"/>
+              <TextBlock Grid.Column="2" Text="WHERE" Style="{StaticResource Label}" VerticalAlignment="Center"/>
+              <TextBlock Grid.Column="3" Text="HOW SURE" Style="{StaticResource Label}" VerticalAlignment="Center"/>
+              <TextBlock Grid.Column="4" Text="STATUS" Style="{StaticResource Label}" VerticalAlignment="Center"/>
+            </Grid>
+          </Border>
+          <ListBox x:Name="SusList" Grid.Row="1" Background="Transparent" BorderThickness="0" ItemContainerStyle="{StaticResource Row}" ScrollViewer.HorizontalScrollBarVisibility="Disabled" VirtualizingPanel.ScrollUnit="Pixel" Focusable="False" Visibility="Collapsed">
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <Grid x:Name="SusRow" Height="58" Margin="16,0,16,0" Background="Transparent">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="34"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="140"/>
+                    <ColumnDefinition Width="80"/>
+                    <ColumnDefinition Width="150"/>
+                    <ColumnDefinition Width="190"/>
+                  </Grid.ColumnDefinitions>
+                  <Grid.ContextMenu>
+                    <ContextMenu>
+                      <MenuItem Header="Open location" Tag="susopen"/>
+                      <MenuItem Header="Scan with Defender" Tag="susscan" IsEnabled="{Binding CanScan}"/>
+                      <MenuItem Header="Copy details" Tag="suscopy"/>
+                    </ContextMenu>
+                  </Grid.ContextMenu>
+                  <CheckBox x:Name="SusCheck" Style="{StaticResource Check}" VerticalAlignment="Center" IsChecked="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanRemove}"/>
+                  <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,14,0">
+                    <TextBlock Text="{Binding Name}" Foreground="#F2F2F2" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
+                    <TextBlock Text="{Binding Why}" Foreground="#8A8A8A" FontSize="12" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" ToolTip="{Binding Why}"/>
+                  </StackPanel>
+                  <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="0,0,10,0" ToolTip="{Binding Location}" Background="Transparent">
+                    <TextBlock Text="{Binding Area}" Foreground="#9A9A9A" FontSize="12.5" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Text="{Binding Location}" Foreground="#6E6E6E" FontSize="11" FontFamily="Consolas" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
+                  </StackPanel>
+                  <TextBlock x:Name="SusSev" Grid.Column="3" Text="{Binding Severity}" Foreground="#9A9A9A" VerticalAlignment="Center" FontSize="12.5"/>
+                  <StackPanel Grid.Column="4" VerticalAlignment="Center" Margin="0,0,10,0">
+                    <TextBlock x:Name="SusStatus" Text="{Binding StatusText}" Foreground="#BDBDBD" FontSize="12.5" TextTrimming="CharacterEllipsis" ToolTip="{Binding StatusText}"/>
+                    <ProgressBar x:Name="SusBar" Style="{StaticResource Bar}" IsIndeterminate="True" Margin="0,6,0,0" Visibility="Collapsed"/>
+                  </StackPanel>
+                  <StackPanel Grid.Column="5" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Button x:Name="SusScanBtn" Content="Scan" Tag="susscan" Style="{StaticResource RowButton}" IsEnabled="{Binding CanScan}" Margin="0,0,8,0" ToolTip="Scan the program it runs with Microsoft Defender"/>
+                    <Button x:Name="SusActBtn" Content="{Binding ActionText}" Tag="susact" Style="{StaticResource RowButton}"/>
+                  </StackPanel>
+                </Grid>
+                <DataTemplate.Triggers>
+                  <DataTrigger Binding="{Binding Severity}" Value="High"><Setter TargetName="SusSev" Property="Foreground" Value="{StaticResource Bad}"/></DataTrigger>
+                  <DataTrigger Binding="{Binding Severity}" Value="Medium"><Setter TargetName="SusSev" Property="Foreground" Value="{StaticResource Warn}"/></DataTrigger>
+                  <DataTrigger Binding="{Binding CanScan}" Value="False"><Setter TargetName="SusScanBtn" Property="Visibility" Value="Hidden"/></DataTrigger>
+                  <DataTrigger Binding="{Binding Fixable}" Value="False"><Setter TargetName="SusActBtn" Property="Visibility" Value="Collapsed"/><Setter TargetName="SusCheck" Property="Visibility" Value="Hidden"/></DataTrigger>
+                  <DataTrigger Binding="{Binding Removed}" Value="True">
+                    <Setter TargetName="SusRow" Property="Opacity" Value="0.6"/>
+                    <Setter TargetName="SusCheck" Property="Visibility" Value="Hidden"/>
+                    <Setter TargetName="SusActBtn" Property="Visibility" Value="Visible"/>
+                    <Setter TargetName="SusStatus" Property="Foreground" Value="{StaticResource Good}"/>
+                  </DataTrigger>
+                  <DataTrigger Binding="{Binding IsBusy}" Value="True"><Setter TargetName="SusBar" Property="Visibility" Value="Visible"/><Setter TargetName="SusActBtn" Property="IsEnabled" Value="False"/><Setter TargetName="SusRow" Property="Opacity" Value="1"/></DataTrigger>
+                  <DataTrigger Binding="{Binding State}" Value="error"><Setter TargetName="SusStatus" Property="Foreground" Value="{StaticResource Bad}"/></DataTrigger>
+                </DataTemplate.Triggers>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
           <StackPanel x:Name="SecMsgPanel" Grid.RowSpan="2" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="560" Visibility="Collapsed">
             <ProgressBar x:Name="SecMsgBar" Style="{StaticResource Bar}" Width="240" IsIndeterminate="True" Margin="0,0,0,20"/>
             <TextBlock x:Name="SecMsgTitle" FontSize="17" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"/>
@@ -1428,7 +1514,8 @@ $Xaml = @'
       </Border>
     </Grid>
 
-    <!-- Windows Update: Windows' own updates (not drivers, which are on the Drivers tab), and its recent history -->    <Grid x:Name="WinPanel" Grid.Row="2" Margin="32,16,32,18" Visibility="Collapsed">
+    <!-- Windows Update: Windows' own updates (not drivers, which are on the Drivers tab), and its recent history -->
+    <Grid x:Name="WinPanel" Grid.Row="2" Margin="32,16,32,18" Visibility="Collapsed">
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto"/>
         <RowDefinition Height="Auto"/>

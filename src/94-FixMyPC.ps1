@@ -50,6 +50,7 @@ function Open-FixMyPC {
     if (-not $script:HealthReader) { Start-HealthScan }
     if ($script:StartupState -in 'none', 'error') { Start-StartupScan }
     if (-not $script:SecReader) { Start-SecRead }
+    if (-not $script:SusReader) { Start-SusRead }
     $script:FixTimer.Start()
     Update-FixView
 }
@@ -60,7 +61,7 @@ function Test-FixChecked {
     if ($script:CleanReader -or -not $script:CleanMeasured) { return $false }
     if ($script:HealthReader -or -not $script:HealthInfo) { return $false }
     if ($script:StartupState -eq 'running') { return $false }
-    if ($script:SecReader -or $script:Lister) { return $false }
+    if ($script:SecReader -or $script:SusReader -or $script:Lister) { return $false }
     return $true
 }
 
@@ -123,6 +124,8 @@ function Build-FixList {
     if ($rel -and [int]$rel.Devices -gt 0) { Add-FixItem 'look-devices' 'Worth a look' "$($rel.Devices) device$(if ([int]$rel.Devices -ne 1) { 's have' } else { ' has' }) a problem" 'Windows reports a problem with their driver or the device itself.' $false -Action 'Drivers' -Ref { $UI.FixOverlay.Visibility = 'Collapsed'; $UI.TabDrivers.IsChecked = $true; $UI.DrvViewDevices.IsChecked = $true; $UI.DrvProblemsOnly.IsChecked = $true; Update-View } }
     $low = @($hi.Volumes | Where-Object { $_.Size -and $_.Free / $_.Size -lt 0.1 } | ForEach-Object { $_.Letter })
     if ($low.Count) { Add-FixItem 'look-space' 'Worth a look' "$($low -join ', ') $(if ($low.Count -ne 1) { 'are' } else { 'is' }) nearly full" 'Cleanup lists your largest files and the apps that take the most space.' $false -Action 'Cleanup' -Ref { $UI.FixOverlay.Visibility = 'Collapsed'; $UI.TabCleanup.IsChecked = $true } }
+    $sus = @($SusItems | Where-Object { -not $_.Removed -and $_.Severity -eq 'High' })
+    if ($sus.Count) { Add-FixItem 'look-suspects' 'Worth a look' "$($sus.Count) suspicious change$(if ($sus.Count -ne 1) { 's' }) that malware often makes" "$(Format-FixNames @($sus | ForEach-Object { $_.Name }) 3). Look each one up on the Security tab, where it can be removed and put back." $false -Action 'Security' -Ref { $UI.FixOverlay.Visibility = 'Collapsed'; $UI.TabSecurity.IsChecked = $true; $UI.SecViewSuspects.IsChecked = $true; Update-View } }
     $badDisk = @($hi.Disks | Where-Object { $_.Health -and $_.Health -ne 'Healthy' } | ForEach-Object { $_.Name })
     if ($badDisk.Count) { Add-FixItem 'look-disk' 'Worth a look' 'A drive reports a problem' "$($badDisk -join ', '). Back up what's on it." $false }
     if ($sec -and $sec.SecureBoot -eq 0) { Add-FixItem 'look-secureboot' 'Worth a look' 'Secure Boot is off' "It's turned on in the PC's firmware (BIOS or UEFI) setup, which this app can't change." $false }
