@@ -5,6 +5,15 @@ All notable changes to Windows Manager (called Windows Software Manager in 2.0, 
 version's section becomes its release notes, which the app shows under "What's new", so it lists only changes to the
 app, not to the repository.
 
+## 2.12.0.0 - 2026-11-18
+
+- Opening the app: a small splash with the app's name, version and a progress bar appears straight away, instead of
+  nothing for several seconds. It's most noticeable the first time after the PC has been idle for a while.
+- The window opens about a second sooner, and answers clicks while it fills in the first tab, rather than freezing
+  for a few seconds once it appears.
+- Later starts skip a step the app used to repeat every time it opened (it now keeps the result in
+  `%LOCALAPPDATA%\WindowsManager\Cache`). Runs as administrator still do it every time.
+
 ## 2.11.0.0 - 2026-10-22
 
 - Security: **Suspicious changes** checks the places malware changes to start with Windows or take over the PC, and

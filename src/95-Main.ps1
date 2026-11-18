@@ -76,6 +76,7 @@ if ($SelfTest) {
 
 # the tab the app opens on reads this PC's health; started now, it reads while the window is being drawn
 if ($script:Section -eq 'health') { Start-HealthScan }
+Step-Splash 90 ('Opening' + $Ellipsis)
 $Timer.Start()
 [void]$Window.ShowDialog()
 # background work can keep the process alive for a few seconds; opening the app again meanwhile shouldn't find it taken

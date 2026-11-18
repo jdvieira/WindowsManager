@@ -2,6 +2,8 @@
 
 $Window = [System.Windows.Markup.XamlReader]::Parse($Xaml)
 $Window.Add_SourceInitialized({
+        # one taskbar button: the window's own, from now on
+        if ($script:Splash) { try { $script:Splash.Window.ShowInTaskbar = $false } catch { } }
         try {
             if (-not ('WingetUM.Dwm' -as [type])) {
                 Add-Type -Namespace WingetUM -Name Dwm -MemberDefinition '[DllImport("dwmapi.dll")] public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);'
