@@ -56,7 +56,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$AppVersion = '2.11.0.0'   # also the exe version (Build-Exe.ps1 reads it); record changes in CHANGELOG.md
+$AppVersion = '2.12.0.0'   # also the exe version (Build-Exe.ps1 reads it); record changes in CHANGELOG.md
 $AppName = 'Windows Manager'
 $Dot = [string][char]0x00B7
 $Ellipsis = [string][char]0x2026
@@ -119,11 +119,31 @@ if (-not $Auto -and -not $TaskOp -and -not $SelfTest -and $Open -notmatch ':log'
     }
 }
 
+# The splash while the app loads (01-Splash.ps1 opens it, for the window only). Windows_Manager.ps1 and Build-Exe.ps1
+# put a Step-Splash line before each part with how far through the parts it is (0-90); each call moves the bar and
+# redraws the splash, since nothing else draws it until the window opens. Close-Splash: the window is ready to use.
+$script:Splash = $null
+function Step-Splash([double]$Percent, [string]$Text) {
+    if (-not $script:Splash) { return }
+    try {
+        if ($Percent -gt $script:Splash.Bar.Value) { $script:Splash.Bar.Value = [Math]::Min(100, $Percent) }
+        if ($Text) { $script:Splash.Status.Text = $Text }
+        $script:Splash.Window.Dispatcher.Invoke([action] { }, 'Background')   # draws what changed, then carries on
+    }
+    catch { }
+}
+function Close-Splash {
+    if (-not $script:Splash) { return }
+    try { $script:Splash.Window.Close() } catch { }
+    $script:Splash = $null
+}
+
 # The window runs without a console, so any unhandled error is written to a log and shown in a message box.
 $StartupLog = Join-Path ([IO.Path]::GetTempPath()) 'Windows_Manager.log'
 function Write-StartupError {
     param($ErrorRecord)
-    $text = "$(Get-Date -Format 's') $($ErrorRecord.Exception.Message)`r`n$($ErrorRecord.InvocationInfo.PositionMessage)`r`n$($ErrorRecord.ScriptStackTrace)`r`n$($ErrorRecord.Exception.ToString())`r`n"
+    Close-Splash
+    $text ="$(Get-Date -Format 's') $($ErrorRecord.Exception.Message)`r`n$($ErrorRecord.InvocationInfo.PositionMessage)`r`n$($ErrorRecord.ScriptStackTrace)`r`n$($ErrorRecord.Exception.ToString())`r`n"
     try { Add-Content -LiteralPath $StartupLog -Value $text } catch { }
     if (-not $SelfTest) {
         [void][System.Windows.MessageBox]::Show("$AppName hit an unexpected error:`n`n$($ErrorRecord.Exception.Message)`n`nDetails were written to:`n$StartupLog", $AppName, 'OK', 'Error')

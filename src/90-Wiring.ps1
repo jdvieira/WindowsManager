@@ -273,21 +273,31 @@ $Window.Add_Closing({
         $Timer.Stop()
     })
 $Window.Add_Activated({ if (-not $script:Worker -and $Window.TaskbarItemInfo) { $Window.TaskbarItemInfo.ProgressState = 'None' } })
+# What the window does once it's on screen, one step at a time: each step waits behind drawing and clicks, so the
+# window keeps answering between them. The splash goes as soon as the window is on screen.
+$script:StartupSteps = New-Object 'System.Collections.Generic.Queue[scriptblock]'
+function Invoke-StartupStep {
+    if (-not $script:StartupSteps.Count) { return }
+    $step = $script:StartupSteps.Dequeue()
+    try { & $step }
+    catch { try { Add-Content -LiteralPath $StartupLog -Value "$(Get-Date -Format 's') while opening: $($_.Exception.Message)`r`n$($_.ScriptStackTrace)`r`n" } catch { } }
+    # priority first: BeginInvoke(action, 'Background') would hand 'Background' to the action as an argument
+    if ($script:StartupSteps.Count) { [void]$Window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background, [action] { Invoke-StartupStep }) }
+}
 $Window.Add_ContentRendered({
         if ($SelfTest) { return }
-        try { Update-ScheduleSummary } catch { }
-        Show-Starter
-        if ($Settings.ScanOnOpen) { Start-Scan } else { $script:Mode = 'idle'; Update-View }
-        # The installed list also tells Discover what is already on this PC
-        Start-InstalledScan
-        Start-WingetVersion
-        Start-StarterVersions
-        Start-SourceList       # for Export list (each source's details) and the Options panel
-        Limit-History
-        # the tab the app opens on (Device Health) reads its details now
-        if ($Panels[$script:Section] -and $Panels[$script:Section].Open) { & $Panels[$script:Section].Open }
-        Update-View
-        try { if (Test-LegacyTask) { Request-TaskMove } else { Request-TaskCopy } } catch { }
+        Close-Splash
+        $Window.Activate()
+        foreach ($step in @(
+                { try { Update-ScheduleSummary } catch { }; Show-Starter }
+                { if ($Settings.ScanOnOpen) { Start-Scan } else { $script:Mode = 'idle'; Update-View } }
+                # The installed list also tells Discover what is already on this PC
+                { Start-InstalledScan; Start-WingetVersion; Start-StarterVersions; Start-SourceList }   # sources: Export list and Options
+                # the tab the app opens on (Device Health) reads its details now
+                { if ($Panels[$script:Section] -and $Panels[$script:Section].Open) { & $Panels[$script:Section].Open }; Update-View }
+                { try { if (Test-LegacyTask) { Request-TaskMove } else { Request-TaskCopy } } catch { } }
+                { Limit-History })) { $script:StartupSteps.Enqueue($step) }
+        Invoke-StartupStep
     })
 
 # Automatic maintenance panel (each job's buttons are wired where the cards are built, in 70-AutoUpdatesPanel.ps1)

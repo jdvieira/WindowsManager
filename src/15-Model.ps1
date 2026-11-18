@@ -1,8 +1,42 @@
 ﻿# Windows Manager - Model (part of src\; see Windows_Manager.ps1)
 
+# C# the app compiles: the classes below, and the window's dark title bar call (35-Window.ps1). Compiling starts the
+# C# compiler, which takes half a second or more on every start and much longer after the PC has been idle, so the
+# result is kept in DataDir\Cache, named by the source's hash, and later starts just load it. A run as administrator
+# always compiles: it mustn't load a file that a program running without administrator rights could have replaced.
+function Import-AppTypes([string]$Source) {
+    if (-not $IsAdmin) {
+        $dll = $null
+        try {
+            $sha = [Security.Cryptography.SHA256]::Create()
+            $hash = -join @($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($Source))[0..7] | ForEach-Object { $_.ToString('x2') })
+            $sha.Dispose()
+            $dir = Join-Path $DataDir 'Cache'
+            $dll = Join-Path $dir "WingetUM-$hash.dll"
+            if (-not (Test-Path -LiteralPath $dll)) {
+                New-Item -ItemType Directory -Path $dir -Force | Out-Null
+                $tmp = Join-Path $dir "build-$PID.dll"
+                Add-Type -TypeDefinition $Source -OutputAssembly $tmp
+                try { Move-Item -LiteralPath $tmp -Destination $dll -ErrorAction Stop }
+                catch { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }   # another copy got there first
+                # what earlier versions compiled (one a copy still running has loaded stays until next time)
+                Get-ChildItem -LiteralPath $dir -Filter 'WingetUM-*.dll' | Where-Object { $_.FullName -ne $dll } | Remove-Item -Force -ErrorAction SilentlyContinue
+            }
+            [void][Reflection.Assembly]::LoadFrom($dll)
+            if ('WingetUM.Package' -as [type]) { return }
+        }
+        catch {
+            # unreadable or damaged: compiled again next time
+            if ($dll -and -not ('WingetUM.Package' -as [type])) { Remove-Item -LiteralPath $dll -Force -ErrorAction SilentlyContinue }
+        }
+        if ('WingetUM.Package' -as [type]) { return }
+    }
+    Add-Type -TypeDefinition $Source
+}
+
 # A small bindable class, so rows update in place as their state and progress change.
 if (-not ('WingetUM.Package' -as [type])) {
-    Add-Type -TypeDefinition @'
+    Import-AppTypes @'
 using System;
 using System.ComponentModel;
 namespace WingetUM {
@@ -600,6 +634,10 @@ namespace WingetUM {
                 return t ? To : (f ? From : "");
             }
         }
+    }
+    // the window's dark title bar (35-Window.ps1)
+    public class Dwm {
+        [System.Runtime.InteropServices.DllImport("dwmapi.dll")] public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
     }
 }
 '@

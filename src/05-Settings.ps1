@@ -119,39 +119,16 @@ function Limit-History {
     try {
         $lines = Read-HistoryLines
         $cutoff = (Get-Date).AddDays(-365)
-        $keep = @($lines | Where-Object { try { [datetime]($_ | ConvertFrom-Json).Time -ge $cutoff } catch { $false } } | Select-Object -Last 2000)
+        # entries are added oldest first: when there aren't too many and the oldest is recent, there's nothing to drop
+        # (reading every entry takes a moment, and this runs as the window opens)
+        if ($lines.Count -le 2000) {
+            if (-not $lines.Count) { return }
+            try { if ([datetime]($lines[0] | ConvertFrom-Json).Time -ge $cutoff) { return } } catch { }
+        }
+        $keep =@($lines | Where-Object { try { [datetime]($_ | ConvertFrom-Json).Time -ge $cutoff } catch { $false } } | Select-Object -Last 2000)
         if ($keep.Count -ne $lines.Count) { [IO.File]::WriteAllLines($HistoryPath, [string[]]$keep, (New-Object Text.UTF8Encoding($false))) }
     }
     catch { }
-}
-
-# Build-Exe.ps1 fills these with assets\icon.ico and assets\logo.jpg (base64), so the exe needs no other files.
-$EmbeddedIcon = ''
-$EmbeddedLogo = ''
-$AssetsDir = if ($AppRoot) { Join-Path $AppRoot 'assets' } else { $null }
-function Get-AssetBytes([string]$Embedded, [string]$FileName) {
-    if ($Embedded) { return , [Convert]::FromBase64String($Embedded) }
-    if ($AssetsDir) {
-        $file = Join-Path $AssetsDir $FileName
-        if (Test-Path -LiteralPath $file) { return , [IO.File]::ReadAllBytes($file) }
-    }
-    return $null
-}
-# The app's icon (assets\icon.ico, drawn by tools\New-AppIcon.ps1). A window's Icon picks its own sizes from it;
-# -Size returns the smallest frame at least that big (the largest when none is), for the header and notifications.
-function Get-AppIcon([int]$Size) {
-    try {
-        $bytes = Get-AssetBytes $EmbeddedIcon 'icon.ico'
-        if (-not $bytes) { return $null }
-        $f = [System.Windows.Media.Imaging.BitmapFrame]::Create((New-Object IO.MemoryStream(, $bytes)), 'None', 'OnLoad')
-        if ($Size -le 0 -or -not $f.Decoder) { return $f }
-        $all = @($f.Decoder.Frames | Sort-Object PixelWidth)
-        $fit = @($all | Where-Object { $_.PixelWidth -ge $Size }) | Select-Object -First 1
-        if ($fit) { return $fit }
-        return $all[-1]
-    }
-    catch { }
-    return $null
 }
 
 # winget is normally on PATH through its App Execution Alias; an elevated or unusual session may only see the package folder.

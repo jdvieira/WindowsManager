@@ -25,9 +25,12 @@ $parts = @(Get-ChildItem -LiteralPath $srcDir -Filter '*.ps1')
 # ordinal: the numbers in the names set the order, whatever the culture's sorting rules
 [Array]::Sort($parts, [Comparison[object]] { param($a, $b) [string]::CompareOrdinal($a.Name, $b.Name) })
 if (-not $parts.Count) { throw "No source files found in $srcDir." }
+# before each part: Step-Splash with how far through the parts it is, so the splash's bar moves (src\00-Startup.ps1)
+$n = 0
 $text = ($parts | ForEach-Object {
         $body = [IO.File]::ReadAllText($_.FullName)
-        if ($_.Name -like '00-*') { $body } else { "# ==== src\$($_.Name) ====`r`n$body" }
+        $n++
+        if ($_.Name -like '00-*') { $body } else { "# ==== src\$($_.Name) ====`r`nStep-Splash $([int](90 * ($n - 1) / $parts.Count))`r`n$body" }
     }) -join "`r`n"
 
 $buildDir = Join-Path $PSScriptRoot 'dist\build'
